@@ -20,20 +20,22 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Verify Android app module
+        run: |
+          if [ ! -f app/build.gradle ] && [ ! -f app/build.gradle.kts ]; then
+            echo "::error::Missing app/build.gradle. Upload the complete app directory to the repository root."
+            exit 1
+          fi
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-
-      - name: Verify Android app module
-        run: |
-          test -f app/build.gradle -o -f app/build.gradle.kts || {
-            echo "::error::Missing app/build.gradle. Upload the full app folder first."
-            exit 1
-          }
 
       - name: Build debug APK
         run: gradle --no-daemon :app:assembleDebug
