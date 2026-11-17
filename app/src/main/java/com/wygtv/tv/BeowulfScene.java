@@ -7,7 +7,8 @@ import android.view.View;
 /** Resolution-independent artwork for the WygTV home screen. */
 public final class BeowulfScene extends View {
  private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
- public BeowulfScene(Context context){super(context);setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);}
+ private final Bitmap warriors;
+ public BeowulfScene(Context context){super(context);warriors=BitmapFactory.decodeResource(getResources(),R.drawable.wygtv_icon);setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);}
  private void polygon(Canvas c,int color,float... points){paint.setShader(null);paint.setColor(color);paint.setStyle(Paint.Style.FILL);Path p=new Path();p.moveTo(points[0],points[1]);for(int i=2;i<points.length;i+=2)p.lineTo(points[i],points[i+1]);p.close();c.drawPath(p,paint);}
  private void line(Canvas c,int color,float width,float x1,float y1,float x2,float y2){paint.setShader(null);paint.setColor(color);paint.setStrokeWidth(width);c.drawLine(x1,y1,x2,y2,paint);}
  @Override protected void onDraw(Canvas canvas){super.onDraw(canvas);Canvas c=canvas;c.save();c.scale(getWidth()/960f,getHeight()/540f);
@@ -27,6 +28,8 @@ public final class BeowulfScene extends View {
   polygon(c,0xff0A111C,96,470,109,270,122,470);polygon(c,0xff78838B,106,445,109,275,115,445,110,463);
   line(c,0xffB59456,7,83,442,139,442);line(c,0xff8F7447,8,110,443,110,484);
   paint.setColor(0xff101B29);c.drawCircle(177,481,56,paint);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(4);paint.setColor(0xff897247);c.drawCircle(177,481,54,paint);paint.setStyle(Paint.Style.FILL);paint.setColor(0xff9C8252);c.drawCircle(177,481,12,paint);
+  // Beowulf and Wiglaf form a subdued backdrop behind the main choices.
+  paint.setShader(null);paint.setAlpha(110);paint.setFilterBitmap(true);c.drawBitmap(warriors,null,new RectF(425,55,910,540),paint);paint.setAlpha(255);
   paint.setShader(new LinearGradient(0,240,0,540,new int[]{0x00070D17,0xdd070D17},null,Shader.TileMode.CLAMP));c.drawRect(0,230,960,540,paint);
   paint.setShader(new RadialGradient(480,265,510,new int[]{0x17050B13,0x92050B13},null,Shader.TileMode.CLAMP));c.drawRect(0,0,960,540,paint);paint.setShader(null);c.restore();
  }

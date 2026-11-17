@@ -19,13 +19,15 @@ public class MainActivity extends Activity {
   LinearLayout layout=new LinearLayout(this);layout.setOrientation(LinearLayout.VERTICAL);layout.setPadding(dp(36),dp(20),dp(36),dp(18));scene.addView(layout,new FrameLayout.LayoutParams(-1,-1));
   LinearLayout header=new LinearLayout(this);header.setGravity(Gravity.CENTER_VERTICAL);layout.addView(header,new LinearLayout.LayoutParams(-1,dp(52)));
   TextView brand=label("WygTV",32);brand.setTypeface(null,Typeface.BOLD);brand.setTextColor(0xffEACB86);header.addView(brand,new LinearLayout.LayoutParams(0,-1,1));
-  TextView settings=button("Settings / Playlist",header,()->login());settings.setTextSize(16);settings.setLayoutParams(new LinearLayout.LayoutParams(dp(200),dp(48)));
   LinearLayout center=new LinearLayout(this);center.setOrientation(LinearLayout.VERTICAL);center.setGravity(Gravity.CENTER);layout.addView(center,new LinearLayout.LayoutParams(-1,0,1));
   TextView welcome=label("YOUR NEXT SAGA AWAITS",15);welcome.setTextColor(0xffEACB86);welcome.setLetterSpacing(.18f);welcome.setGravity(Gravity.CENTER);center.addView(welcome,new LinearLayout.LayoutParams(-1,dp(35)));
   TextView heading=label("Choose your adventure",30);heading.setTypeface(null,Typeface.BOLD);heading.setGravity(Gravity.CENTER);center.addView(heading,new LinearLayout.LayoutParams(-1,dp(60)));
   LinearLayout tiles=new LinearLayout(this);tiles.setGravity(Gravity.CENTER);center.addView(tiles,new LinearLayout.LayoutParams(-1,dp(135)));
   TextView live=homeTile("▣","Live TV",tiles,()->browse("live"));homeTile("▶","Movies",tiles,()->browse("vod"));homeTile("▤","Series",tiles,()->browse("series"));homeTile("★","Favorites",tiles,()->favorites());
-  status=label("",13);status.setGravity(Gravity.CENTER);status.setTextColor(0xffB4C0D1);layout.addView(status,new LinearLayout.LayoutParams(-1,dp(28)));status.setText(saved("host").isEmpty()?"Connect your playlist in Settings to begin":"Connected • "+saved("title"));live.requestFocus();
+  LinearLayout footer=new LinearLayout(this);footer.setGravity(Gravity.CENTER_VERTICAL);layout.addView(footer,new LinearLayout.LayoutParams(-1,dp(56)));
+  TextView manage=button("Manage Playlist",footer,()->login());manage.setTextSize(16);manage.setGravity(Gravity.CENTER);manage.setLayoutParams(new LinearLayout.LayoutParams(dp(190),dp(48)));
+  status=label("",13);status.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);status.setTextColor(0xffB4C0D1);footer.addView(status,new LinearLayout.LayoutParams(0,-1,1));status.setText(saved("host").isEmpty()?"Connect your playlist to begin":"Connected • "+saved("title"));
+  manage.setId(View.generateViewId());live.setId(View.generateViewId());for(int i=0;i<tiles.getChildCount();i++)tiles.getChildAt(i).setNextFocusDownId(manage.getId());manage.setNextFocusUpId(live.getId());live.requestFocus();
  }
  TextView homeTile(String icon,String title,LinearLayout parent,Runnable action){
   TextView tile=label(icon+"\n"+title,24);tile.setGravity(Gravity.CENTER);tile.setTypeface(null,Typeface.BOLD);tile.setFocusable(true);tile.setClickable(true);tile.setBackground(homeTileBackground(false));
