@@ -3,7 +3,9 @@ name: Build WygTV Android TV APK
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [app, main, "codex/**"]
+  pull_request:
+    branches: [app, main]
 
 jobs:
   build:
@@ -37,8 +39,8 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Build debug APK
-        run: gradle --no-daemon :app:assembleDebug
+      - name: Check and build debug APK
+        run: gradle --no-daemon :app:lintDebug :app:testDebugUnitTest :app:assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -46,3 +48,12 @@ jobs:
           name: WygTV-AndroidTV-debug-APK
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
+
+      - name: Upload check reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: WygTV-check-reports
+          path: app/build/reports/
+          if-no-files-found: ignore
