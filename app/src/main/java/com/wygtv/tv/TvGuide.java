@@ -126,7 +126,7 @@ final class TvGuide {
         bar.addView(clock, new LinearLayout.LayoutParams(-2, -1));
         a.root.addView(bar, 0, new LinearLayout.LayoutParams(-1, a.dp(44)));
         a.status.setLayoutParams(new LinearLayout.LayoutParams(-1, a.dp(24)));
-        a.status.setText("OK  Watch full screen      ◀ ▶  Move through time      ▲ ▼  Change channel      ▲ from the top  Pick Favorites or a category      BACK  Live TV");
+        a.status.setText("OK  Watch full screen      ◀ ▶  Move through time      ▲ ▼  Change channel      ◀ to ☆  Favorite      ▲ from the top  Pick Favorites or a category      BACK  Live TV");
 
         int screenW = a.getResources().getDisplayMetrics().widthPixels;
         chanW = a.dp(200);
@@ -279,6 +279,28 @@ final class TvGuide {
         if (ch == null) return;
         LinearLayout row = new LinearLayout(a);
         rows.addView(row, new LinearLayout.LayoutParams(-1, a.dp(40)));
+        // Star at the start of the row: Left from the first programme reaches it, OK adds or removes the favorite.
+        final String sid = ch.optString("stream_id"), chName = ch.optString("name", "Channel");
+        TextView star = text(a.isFavorite("live", sid) ? "★" : "☆", 20, a.isFavorite("live", sid) ? Theme.ACCENT : Theme.MUTED, true);
+        star.setGravity(Gravity.CENTER);
+        star.setFocusable(true);
+        star.setClickable(true);
+        star.setContentDescription("Favorite");
+        star.setBackground(rowBg(false));
+        star.setOnFocusChangeListener((v, f) -> {
+            star.setBackground(rowBg(f));
+            star.setTextColor(f ? Theme.INK : a.isFavorite("live", sid) ? Theme.ACCENT : Theme.MUTED);
+        });
+        star.setOnClickListener(v -> {
+            String ext = ch.optString("container_extension", "ts");
+            boolean added = a.toggleFavorite("live", sid, chName, ext.isEmpty() ? "ts" : ext);
+            star.setText(added ? "★" : "☆");
+            if (!star.hasFocus()) star.setTextColor(added ? Theme.ACCENT : Theme.MUTED);
+            android.widget.Toast.makeText(a, added ? "★ Added to Favorites" : "Removed from Favorites", android.widget.Toast.LENGTH_SHORT).show();
+        });
+        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(a.dp(36), -1);
+        sp.setMargins(0, a.dp(2), a.dp(4), a.dp(2));
+        row.addView(star, sp);
         String num = ch.optString("num", "");
         TextView name = text((num.isEmpty() || num.equals("0") ? "" : num + "   ") + ch.optString("name", "Channel"), 14, Theme.TEXT, true);
         name.setSingleLine(true);
@@ -286,7 +308,7 @@ final class TvGuide {
         name.setPadding(a.dp(12), 0, a.dp(8), 0);
         name.setBackground(rowBg(false));
         ChannelIcons.attach(name, ch.optString("stream_icon"), ch.optString("name", "Channel"), 24);
-        LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(chanW, -1);
+        LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(chanW - a.dp(40), -1);
         np.setMargins(0, a.dp(2), a.dp(8), a.dp(2));
         row.addView(name, np);
         LinearLayout cells = new LinearLayout(a);
