@@ -25,8 +25,11 @@ import java.net.URI;
  */
 final class Menus {
 
-    static final String[] START_KEYS = {"home", "live", "guide", "favorites", "recent", "last"};
-    static final String[] START_LABELS = {"Home", "Live TV", "TV Guide", "Favorites", "Recently watched", "Last channel watched"};
+    static final String[] START_KEYS = {"home", "live", "guide", "last", "favorites", "recent"};
+    static final String[] START_LABELS = {"Home", "Live TV", "TV Guide", "Last channel watched (CH+/CH- go through Favorites)", "Favorites", "Recently watched"};
+    /** In Live TV only mode the app starts on the guide or straight on the last channel. */
+    static final String[] START_KEYS_LIVE = {"guide", "last"};
+    static final String[] START_LABELS_LIVE = {"TV Guide", "Last channel watched (CH+/CH- go through Favorites)"};
     static final String[] FORMAT_KEYS = {"auto", "ts", "m3u8"};
     static final String[] FORMAT_LABELS = {"Automatic (provider default)", "MPEG-TS (.ts)", "HLS (.m3u8)"};
 
@@ -297,9 +300,10 @@ final class Menus {
                     settings(a, themeRow);
                 }));
         final int startRow = list.getChildCount();
-        if (!liveOnly) row(a, list, "Open at start-up", START_LABELS[indexOf(START_KEYS, a.prefs.getString("start_screen", "home"))], () ->
-                choose(a, "Open at start-up", START_LABELS, indexOf(START_KEYS, a.prefs.getString("start_screen", "home")), i -> {
-                    a.prefs.edit().putString("start_screen", START_KEYS[i]).apply();
+        final String[] startKeys = liveOnly ? START_KEYS_LIVE : START_KEYS, startLabels = liveOnly ? START_LABELS_LIVE : START_LABELS;
+        row(a, list, "Open at start-up", startLabels[indexOf(startKeys, a.prefs.getString("start_screen", "home"))], () ->
+                choose(a, "Open at start-up", startLabels, indexOf(startKeys, a.prefs.getString("start_screen", "home")), i -> {
+                    a.prefs.edit().putString("start_screen", startKeys[i]).apply();
                     settings(a, startRow);
                 }));
         final int formatRow = list.getChildCount();
