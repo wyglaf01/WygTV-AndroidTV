@@ -55,6 +55,15 @@ final class NavRail {
         rail.setPadding(a.dp(8), a.dp(16), a.dp(8), a.dp(12));
         rail.setBackground(background(false));
         boolean m3u = a.library.activeIsM3u();
+        if (a.liveOnly()) {
+            // Live TV only (Settings → App mode): the guide is the main screen, plus Live TV and Settings.
+            add("▦", "TV Guide", "guide", current, () -> a.openGuide(null));
+            add("▣", "Live TV", "live", current, () -> a.browse("live"));
+            rail.addView(new View(a), new LinearLayout.LayoutParams(-1, 0, 1));
+            add("⚙", "Settings", "settings", current, () -> a.settings());
+            lockEnds();
+            return;
+        }
         add("⌂", "Home", "home", current, () -> a.home());
         add("▣", "Live TV", "live", current, () -> a.browse("live"));
         add("▦", "TV Guide", "guide", current, () -> a.openGuide(null));
@@ -62,13 +71,15 @@ final class NavRail {
             add("▶", "Movies", "vod", current, () -> a.browse("vod"));
             add("▤", "Series", "series", current, () -> a.browse("series"));
         }
-        add("★", "Favorites", "favorites", current, () -> a.favorites());
         add("↺", "Recently watched", "recent", current, () -> a.recent());
-        add("⌕", "Search", "search", current, () -> a.searchLive());
         rail.addView(new View(a), new LinearLayout.LayoutParams(-1, 0, 1));
         add("☰", "Playlists", "playlists", current, () -> a.playlists());
         add("⚙", "Settings", "settings", current, () -> a.settings());
-        // Up from the top item and Down from the bottom one stay in the menu.
+        lockEnds();
+    }
+
+    /** Up from the top item and Down from the bottom one stay in the menu. */
+    private void lockEnds() {
         if (!items.isEmpty()) {
             TextView top = items.get(0), bottom = items.get(items.size() - 1);
             top.setId(View.generateViewId());
