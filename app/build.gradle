@@ -1,8 +1,21 @@
 plugins { id 'com.android.application' }
 android { namespace 'com.wygtv.tv'; compileSdk 35
-    defaultConfig { applicationId 'com.wygtv.tv'; minSdk 23; targetSdk 28; versionCode 1; versionName '1.0-TV' }
+    defaultConfig { applicationId 'com.wygtv.tv'; minSdk 23; targetSdk 28; versionCode((System.getenv('GITHUB_RUN_NUMBER') ?: '1') as int); versionName '1.0-TV' }
     // Preserve the existing sideloaded TV runtime behavior; Play target migration needs device testing.
     lint { warning 'ExpiredTargetSdkVersion' }
+    // Permanent WygTV signing key, given to CI as GitHub secrets (never committed), so each
+    // new build installs over the last one. Local builds without it keep the normal debug key.
+    def wygtvKey = System.getenv('WYGTV_KEYSTORE')
+    if (wygtvKey && file(wygtvKey).exists()) {
+        signingConfigs {
+            wygtv {
+                storeFile file(wygtvKey); storeType 'pkcs12'
+                storePassword System.getenv('WYGTV_KEY_PASSWORD')
+                keyAlias 'wygtv'; keyPassword System.getenv('WYGTV_KEY_PASSWORD')
+            }
+        }
+        buildTypes { debug { signingConfig signingConfigs.wygtv } }
+    }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
 dependencies { testImplementation 'junit:junit:4.13.2'; implementation 'androidx.media3:media3-exoplayer:1.5.1'; implementation 'androidx.media3:media3-ui:1.5.1' }
