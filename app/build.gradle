@@ -1,9 +1,3 @@
-plugins { id 'com.android.application' }
-android { namespace 'com.wygtv.tv'; compileSdk 35
-    defaultConfig { applicationId 'com.wygtv.tv'; minSdk 23; targetSdk 28; versionCode 1; versionName '1.0-TV' }
-    // Preserve the existing sideloaded TV runtime behavior; Play target migration needs device testing.
-    lint { warning 'ExpiredTargetSdkVersion' }
-    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
-}
-dependencies { testImplementation 'junit:junit:4.13.2'; implementation 'androidx.media3:media3-exoplayer:1.5.1'; implementation 'androidx.media3:media3-ui:1.5.1' }
-
+plugins { id "com.android.application" }
+android { namespace "com.xtream.tabletplayer"; compileSdk 35
+ defaultConfig { applicationId "com.xtream.tabletplayer"; minSdk 23; targetSdk 28; versionCode 11; versionName "2.0" } }
