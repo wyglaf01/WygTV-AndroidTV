@@ -323,6 +323,8 @@ final class Menus {
             new AlertDialog.Builder(a).setTitle("Clear Recently watched?").setPositiveButton("Clear", (d, w) -> { a.library.clearRecent(); settings(a, recentRow); })
                     .setNegativeButton("Cancel", null).show();
         });
+        row(a, list, "Back up playlists", "save playlists, favorites, hidden items and settings to a dated WygTV backup file", () -> Backup.backup(a));
+        row(a, list, "Restore from a backup", "reload everything from a WygTV backup file", () -> Backup.restore(a));
         String version = "";
         try { version = a.getPackageManager().getPackageInfo(a.getPackageName(), 0).versionName; } catch (Exception ignored) { }
         final String about = "WygTV " + version + " for Android TV";
