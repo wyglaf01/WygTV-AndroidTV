@@ -96,7 +96,7 @@ final class VirtualCategories {
     }
 
     static void delete(MainActivity a, String id, Runnable then) {
-        new AlertDialog.Builder(a).setTitle("Delete \"" + name(a, id) + "\"?")
+        new Dialogs.Builder(a).setTitle("Delete \"" + name(a, id) + "\"?")
                 .setMessage("Only the category goes. The channels stay in their playlists.")
                 .setPositiveButton("Delete", (d, w) -> {
                     JSONArray l = all(a), out = new JSONArray();
@@ -119,7 +119,7 @@ final class VirtualCategories {
         FrameLayout box = new FrameLayout(a);
         box.setPadding(a.dp(20), a.dp(8), a.dp(20), 0);
         box.addView(field);
-        new AlertDialog.Builder(a).setTitle(title).setView(box)
+        new Dialogs.Builder(a).setTitle(title).setView(box)
                 .setPositiveButton("Save", (d, w) -> {
                     String name = field.getText().toString().trim();
                     if (name.isEmpty()) { Toast.makeText(a, "Type a name first.", Toast.LENGTH_SHORT).show(); return; }
@@ -144,7 +144,7 @@ final class VirtualCategories {
             labels.add((contains(c, playlist, sid) ? "✓  " : "      ") + c.optString("name"));
         }
         labels.add("+  New category…");
-        new AlertDialog.Builder(a).setTitle("Add \"" + item.optString("name", "channel") + "\" to")
+        new Dialogs.Builder(a).setTitle("Add \"" + item.optString("name", "channel") + "\" to")
                 .setItems(labels.toArray(new String[0]), (d, w) -> {
                     if (w == cats.size()) { create(a, cat -> toggle(a, cat, item, playlist)); return; }
                     toggle(a, cats.get(w), item, playlist);
@@ -187,7 +187,7 @@ final class VirtualCategories {
         String title = item.optString("name", "Untitled"), playlist = item.optString("playlist");
         JSONObject p = a.library.find(playlist);
         String from = p == null ? "a removed playlist" : p.optString("title").isEmpty() ? Menus.hostOf(p.optString(Library.M3U.equals(p.optString("type")) ? "url" : "host")) : p.optString("title");
-        new AlertDialog.Builder(a).setTitle(title + "   (" + from + ")")
+        new Dialogs.Builder(a).setTitle(title + "   (" + from + ")")
                 .setItems(new String[]{"Play", "Program guide", "Remove from \"" + name(a, categoryId) + "\"", "Close"}, (d, w) -> {
                     if (w == 0 || w == 1) {
                         if (!useItsPlaylist(a, item)) return;

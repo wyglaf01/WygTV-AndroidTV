@@ -126,11 +126,11 @@ final class Menus {
     private static void playlistActions(MainActivity a, JSONObject p) {
         boolean on = p.optString("id").equals(a.library.activeId());
         String[] items = {on ? "Go to Home" : "Watch this playlist", "Edit", "Refresh now", "Delete"};
-        new AlertDialog.Builder(a).setTitle(p.optString("title", "Playlist")).setItems(items, (d, which) -> {
+        new Dialogs.Builder(a).setTitle(p.optString("title", "Playlist")).setItems(items, (d, which) -> {
             if (which == 0) { a.switchPlaylist(p); a.home(); }
             else if (which == 1) { if (Library.M3U.equals(p.optString("type"))) m3uForm(a, p); else xtreamForm(a, p, null); }
             else if (which == 2) refresh(a, p);
-            else new AlertDialog.Builder(a).setTitle("Delete “" + p.optString("title", "Playlist") + "”?")
+            else new Dialogs.Builder(a).setTitle("Delete “" + p.optString("title", "Playlist") + "”?")
                         .setMessage("Its favorites stay saved, so they come back if you add the same playlist again.")
                         .setPositiveButton("Delete", (d2, w2) -> {
                             a.library.remove(p.optString("id"));
@@ -230,7 +230,7 @@ final class Menus {
             if (!(link.startsWith("http://") || link.startsWith("https://"))) { alert(a, "Enter a link that starts with http:// or https://."); return; }
             String[] xt = M3u.xtreamLogin(link);
             if (xt != null && existing == null) {
-                new AlertDialog.Builder(a).setTitle("This is an Xtream Codes link")
+                new Dialogs.Builder(a).setTitle("This is an Xtream Codes link")
                         .setMessage("Adding it as Xtream Codes also gives you Movies, Series and the provider's TV guide.")
                         .setPositiveButton("Add as Xtream", (d, w) -> xtreamForm(a, null, xt))
                         .setNegativeButton("Keep as M3U", (d, w) -> loadM3u(a, existing, title.getText().toString().trim(), link, epg.getText().toString().trim()))
@@ -323,14 +323,14 @@ final class Menus {
         int hidden = a.hiddenCount();
         row(a, list, "Hidden categories and channels", hidden == 0 ? "nothing hidden" : hidden + " hidden  •  press OK to show them all again", () -> {
             if (a.hiddenCount() == 0) { Toast.makeText(a, "Nothing is hidden.", Toast.LENGTH_SHORT).show(); return; }
-            new AlertDialog.Builder(a).setTitle("Show everything again?").setMessage("Every hidden category and channel in this playlist comes back.")
+            new Dialogs.Builder(a).setTitle("Show everything again?").setMessage("Every hidden category and channel in this playlist comes back.")
                     .setPositiveButton("Show all", (d, w) -> { a.unhideAll(); settings(a, hiddenRow); }).setNegativeButton("Cancel", null).show();
         });
         final int recentRow = list.getChildCount();
         int recent = a.library.recent().length();
         row(a, list, "Recently watched", recent == 0 ? "empty" : recent + " items  •  press OK to clear", () -> {
             if (a.library.recent().length() == 0) return;
-            new AlertDialog.Builder(a).setTitle("Clear Recently watched?").setPositiveButton("Clear", (d, w) -> { a.library.clearRecent(); settings(a, recentRow); })
+            new Dialogs.Builder(a).setTitle("Clear Recently watched?").setPositiveButton("Clear", (d, w) -> { a.library.clearRecent(); settings(a, recentRow); })
                     .setNegativeButton("Cancel", null).show();
         });
         row(a, list, "Back up playlists", "save playlists, favorites, your categories, My List, hidden items and all settings to a dated WygTV backup file", () -> Backup.backup(a));
@@ -357,7 +357,7 @@ final class Menus {
         input.setText(active.optString("epg"));
         input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
         boolean m3u = Library.M3U.equals(active.optString("type"));
-        new AlertDialog.Builder(a).setTitle("TV guide (XMLTV) link for this playlist")
+        new Dialogs.Builder(a).setTitle("TV guide (XMLTV) link for this playlist")
                 .setMessage(m3u ? "Leave empty to use the guide the playlist names, if it has one." : "Leave empty to use the provider's own guide.")
                 .setView(input)
                 .setPositiveButton("Save", (d, w) -> {
@@ -411,13 +411,13 @@ final class Menus {
             });
             row.setTag(id);
             row.setOnLongClickListener(v -> {
-                new AlertDialog.Builder(a).setTitle(title).setItems(new String[]{"Remove from this list", "Cancel"}, (d, w) -> {
+                new Dialogs.Builder(a).setTitle(title).setItems(new String[]{"Remove from this list", "Cancel"}, (d, w) -> {
                     if (w == 0) { a.library.removeRecent(type, id); recent(a); }
                 }).show();
                 return true;
             });
         }
-        a.button("Clear the list", list, () -> new AlertDialog.Builder(a).setTitle("Clear Recently watched?")
+        a.button("Clear the list", list, () -> new Dialogs.Builder(a).setTitle("Clear Recently watched?")
                 .setPositiveButton("Clear", (d, w) -> { a.library.clearRecent(); recent(a); }).setNegativeButton("Cancel", null).show());
         if (!a.focusResume(list)) list.getChildAt(1).requestFocus();
     }
@@ -449,7 +449,7 @@ final class Menus {
     interface Pick { void run(int index); }
 
     private static void choose(MainActivity a, String title, String[] labels, int current, Pick pick) {
-        new AlertDialog.Builder(a).setTitle(title).setSingleChoiceItems(labels, current, (d, which) -> { d.dismiss(); pick.run(which); })
+        new Dialogs.Builder(a).setTitle(title).setSingleChoiceItems(labels, current, (d, which) -> { d.dismiss(); pick.run(which); })
                 .setNegativeButton("Cancel", null).show();
     }
 
@@ -459,6 +459,6 @@ final class Menus {
     }
 
     static void alert(MainActivity a, String message) {
-        new AlertDialog.Builder(a).setMessage(message).setPositiveButton("OK", null).show();
+        new Dialogs.Builder(a).setMessage(message).setPositiveButton("OK", null).show();
     }
 }
