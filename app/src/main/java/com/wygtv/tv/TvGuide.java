@@ -75,13 +75,17 @@ final class TvGuide {
     private LinearLayout timeHeader, rows;
     private View nowLine;
 
-    static void open(MainActivity a) {
+    static void open(MainActivity a) { open(a, null); }
+
+    /** Opens the guide on the current channel list, starting on the given channel when there is one. */
+    static void open(MainActivity a, String focusStreamId) {
         String title = "";
         for (int i = 0; i < a.categories.length(); i++) {
             JSONObject c = a.categories.optJSONObject(i);
             if (c != null && c.optString("category_id").equals(a.category)) title = c.optString("category_name");
         }
         a.tvGuide = new TvGuide(a, a.items, title);
+        if (focusStreamId != null) a.tvGuide.focusStream(focusStreamId);
         a.tvGuide.show();
     }
 
@@ -600,8 +604,16 @@ final class TvGuide {
         focusRow = row;
         releasePreview();
         a.playerReturn = this::show;
+        a.zapList = channels; // CH+/CH- in the player follow the guide's channel order
         String ext = ch.optString("container_extension", "ts");
         a.play("live", streamId(row), ext.isEmpty() ? "ts" : ext, ch.optString("name", "Channel"));
+    }
+
+    /** Start on this channel the next time the guide is shown (used after zapping in the player). */
+    void focusStream(String id) {
+        for (int i = 0; i < channels.length(); i++) {
+            if (id != null && id.equals(streamId(i))) { focusRow = i; page = i / PAGE; return; }
+        }
     }
 
     /** Activity went to the background: stop the preview so it doesn't keep playing or hold the connection. */
