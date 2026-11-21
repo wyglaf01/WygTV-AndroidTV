@@ -14,7 +14,9 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.media3.common.MediaItem;
+import androidx.annotation.OptIn;
 import androidx.media3.common.Player;
+import androidx.media3.common.util.UnstableApi;
 import androidx.media3.ui.PlayerView;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -28,6 +30,7 @@ import org.json.JSONObject;
  * List screens: CH+/CH- and Page keys jump ten rows, Menu opens a row's options, Guide and Search jump
  * straight to the TV guide and channel search.
  */
+@OptIn(markerClass = UnstableApi.class) // PlayerView controller show/hide/visibility calls
 final class TvRemote {
     private static final int BANNER_MS = 5000, NUMBER_MS = 1800, LIST_JUMP = 10;
     private static final long SEEK_SHORT_MS = 10_000, SEEK_LONG_MS = 30_000;
