@@ -59,12 +59,17 @@ jobs:
         run: |
           mkdir -p dist
           cp app/build/outputs/apk/debug/*.apk dist/wygtv.apk
+          # WygTV's in-app updater reads this to know whether a newer build exists.
+          echo "{\"versionCode\": ${GITHUB_RUN_NUMBER}, \"versionName\": \"1.0.${GITHUB_RUN_NUMBER}\"}" > dist/version.json
+          cat dist/version.json
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: wygtv
-          path: dist/wygtv.apk
+          path: |
+            dist/wygtv.apk
+            dist/version.json
           if-no-files-found: error
 
 
@@ -110,4 +115,4 @@ jobs:
           else
             gh release create "$TAG" --title "WygTV (latest build)" --notes "$NOTES" --latest
           fi
-          gh release upload "$TAG" dist/wygtv.apk --clobber
+          gh release upload "$TAG" dist/wygtv.apk dist/version.json --clobber
