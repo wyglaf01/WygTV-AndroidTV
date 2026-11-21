@@ -46,6 +46,8 @@ final class TvGuide {
 
     private final MainActivity a;
     private final JSONArray channels;
+    /** True when the list holds channels from more than one playlist (Favorites or your own categories); rows then name their playlist. */
+    private final boolean mixed;
     private final String categoryTitle;
     private final Map<String, List<EpgGrid.Program>> epg = new HashMap<>();
     private final Set<String> requested = new HashSet<>();
@@ -88,6 +90,9 @@ final class TvGuide {
         this.a = a;
         this.channels = channels;
         this.categoryTitle = categoryTitle;
+        java.util.Set<String> from = new java.util.HashSet<>();
+        for (int i = 0; i < channels.length(); i++) { JSONObject o = channels.optJSONObject(i); if (o != null) from.add(o.optString("playlist").isEmpty() ? a.library.activeId() : o.optString("playlist")); }
+        mixed = from.size() > 1;
         winStart = EpgGrid.windowStart(now());
         focusTime = now();
     }
@@ -98,7 +103,13 @@ final class TvGuide {
 
     void show() {
         a.mode = "guide";
-        a.shell(categoryTitle.isEmpty() ? "TV GUIDE" : "TV GUIDE • " + categoryTitle);
+        String single = "";
+        if (!mixed && a.library.all().length() > 1) {
+            JSONObject first = channels.optJSONObject(0);
+            JSONObject other = first == null ? null : otherPlaylist(0);
+            single = "  •  " + Library.nameOf(other != null ? other : a.library.find(a.library.activeId()));
+        }
+        a.shell((categoryTitle.isEmpty() ? "TV GUIDE" : "TV GUIDE • " + categoryTitle) + single);
         shownRoot = a.root;
         session++;
         pool = Executors.newFixedThreadPool(3);
@@ -280,8 +291,8 @@ final class TvGuide {
         LinearLayout row = new LinearLayout(a);
         rows.addView(row, new LinearLayout.LayoutParams(-1, a.dp(40)));
         // Star at the start of the row: Left from the first programme reaches it, OK adds or removes the favorite.
-        final String sid = ch.optString("stream_id"), chName = ch.optString("name", "Channel");
-        TextView star = text(a.isFavorite("live", sid) ? "★" : "☆", 20, a.isFavorite("live", sid) ? Theme.ACCENT : Theme.MUTED, true);
+        final String sid = ch.optString("stream_id"), chName = ch.optString("name", "Channel"), pre = prefixOf(i);
+        TextView star = text(a.isFavoriteIn(pre, "live", sid) ? "★" : "☆", 20, a.isFavoriteIn(pre, "live", sid) ? Theme.ACCENT : Theme.MUTED, true);
         star.setGravity(Gravity.CENTER);
         star.setFocusable(true);
         star.setClickable(true);
@@ -289,11 +300,11 @@ final class TvGuide {
         star.setBackground(rowBg(false));
         star.setOnFocusChangeListener((v, f) -> {
             star.setBackground(rowBg(f));
-            star.setTextColor(f ? Theme.INK : a.isFavorite("live", sid) ? Theme.ACCENT : Theme.MUTED);
+            star.setTextColor(f ? Theme.INK : a.isFavoriteIn(pre, "live", sid) ? Theme.ACCENT : Theme.MUTED);
         });
         star.setOnClickListener(v -> {
             String ext = ch.optString("container_extension", "ts");
-            boolean added = a.toggleFavorite("live", sid, chName, ext.isEmpty() ? "ts" : ext);
+            boolean added = a.toggleFavoriteIn(pre, "live", sid, chName, ext.isEmpty() ? "ts" : ext);
             star.setText(added ? "★" : "☆");
             if (!star.hasFocus()) star.setTextColor(added ? Theme.ACCENT : Theme.MUTED);
             android.widget.Toast.makeText(a, added ? "★ Added to Favorites" : "Removed from Favorites", android.widget.Toast.LENGTH_SHORT).show();
@@ -302,8 +313,21 @@ final class TvGuide {
         sp.setMargins(0, a.dp(2), a.dp(4), a.dp(2));
         row.addView(star, sp);
         String num = ch.optString("num", "");
-        TextView name = text((num.isEmpty() || num.equals("0") ? "" : num + "   ") + ch.optString("name", "Channel"), 14, Theme.TEXT, true);
+        String label = (num.isEmpty() || num.equals("0") || mixed ? "" : num + "   ") + ch.optString("name", "Channel");
+        TextView name = text(label, 14, Theme.TEXT, true);
         name.setSingleLine(true);
+        if (mixed) {
+            // Channels from more than one playlist: a small second line says which one.
+            String from = Library.nameOf(otherPlaylist(i) != null ? otherPlaylist(i) : a.library.find(a.library.activeId()));
+            android.text.SpannableString two = new android.text.SpannableString(label + "\n" + from);
+            two.setSpan(new android.text.style.RelativeSizeSpan(.72f), label.length() + 1, two.length(), 0);
+            two.setSpan(new android.text.style.ForegroundColorSpan(Theme.MUTED), label.length() + 1, two.length(), 0);
+            two.setSpan(new android.text.style.StyleSpan(Typeface.NORMAL), label.length() + 1, two.length(), 0);
+            name.setSingleLine(false);
+            name.setMaxLines(2);
+            name.setLineSpacing(0, .9f);
+            name.setText(two);
+        }
         name.setEllipsize(TextUtils.TruncateAt.END);
         name.setPadding(a.dp(12), 0, a.dp(8), 0);
         name.setBackground(rowBg(false));
@@ -328,7 +352,7 @@ final class TvGuide {
         rebuilding = true;
         cells.removeAllViews();
         long winEnd = winStart + EpgGrid.WINDOW;
-        List<EpgGrid.Program> progs = epg.get(streamId(i));
+        List<EpgGrid.Program> progs = epg.get(key(i));
         List<EpgGrid.Cell> list = progs == null
                 ? Collections.singletonList(new EpgGrid.Cell(winStart, winEnd, null))
                 : EpgGrid.cells(progs, winStart, winEnd);
@@ -484,7 +508,7 @@ final class TvGuide {
         String name = ch.optString("name", "Channel"), num = ch.optString("num", "");
         infoChannel.setText(((num.isEmpty() || num.equals("0")) ? "" : num + " · ") + name.toUpperCase(java.util.Locale.getDefault()));
         previewLabel.setText(name + " · live preview");
-        List<EpgGrid.Program> progs = epg.get(streamId(row));
+        List<EpgGrid.Program> progs = epg.get(key(row));
         EpgGrid.Program p = c.program;
         long n = now();
         if (p == null) {
@@ -531,18 +555,39 @@ final class TvGuide {
         return ch == null ? "" : ch.optString("stream_id");
     }
 
+    /** The channel's playlist when it isn't the active one, else null. */
+    private JSONObject otherPlaylist(int row) {
+        JSONObject ch = channels.optJSONObject(row);
+        String pid = ch == null ? "" : ch.optString("playlist");
+        return pid.isEmpty() || pid.equals(a.library.activeId()) ? null : a.library.find(pid);
+    }
+
+    /** Where this channel's favorite is saved: its own playlist's prefix. */
+    private String prefixOf(int row) {
+        JSONObject p = otherPlaylist(row);
+        return p == null ? a.accountPrefix() : Library.prefixOf(p);
+    }
+
+    /** Playlist + channel id, since two providers can use the same channel number. */
+    private String key(int row) {
+        JSONObject ch = channels.optJSONObject(row);
+        String pid = ch == null ? "" : ch.optString("playlist");
+        return (pid.isEmpty() ? a.library.activeId() : pid) + "|" + streamId(row);
+    }
+
     private void requestEpg(int row) {
-        String id = streamId(row);
-        if (id.isEmpty() || pool == null || epg.containsKey(id) || !requested.add(id)) return;
+        String sid = streamId(row), id = key(row);
+        if (sid.isEmpty() || pool == null || epg.containsKey(id) || !requested.add(id)) return;
         final int s = session;
-        final String action = "get_short_epg&stream_id=" + a.enc(id) + "&limit=12";
+        final JSONObject other = otherPlaylist(row);
+        final String action = "get_short_epg&stream_id=" + a.enc(sid) + "&limit=12";
         pool.execute(() -> {
             List<EpgGrid.Program> progs = new ArrayList<>();
             try {
                 // Provider guide, the playlist's XMLTV guide, or the guide link set in Settings.
                 {
                     if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
-                    JSONArray list = a.apiBlocking(action).optJSONArray("epg_listings");
+                    JSONArray list = (other == null ? a.apiBlocking(action) : a.library.epgFor(other, action)).optJSONArray("epg_listings");
                     TimeZone tz = TimeZone.getDefault();
                     if (list != null) for (int k = 0; k < list.length(); k++) {
                         JSONObject e = list.optJSONObject(k);
@@ -563,7 +608,7 @@ final class TvGuide {
                 epg.put(id, clean);
                 requested.remove(id);
                 if (s != session) return;
-                for (int k = 0; k < rowCells.size(); k++) if (streamId(rowCells.keyAt(k)).equals(id)) fillRow(rowCells.keyAt(k));
+                for (int k = 0; k < rowCells.size(); k++) if (key(rowCells.keyAt(k)).equals(id)) fillRow(rowCells.keyAt(k));
             });
         });
     }
@@ -574,7 +619,8 @@ final class TvGuide {
         JSONObject ch = channels.optJSONObject(row);
         String ext = ch == null ? "ts" : ch.optString("container_extension", "ts");
         if (ext.isEmpty()) ext = "ts";
-        return a.streamUrl("live", streamId(row), ext);
+        JSONObject other = otherPlaylist(row);
+        return other == null ? a.streamUrl("live", streamId(row), ext) : a.library.streamUrlFor(other, streamId(row), ext);
     }
 
     private void schedulePreview(int row) {
@@ -585,8 +631,19 @@ final class TvGuide {
     }
 
     private void startPreview(int row) {
-        String id = streamId(row);
-        if (id.isEmpty() || (preview != null && id.equals(previewId))) return;
+        String id = key(row);
+        if (streamId(row).isEmpty() || (preview != null && id.equals(previewId))) return;
+        String url = streamUrl(row);
+        if (url == null) {
+            // A channel from another M3U playlist: read that playlist first, then preview.
+            JSONObject other = otherPlaylist(row);
+            final int s = session;
+            if (other != null && pool != null) pool.execute(() -> {
+                try { a.library.m3uOf(other); } catch (Exception e) { return; }
+                ui.post(() -> { if (s == session && focusRow == row) startPreview(row); });
+            });
+            return;
+        }
         previewId = id;
         previewError.setVisibility(View.GONE);
         if (preview == null) {
@@ -596,7 +653,7 @@ final class TvGuide {
                 @Override public void onPlayerError(PlaybackException error) { previewError.setVisibility(View.VISIBLE); }
             });
         }
-        preview.setMediaItem(MediaItem.fromUri(streamUrl(row)));
+        preview.setMediaItem(MediaItem.fromUri(url));
         preview.prepare();
         preview.play();
     }
@@ -616,8 +673,20 @@ final class TvGuide {
         if (ch == null) return;
         focusRow = row;
         releasePreview();
+        // A channel from another playlist: switch to it first (the guide keeps its list), and zap only within that playlist.
+        String pid = ch.optString("playlist");
+        JSONArray zap = channels;
+        if (mixed) {
+            String want = pid.isEmpty() ? a.library.activeId() : pid;
+            zap = new JSONArray();
+            for (int k = 0; k < channels.length(); k++) { JSONObject o = channels.optJSONObject(k); if (o != null && (o.optString("playlist").isEmpty() ? a.library.activeId() : o.optString("playlist")).equals(want)) zap.put(o); }
+        }
+        if (otherPlaylist(row) != null) {
+            if (!VirtualCategories.useItsPlaylist(a, ch)) return;
+            a.tvGuide = this;
+        }
         a.playerReturn = this::show;
-        a.zapList = channels; // CH+/CH- in the player follow the guide's channel order
+        a.zapList = zap; // CH+/CH- in the player follow the guide's channel order
         String ext = ch.optString("container_extension", "ts");
         a.play("live", streamId(row), ext.isEmpty() ? "ts" : ext, ch.optString("name", "Channel"));
     }

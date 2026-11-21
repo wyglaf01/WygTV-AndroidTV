@@ -224,15 +224,7 @@ final class Library {
     JSONArray liveChannelsOf(JSONObject p) throws Exception {
         JSONArray raw = new JSONArray();
         if (M3U.equals(p.optString("type"))) {
-            String url = p.optString("url");
-            File f = m3uFile(url);
-            String text = f.exists() ? readFile(f) : null;
-            if (text == null || !M3u.looksLikePlaylist(text)) {
-                text = download(url, 60000);
-                if (!M3u.looksLikePlaylist(text)) throw new IllegalStateException("not a playlist");
-                try (OutputStream out = new FileOutputStream(f)) { out.write(text.getBytes(StandardCharsets.UTF_8)); }
-            }
-            M3u.Playlist pl = M3u.parse(text);
+            M3u.Playlist pl = m3uOf(p);
             for (int i = 0; i < pl.channels.size(); i++) raw.put(channelJson(pl.channels.get(i), i));
         } else {
             String body = download(p.optString("host") + "/player_api.php?username=" + java.net.URLEncoder.encode(p.optString("user"), "UTF-8")
@@ -250,6 +242,49 @@ final class Library {
             out.put(o);
         }
         return out;
+    }
+
+    // ---------------------------------------------------------------- other (not active) playlists
+
+    /** Parsed M3U playlists other than the active one, by link, so their channels can play and preview without switching. */
+    private final Map<String, M3u.Playlist> otherM3u = new HashMap<>();
+
+    /** An M3U playlist parsed from its saved copy (or the network). Call off the UI thread. */
+    M3u.Playlist m3uOf(JSONObject p) throws Exception {
+        String url = p.optString("url");
+        synchronized (otherM3u) { M3u.Playlist got = otherM3u.get(url); if (got != null) return got; }
+        File f = m3uFile(url);
+        String text = f.exists() ? readFile(f) : null;
+        if (text == null || !M3u.looksLikePlaylist(text)) {
+            text = download(url, 60000);
+            if (!M3u.looksLikePlaylist(text)) throw new IllegalStateException("not a playlist");
+            try (OutputStream out = new FileOutputStream(f)) { out.write(text.getBytes(StandardCharsets.UTF_8)); }
+        }
+        M3u.Playlist parsed = M3u.parse(text);
+        synchronized (otherM3u) { otherM3u.put(url, parsed); }
+        return parsed;
+    }
+
+    /** A channel's address in any saved playlist; null for an M3U playlist that isn't loaded yet (see {@link #m3uOf}). */
+    String streamUrlFor(JSONObject p, String id, String ext) {
+        if (M3U.equals(p.optString("type"))) {
+            synchronized (otherM3u) {
+                M3u.Playlist pl = otherM3u.get(p.optString("url"));
+                M3u.Channel c = pl == null ? null : pl.byId.get(id);
+                return c == null ? null : c.url;
+            }
+        }
+        String f = prefs.getString("live_format", "auto");
+        if (!f.equals("auto")) ext = f;
+        return p.optString("host") + "/live/" + XtreamProtocol.encode(p.optString("user")) + "/" + XtreamProtocol.encode(p.optString("pass")) + "/" + id + "." + ext;
+    }
+
+    /** The provider's short guide for a channel of another Xtream playlist (M3U playlists that aren't active have none here). Call off the UI thread. */
+    JSONObject epgFor(JSONObject p, String action) throws Exception {
+        if (M3U.equals(p.optString("type"))) return new JSONObject().put("epg_listings", new JSONArray());
+        String body = download(p.optString("host") + "/player_api.php?username=" + XtreamProtocol.encode(p.optString("user"))
+                + "&password=" + XtreamProtocol.encode(p.optString("pass")) + "&action=" + action, 20000);
+        return new JSONObject(body.trim());
     }
 
     /** A playlist's name for labels: its title, else its server. */
