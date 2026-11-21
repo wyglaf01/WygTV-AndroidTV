@@ -54,15 +54,16 @@ final class Menus {
         heading.setTypeface(null, Typeface.BOLD);
         heading.setGravity(Gravity.CENTER);
         center.addView(heading, new LinearLayout.LayoutParams(-1, a.dp(56)));
-        TextView hint = a.label("Pick how your provider gave you access. You can add more playlists later from the menu.", 16);
+        TextView hint = a.label("Pick how your provider gave you access, or restore a WygTV backup. You can add more playlists later from the menu.", 16);
         hint.setTextColor(Theme.MUTED);
         hint.setGravity(Gravity.CENTER);
         center.addView(hint, new LinearLayout.LayoutParams(-1, a.dp(40)));
         LinearLayout tiles = new LinearLayout(a);
         tiles.setGravity(Gravity.CENTER);
-        center.addView(tiles, new LinearLayout.LayoutParams(a.dp(640), a.dp(170)));
+        center.addView(tiles, new LinearLayout.LayoutParams(-1, a.dp(170)));
         TextView xtream = a.homeTile("⚙", "Xtream Codes\nserver + username", tiles, () -> xtreamForm(a, null, null));
         a.homeTile("☰", "M3U link\nplaylist URL", tiles, () -> m3uForm(a, null));
+        a.homeTile("↺", "Restore\nfrom a backup", tiles, () -> Backup.restore(a));
         for (int i = 0; i < tiles.getChildCount(); i++) ((TextView) tiles.getChildAt(i)).setTextSize(21);
         xtream.requestFocus();
     }
