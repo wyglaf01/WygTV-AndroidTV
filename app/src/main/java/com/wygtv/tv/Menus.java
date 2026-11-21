@@ -24,7 +24,6 @@ import java.net.URI;
  * organised the way IPTVnator does it (a playlist manager you start from, then a settings page).
  */
 final class Menus {
-    private static final int CREAM = 0xffF5E8CA, TAN = 0xffD9BF94, GOLD = 0xffEACB86;
 
     static final String[] START_KEYS = {"home", "live", "guide", "favorites", "recent", "last"};
     static final String[] START_LABELS = {"Home", "Live TV", "TV Guide", "Favorites", "Recently watched", "Last channel watched"};
@@ -47,7 +46,7 @@ final class Menus {
         center.setPadding(a.dp(80), a.dp(20), a.dp(80), a.dp(20));
         scene.addView(center, new FrameLayout.LayoutParams(-1, -1));
         TextView small = a.label("WELCOME TO WYGTV", 15);
-        small.setTextColor(GOLD);
+        small.setTextColor(Theme.ACCENT);
         small.setLetterSpacing(.18f);
         small.setGravity(Gravity.CENTER);
         center.addView(small, new LinearLayout.LayoutParams(-1, a.dp(35)));
@@ -56,7 +55,7 @@ final class Menus {
         heading.setGravity(Gravity.CENTER);
         center.addView(heading, new LinearLayout.LayoutParams(-1, a.dp(56)));
         TextView hint = a.label("Pick how your provider gave you access. You can add more playlists later from the menu.", 16);
-        hint.setTextColor(TAN);
+        hint.setTextColor(Theme.MUTED);
         hint.setGravity(Gravity.CENTER);
         center.addView(hint, new LinearLayout.LayoutParams(-1, a.dp(40)));
         LinearLayout tiles = new LinearLayout(a);
@@ -84,7 +83,7 @@ final class Menus {
             boolean on = p.optString("id").equals(active);
             TextView row = a.button((on ? "●  " : "○  ") + p.optString("title", "Playlist") + (on ? "   (watching)" : "") + "\n      " + describe(p), list, () -> playlistActions(a, p));
             row.setTextSize(19);
-            if (on) row.setTextColor(GOLD);
+            if (on) row.setTextColor(Theme.ACCENT);
             if (focus == null || on) focus = row;
         }
         TextView addX = a.button("+  Add an Xtream Codes login", list, () -> xtreamForm(a, null, null));
@@ -282,16 +281,23 @@ final class Menus {
         JSONObject active = a.library.find(a.library.activeId());
 
         row(a, list, "Playlist", active == null ? "none" : active.optString("title") + "  (" + (m3u ? "M3U" : "Xtream Codes") + ")", () -> a.playlists());
+        final int themeRow = list.getChildCount();
+        row(a, list, "Theme", Theme.LABELS[Theme.indexOf(a.prefs.getString("theme", "steampunk"))], () ->
+                choose(a, "Theme", Theme.LABELS, Theme.indexOf(a.prefs.getString("theme", "steampunk")), i -> {
+                    a.prefs.edit().putString("theme", Theme.KEYS[i]).apply();
+                    a.applyTheme();
+                    settings(a, themeRow);
+                }));
         row(a, list, "Open at start-up", START_LABELS[indexOf(START_KEYS, a.prefs.getString("start_screen", "home"))], () ->
                 choose(a, "Open at start-up", START_LABELS, indexOf(START_KEYS, a.prefs.getString("start_screen", "home")), i -> {
                     a.prefs.edit().putString("start_screen", START_KEYS[i]).apply();
-                    settings(a, 1);
+                    settings(a, 2);
                 }));
         if (!m3u) {
             row(a, list, "Live stream format", FORMAT_LABELS[indexOf(FORMAT_KEYS, a.prefs.getString("live_format", "auto"))], () ->
                     choose(a, "Live stream format (try HLS if channels stutter or won't start)", FORMAT_LABELS, indexOf(FORMAT_KEYS, a.prefs.getString("live_format", "auto")), i -> {
                         a.prefs.edit().putString("live_format", FORMAT_KEYS[i]).apply();
-                        settings(a, 2);
+                        settings(a, 3);
                     }));
         }
         final int guideRow = list.getChildCount();
@@ -412,7 +418,7 @@ final class Menus {
 
     private static void note(MainActivity a, LinearLayout parent, String text) {
         TextView t = a.label(text, 15);
-        t.setTextColor(TAN);
+        t.setTextColor(Theme.MUTED);
         t.setPadding(a.dp(8), a.dp(4), a.dp(8), a.dp(8));
         parent.addView(t, new LinearLayout.LayoutParams(-1, -2));
     }

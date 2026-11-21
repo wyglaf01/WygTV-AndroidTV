@@ -43,7 +43,6 @@ final class TvGuide {
     private static final int PAGE = 40;
     private static final int PREVIEW_DELAY_MS = 700;
     private static final long HORIZON = 24 * 60 * EpgGrid.MINUTE;
-    private static final int CREAM = 0xffF5E8CA, TAN = 0xffD9BF94, GOLD = 0xffEACB86, COPPER = 0xffD9822B, INK = 0xff2A1708;
 
     private final MainActivity a;
     private final JSONArray channels;
@@ -123,7 +122,7 @@ final class TvGuide {
         LinearLayout.LayoutParams sourceLp = new LinearLayout.LayoutParams(-2, a.dp(38));
         sourceLp.setMargins(a.dp(8), 0, a.dp(12), 0);
         source.setLayoutParams(sourceLp);
-        clock = text("", 20, GOLD, true);
+        clock = text("", 20, Theme.ACCENT, true);
         bar.addView(clock, new LinearLayout.LayoutParams(-2, -1));
         a.root.addView(bar, 0, new LinearLayout.LayoutParams(-1, a.dp(44)));
         a.status.setLayoutParams(new LinearLayout.LayoutParams(-1, a.dp(24)));
@@ -153,7 +152,7 @@ final class TvGuide {
         rows.setOrientation(LinearLayout.VERTICAL);
         scroll.addView(rows, new FrameLayout.LayoutParams(-1, -2));
         nowLine = new View(a);
-        nowLine.setBackgroundColor(COPPER);
+        nowLine.setBackgroundColor(Theme.COPPER);
         grid.addView(nowLine, new FrameLayout.LayoutParams(a.dp(2), -1));
 
         final View myRoot = shownRoot;
@@ -175,33 +174,33 @@ final class TvGuide {
         info.setPadding(a.dp(20), a.dp(12), a.dp(20), a.dp(12));
         info.setBackground(a.bg(a.PANEL));
         top.addView(info, new LinearLayout.LayoutParams(0, -1, 1));
-        infoChannel = text("", 12, TAN, false);
+        infoChannel = text("", 12, Theme.MUTED, false);
         infoChannel.setLetterSpacing(.12f);
         info.addView(infoChannel);
-        infoTitle = text("", 22, CREAM, true);
+        infoTitle = text("", 22, Theme.TEXT, true);
         infoTitle.setMaxLines(2);
         infoTitle.setEllipsize(TextUtils.TruncateAt.END);
         info.addView(infoTitle);
         LinearLayout timeRow = new LinearLayout(a);
         timeRow.setGravity(Gravity.CENTER_VERTICAL);
         info.addView(timeRow, new LinearLayout.LayoutParams(-1, a.dp(24)));
-        infoTime = text("", 13, GOLD, false);
+        infoTime = text("", 13, Theme.ACCENT, false);
         timeRow.addView(infoTime);
         progress = new ProgressBar(a, null, android.R.attr.progressBarStyleHorizontal);
         progress.setMax(100);
-        progress.setProgressTintList(android.content.res.ColorStateList.valueOf(COPPER));
-        progress.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(0x40F5E8CA));
+        progress.setProgressTintList(android.content.res.ColorStateList.valueOf(Theme.COPPER));
+        progress.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(Theme.alpha(Theme.TEXT,0x40)));
         LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(a.dp(160), a.dp(6));
         pp.setMargins(a.dp(12), 0, a.dp(12), 0);
         timeRow.addView(progress, pp);
-        infoLeft = text("", 13, TAN, false);
+        infoLeft = text("", 13, Theme.MUTED, false);
         timeRow.addView(infoLeft);
-        infoDesc = text("", 13, 0xffE6D6B8, false);
+        infoDesc = text("", 13, Theme.TEXT, false);
         infoDesc.setMaxLines(3);
         infoDesc.setEllipsize(TextUtils.TruncateAt.END);
         infoDesc.setLineSpacing(0, 1.15f);
         info.addView(infoDesc, new LinearLayout.LayoutParams(-1, 0, 1));
-        infoNext = text("", 12, TAN, false);
+        infoNext = text("", 12, Theme.MUTED, false);
         infoNext.setSingleLine(true);
         infoNext.setEllipsize(TextUtils.TruncateAt.END);
         info.addView(infoNext);
@@ -210,7 +209,7 @@ final class TvGuide {
         GradientDrawable border = new GradientDrawable();
         border.setColor(0xff000000);
         border.setCornerRadius(a.dp(10));
-        border.setStroke(a.dp(3), 0xffC9A060);
+        border.setStroke(a.dp(3), Theme.STROKE_FOCUS);
         frame.setBackground(border);
         frame.setPadding(a.dp(3), a.dp(3), a.dp(3), a.dp(3));
         LinearLayout.LayoutParams fp = new LinearLayout.LayoutParams(a.dp(190) * 16 / 9, -1);
@@ -220,7 +219,7 @@ final class TvGuide {
         previewView.setUseController(false);
         previewView.setFocusable(false);
         frame.addView(previewView, new FrameLayout.LayoutParams(-1, -1));
-        previewError = text("Preview unavailable", 14, TAN, false);
+        previewError = text("Preview unavailable", 14, Theme.MUTED, false);
         previewError.setGravity(Gravity.CENTER);
         previewError.setVisibility(View.GONE);
         frame.addView(previewError, new FrameLayout.LayoutParams(-1, -1));
@@ -258,7 +257,7 @@ final class TvGuide {
         if (page > 0) navButton("▲ Previous channels", () -> { page--; focusRow = page * PAGE + PAGE - 1; buildRows(); });
         for (int i = from; i < to; i++) addRow(i);
         if (to < total) navButton("▼ More channels (" + (total - to) + " left)", () -> { page++; focusRow = page * PAGE; buildRows(); });
-        if (total == 0) rows.addView(text("No channels in this category.", 18, CREAM, false), new LinearLayout.LayoutParams(-1, a.dp(60)));
+        if (total == 0) rows.addView(text("No channels in this category.", 18, Theme.TEXT, false), new LinearLayout.LayoutParams(-1, a.dp(60)));
         rebuilding = false;
         drawTimeHeader();
         // Ask for guide data starting at the focused channel, so what you look at fills in first.
@@ -281,7 +280,7 @@ final class TvGuide {
         LinearLayout row = new LinearLayout(a);
         rows.addView(row, new LinearLayout.LayoutParams(-1, a.dp(40)));
         String num = ch.optString("num", "");
-        TextView name = text((num.isEmpty() || num.equals("0") ? "" : num + "   ") + ch.optString("name", "Channel"), 14, CREAM, true);
+        TextView name = text((num.isEmpty() || num.equals("0") ? "" : num + "   ") + ch.optString("name", "Channel"), 14, Theme.TEXT, true);
         name.setSingleLine(true);
         name.setEllipsize(TextUtils.TruncateAt.END);
         name.setPadding(a.dp(12), 0, a.dp(8), 0);
@@ -338,13 +337,13 @@ final class TvGuide {
         EpgGrid.Program p = c.program;
         String title = p == null ? (loading ? "Loading guide…" : "No guide information")
                 : (p.start < winStart ? "‹ " : "") + (p.title.isEmpty() ? "Untitled" : p.title) + (p.end > winEnd ? " ›" : "");
-        TextView t = text(title, 14, CREAM, true);
+        TextView t = text(title, 14, Theme.TEXT, true);
         t.setSingleLine(true);
         t.setEllipsize(TextUtils.TruncateAt.END);
         v.addView(t);
         TextView sub = null;
         if (width > a.dp(90)) {
-            sub = text(p == null ? "Press OK to watch" : fmt(p.start) + " – " + fmt(p.end), 11, TAN, false);
+            sub = text(p == null ? "Press OK to watch" : fmt(p.start) + " – " + fmt(p.end), 11, Theme.MUTED, false);
             sub.setSingleLine(true);
             v.addView(sub);
         }
@@ -353,8 +352,8 @@ final class TvGuide {
         v.setBackground(cellBg(false, airing));
         v.setOnFocusChangeListener((view, focused) -> {
             v.setBackground(cellBg(focused, airing));
-            t.setTextColor(focused ? INK : CREAM);
-            if (subText != null) subText.setTextColor(focused ? 0xff4A2C12 : TAN);
+            t.setTextColor(focused ? Theme.INK : Theme.TEXT);
+            if (subText != null) subText.setTextColor(focused ? Theme.mix(Theme.INK,Theme.FOCUS,0.4f) : Theme.MUTED);
             if (focused && !rebuilding) onCellFocused(row, c);
         });
         v.setOnClickListener(view -> playFullScreen(row));
@@ -378,17 +377,17 @@ final class TvGuide {
     private GradientDrawable cellBg(boolean focused, boolean airing) {
         if (focused) return a.homeTileBackground(true);
         GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                airing ? new int[]{0xeb6E3E1C, 0xeb3A200E} : new int[]{0xe63A2414, 0xeb1A0F08});
+                airing ? new int[]{Theme.alpha(Theme.AIRING,0xeb), Theme.alpha(Theme.mix(Theme.AIRING,Theme.BG,0.5f),0xeb)} : new int[]{Theme.alpha(Theme.PANEL,0xe6), Theme.alpha(Theme.BG,0xeb)});
         g.setCornerRadius(a.dp(8));
-        g.setStroke(a.dp(1), airing ? 0xffB07A3E : 0xff8A6A3A);
+        g.setStroke(a.dp(1), airing ? Theme.mix(Theme.STROKE,Theme.ACCENT,0.4f) : Theme.STROKE);
         return g;
     }
 
     private GradientDrawable rowBg(boolean focused) {
         GradientDrawable g = new GradientDrawable();
-        g.setColor(focused ? 0xbf9C5B22 : 0xe0281809);
+        g.setColor(focused ? Theme.alpha(Theme.FOCUS,0xbf) : Theme.alpha(Theme.mix(Theme.BG,Theme.PANEL,0.4f),0xe0));
         g.setCornerRadius(a.dp(8));
-        g.setStroke(a.dp(1), focused ? 0xffC9A060 : 0xff6E5230);
+        g.setStroke(a.dp(1), focused ? Theme.STROKE_FOCUS : Theme.mix(Theme.STROKE,Theme.BG,0.3f));
         return g;
     }
 
@@ -432,13 +431,13 @@ final class TvGuide {
     private void drawTimeHeader() {
         if (timeHeader == null) return;
         timeHeader.removeAllViews();
-        TextView day = text(DateUtils.isToday(winStart) ? "Today" : DateUtils.formatDateTime(a, winStart, DateUtils.FORMAT_SHOW_WEEKDAY | DateUtils.FORMAT_ABBREV_WEEKDAY), 13, GOLD, true);
+        TextView day = text(DateUtils.isToday(winStart) ? "Today" : DateUtils.formatDateTime(a, winStart, DateUtils.FORMAT_SHOW_WEEKDAY | DateUtils.FORMAT_ABBREV_WEEKDAY), 13, Theme.ACCENT, true);
         timeHeader.addView(day, new LinearLayout.LayoutParams(chanW + a.dp(8), -1));
         float scale = timelineW / (float) EpgGrid.WINDOW;
         for (int k = 0; k < 4; k++) {
             long s = winStart + k * EpgGrid.SLOT;
             int w = Math.round((s + EpgGrid.SLOT - winStart) * scale) - Math.round((s - winStart) * scale);
-            timeHeader.addView(text(fmt(s), 13, TAN, false), new LinearLayout.LayoutParams(w, -1));
+            timeHeader.addView(text(fmt(s), 13, Theme.MUTED, false), new LinearLayout.LayoutParams(w, -1));
         }
     }
 

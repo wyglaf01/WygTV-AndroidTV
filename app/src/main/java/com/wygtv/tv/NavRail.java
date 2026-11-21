@@ -18,7 +18,6 @@ import java.util.List;
  */
 final class NavRail {
     static final int COLLAPSED_DP = 68, EXPANDED_DP = 250;
-    private static final int CREAM = 0xffF5E8CA, GOLD = 0xffEACB86, INK = 0xff2A1708;
 
     private final MainActivity a;
     private final LinearLayout rail;
@@ -87,7 +86,7 @@ final class NavRail {
         v.setSingleLine(true);
         v.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
         v.setPadding(a.dp(14), 0, a.dp(8), 0);
-        v.setTextColor(here ? GOLD : CREAM);
+        v.setTextColor(here ? Theme.ACCENT : Theme.TEXT);
         if (here) v.setTypeface(null, Typeface.BOLD);
         v.setFocusable(true);
         v.setClickable(true);
@@ -99,7 +98,7 @@ final class NavRail {
         v.setOnClickListener(w -> { if (!here || key.equals("home")) action.run(); else collapseAndReturn(); });
         v.setOnFocusChangeListener((w, focused) -> {
             v.setBackground(itemBg(focused, here));
-            v.setTextColor(focused ? INK : here ? GOLD : CREAM);
+            v.setTextColor(focused ? Theme.INK : here ? Theme.ACCENT : Theme.TEXT);
             if (focused) setExpanded(true);
             else rail.post(() -> { if (!rail.hasFocus()) setExpanded(false); });
         });
@@ -148,16 +147,16 @@ final class NavRail {
 
     private GradientDrawable background(boolean open) {
         GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                open ? new int[]{0xfa1E120A, 0xf23A2414} : new int[]{0xe61A0F08, 0xcc2A1A0E});
-        g.setStroke(a.dp(1), 0xff8A6A3A);
+                open ? new int[]{Theme.alpha(Theme.BG,0xfa), Theme.alpha(Theme.PANEL,0xf2)} : new int[]{Theme.alpha(Theme.BG,0xe6), Theme.alpha(Theme.PANEL,0xcc)});
+        g.setStroke(a.dp(1), Theme.STROKE);
         return g;
     }
 
     private GradientDrawable itemBg(boolean focused, boolean here) {
         GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                focused ? new int[]{0xffF0D797, 0xffBA904A} : here ? new int[]{0x663A2414, 0x66603A1A} : new int[]{0x00000000, 0x00000000});
+                focused ? new int[]{Theme.TILE_A, Theme.TILE_B} : here ? new int[]{Theme.alpha(Theme.PANEL,0x66), Theme.alpha(Theme.FOCUS,0x66)} : new int[]{0x00000000, 0x00000000});
         g.setCornerRadius(a.dp(10));
-        if (focused || here) g.setStroke(a.dp(focused ? 2 : 1), focused ? 0xffFFF0C1 : 0xff9A7A44);
+        if (focused || here) g.setStroke(a.dp(focused ? 2 : 1), focused ? Theme.TILE_STROKE : Theme.STROKE);
         return g;
     }
 }

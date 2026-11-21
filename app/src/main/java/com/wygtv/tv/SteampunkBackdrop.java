@@ -20,17 +20,21 @@ public final class SteampunkBackdrop extends Drawable {
 
  @Override public void draw(Canvas c){
   Rect b=getBounds();float w=b.width(),h=b.height();if(w<=0||h<=0)return;
-  c.drawColor(0xff140B06);
+  c.drawColor(Theme.BG);
   if(art!=null){
    float scale=Math.max(w/art.getWidth(),h/art.getHeight());float dw=art.getWidth()*scale,dh=art.getHeight()*scale;
    float left=b.left+(w-dw)/2f,top=b.top+(h-dh)/2f;
    paint.setShader(null);c.drawBitmap(art,null,new RectF(left,top,left+dw,top+dh),paint);
   }
+  if(!Theme.steampunk()){
+   // Other themes wash the artwork in their own colour so it reads as texture.
+   paint.setShader(new LinearGradient(0,b.top,0,b.bottom,new int[]{Theme.alpha(Theme.PANEL,0xC8),Theme.alpha(Theme.BG,0xE0)},null,Shader.TileMode.CLAMP));c.drawRect(b,paint);paint.setShader(null);
+  }
   if(homeScrim){
    // Soft darkening behind the centre tiles and along the bottom plate so cream text stays legible.
-   paint.setShader(new RadialGradient(b.centerX(),b.top+h*.52f,w*.42f,new int[]{0x8C120804,0x40120804,0x00120804},new float[]{0f,.6f,1f},Shader.TileMode.CLAMP));c.drawRect(b,paint);
-   paint.setShader(new LinearGradient(0,b.top+h*.78f,0,b.bottom,new int[]{0x00120804,0xB3120804},null,Shader.TileMode.CLAMP));c.drawRect(b,paint);
-   paint.setShader(new LinearGradient(0,b.top,0,b.top+h*.16f,new int[]{0x99120804,0x00120804},null,Shader.TileMode.CLAMP));c.drawRect(b,paint);
+   paint.setShader(new RadialGradient(b.centerX(),b.top+h*.52f,w*.42f,new int[]{Theme.alpha(Theme.BG,0x8C),Theme.alpha(Theme.BG,0x40),Theme.alpha(Theme.BG,0x00)},new float[]{0f,.6f,1f},Shader.TileMode.CLAMP));c.drawRect(b,paint);
+   paint.setShader(new LinearGradient(0,b.top+h*.78f,0,b.bottom,new int[]{Theme.alpha(Theme.BG,0x00),Theme.alpha(Theme.BG,0xB3)},null,Shader.TileMode.CLAMP));c.drawRect(b,paint);
+   paint.setShader(new LinearGradient(0,b.top,0,b.top+h*.16f,new int[]{Theme.alpha(Theme.BG,0x99),Theme.alpha(Theme.BG,0x00)},null,Shader.TileMode.CLAMP));c.drawRect(b,paint);
    paint.setShader(null);
   }
  }

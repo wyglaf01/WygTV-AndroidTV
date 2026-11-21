@@ -34,7 +34,6 @@ import org.json.JSONObject;
 final class TvRemote {
     private static final int BANNER_MS = 5000, NUMBER_MS = 1800, LIST_JUMP = 10;
     private static final long SEEK_SHORT_MS = 10_000, SEEK_LONG_MS = 30_000;
-    private static final int CREAM = 0xffF5E8CA, GOLD = 0xffEACB86, TAN = 0xffD9BF94;
 
     private final MainActivity a;
     private final Handler ui = new Handler(Looper.getMainLooper());
@@ -90,7 +89,7 @@ final class TvRemote {
         frame.setBackgroundColor(0xff000000);
         frame.addView(playerView, new FrameLayout.LayoutParams(-1, -1));
         buildBanner(frame);
-        numberBox = text("", 44, GOLD, true);
+        numberBox = text("", 44, Theme.ACCENT, true);
         numberBox.setGravity(Gravity.CENTER);
         numberBox.setBackground(panel());
         numberBox.setVisibility(View.GONE);
@@ -114,22 +113,22 @@ final class TvRemote {
         banner.setVisibility(View.GONE);
         LinearLayout top = new LinearLayout(a);
         top.setGravity(Gravity.CENTER_VERTICAL);
-        bannerNumber = text("", 30, GOLD, true);
+        bannerNumber = text("", 30, Theme.ACCENT, true);
         top.addView(bannerNumber, new LinearLayout.LayoutParams(-2, -2));
-        bannerTitle = text("", 28, CREAM, true);
+        bannerTitle = text("", 28, Theme.TEXT, true);
         bannerTitle.setSingleLine(true);
         bannerTitle.setPadding(a.dp(18), 0, 0, 0);
         top.addView(bannerTitle, new LinearLayout.LayoutParams(0, -2, 1));
         banner.addView(top);
-        bannerNow = text("", 19, CREAM, false);
+        bannerNow = text("", 19, Theme.TEXT, false);
         bannerNow.setSingleLine(true);
         banner.addView(bannerNow);
-        bannerNext = text("", 16, TAN, false);
+        bannerNext = text("", 16, Theme.MUTED, false);
         bannerNext.setSingleLine(true);
         banner.addView(bannerNext);
         TextView hints = text(isLive()
                 ? "▲▼ / CH± change channel    0-9 channel number    OK info    GUIDE TV guide    MENU options    BACK exit"
-                : "◀▶ seek    ▶❚❚ play / pause    MENU options    BACK exit", 14, TAN, false);
+                : "◀▶ seek    ▶❚❚ play / pause    MENU options    BACK exit", 14, Theme.MUTED, false);
         hints.setPadding(0, a.dp(8), 0, 0);
         banner.addView(hints);
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM);
@@ -525,9 +524,9 @@ final class TvRemote {
     }
 
     private GradientDrawable panel() {
-        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{0xe6301C0E, 0xf01A0F08});
+        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{Theme.alpha(Theme.PANEL,0xe6), Theme.alpha(Theme.BG,0xf0)});
         g.setCornerRadius(a.dp(14));
-        g.setStroke(a.dp(2), 0xffC9A060);
+        g.setStroke(a.dp(2), Theme.STROKE_FOCUS);
         return g;
     }
 
