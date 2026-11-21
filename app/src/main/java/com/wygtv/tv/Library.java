@@ -217,6 +217,48 @@ final class Library {
         return out;
     }
 
+    /**
+     * Every live channel of a saved playlist that isn't active (for Search across playlists), each tagged with
+     * "playlist" = its id. Channels and categories hidden in that playlist are left out. Call off the UI thread.
+     */
+    JSONArray liveChannelsOf(JSONObject p) throws Exception {
+        JSONArray raw = new JSONArray();
+        if (M3U.equals(p.optString("type"))) {
+            String url = p.optString("url");
+            File f = m3uFile(url);
+            String text = f.exists() ? readFile(f) : null;
+            if (text == null || !M3u.looksLikePlaylist(text)) {
+                text = download(url, 60000);
+                if (!M3u.looksLikePlaylist(text)) throw new IllegalStateException("not a playlist");
+                try (OutputStream out = new FileOutputStream(f)) { out.write(text.getBytes(StandardCharsets.UTF_8)); }
+            }
+            M3u.Playlist pl = M3u.parse(text);
+            for (int i = 0; i < pl.channels.size(); i++) raw.put(channelJson(pl.channels.get(i), i));
+        } else {
+            String body = download(p.optString("host") + "/player_api.php?username=" + java.net.URLEncoder.encode(p.optString("user"), "UTF-8")
+                    + "&password=" + java.net.URLEncoder.encode(p.optString("pass"), "UTF-8") + "&action=get_live_streams", 60000);
+            raw = new JSONArray(body.trim());
+        }
+        String pre = prefixOf(p), id = p.optString("id");
+        java.util.Set<String> hiddenCats = prefs.getStringSet(pre + "hidden_categories_live", java.util.Collections.<String>emptySet());
+        java.util.Set<String> hiddenChannels = prefs.getStringSet(pre + "hidden_channels_live", java.util.Collections.<String>emptySet());
+        JSONArray out = new JSONArray();
+        for (int i = 0; i < raw.length(); i++) {
+            JSONObject o = raw.optJSONObject(i);
+            if (o == null || hiddenCats.contains(o.optString("category_id")) || hiddenChannels.contains(o.optString("stream_id"))) continue;
+            o.put("playlist", id);
+            out.put(o);
+        }
+        return out;
+    }
+
+    /** A playlist's name for labels: its title, else its server. */
+    static String nameOf(JSONObject p) {
+        if (p == null) return "removed playlist";
+        String t = p.optString("title");
+        return t.isEmpty() ? Menus.hostOf(p.optString(M3U.equals(p.optString("type")) ? "url" : "host")) : t;
+    }
+
     private static JSONObject channelJson(M3u.Channel c, int index) throws JSONException {
         return new JSONObject().put("stream_id", c.id).put("name", c.name).put("category_id", c.group)
                 .put("stream_icon", c.logo).put("epg_channel_id", c.tvgId)

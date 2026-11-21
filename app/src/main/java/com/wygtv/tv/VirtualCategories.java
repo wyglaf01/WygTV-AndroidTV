@@ -133,7 +133,7 @@ final class VirtualCategories {
      * "New category…". Picking a ticked one takes the channel out again.
      */
     static void addDialog(MainActivity a, JSONObject item) {
-        String playlist = a.library.activeId(), sid = item.optString("stream_id");
+        String playlist = item.optString("playlist", "").isEmpty() ? a.library.activeId() : item.optString("playlist"), sid = item.optString("stream_id");
         JSONArray l = all(a);
         List<JSONObject> cats = new ArrayList<>();
         List<String> labels = new ArrayList<>();
