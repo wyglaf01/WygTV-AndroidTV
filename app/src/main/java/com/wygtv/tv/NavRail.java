@@ -62,7 +62,6 @@ final class NavRail {
             add("▶", "Movies", "vod", current, () -> a.browse("vod"));
             add("▤", "Series", "series", current, () -> a.browse("series"));
         }
-        add("★", "Favorites", "favorites", current, () -> a.favorites());
         add("↺", "Recently watched", "recent", current, () -> a.recent());
         rail.addView(new View(a), new LinearLayout.LayoutParams(-1, 0, 1));
         add("☰", "Playlists", "playlists", current, () -> a.playlists());
