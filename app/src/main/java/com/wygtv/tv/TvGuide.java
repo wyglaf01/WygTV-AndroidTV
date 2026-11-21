@@ -21,10 +21,6 @@ import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.ui.PlayerView;
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -127,7 +123,7 @@ final class TvGuide {
 
         int screenW = a.getResources().getDisplayMetrics().widthPixels;
         chanW = a.dp(200);
-        timelineW = Math.max(a.dp(320), screenW - a.dp(48) - chanW - a.dp(8));
+        timelineW = Math.max(a.dp(320), screenW - a.dp(48) - a.dp(NavRail.COLLAPSED_DP) - chanW - a.dp(8));
 
         LinearLayout col = new LinearLayout(a);
         col.setOrientation(LinearLayout.VERTICAL);
@@ -507,13 +503,14 @@ final class TvGuide {
         String id = streamId(row);
         if (id.isEmpty() || pool == null || epg.containsKey(id) || !requested.add(id)) return;
         final int s = session;
-        final String url = a.base() + "&action=get_short_epg&stream_id=" + a.enc(id) + "&limit=12";
+        final String action = "get_short_epg&stream_id=" + a.enc(id) + "&limit=12";
         pool.execute(() -> {
             List<EpgGrid.Program> progs = new ArrayList<>();
             try {
-                String body = download(url);
-                if (body.trim().startsWith("{")) {
-                    JSONArray list = new JSONObject(body).optJSONArray("epg_listings");
+                // Provider guide, the playlist's XMLTV guide, or the guide link set in Settings.
+                {
+                    if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+                    JSONArray list = a.apiBlocking(action).optJSONArray("epg_listings");
                     TimeZone tz = TimeZone.getDefault();
                     if (list != null) for (int k = 0; k < list.length(); k++) {
                         JSONObject e = list.optJSONObject(k);
@@ -539,29 +536,13 @@ final class TvGuide {
         });
     }
 
-    private static String download(String url) throws Exception {
-        if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
-        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-        c.setConnectTimeout(12000);
-        c.setReadTimeout(16000);
-        try (InputStream in = c.getInputStream()) {
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            byte[] buf = new byte[8192];
-            int n;
-            while ((n = in.read(buf)) != -1) out.write(buf, 0, n);
-            return out.toString("UTF-8");
-        } finally {
-            c.disconnect();
-        }
-    }
-
     // ---------------------------------------------------------------- preview and playback
 
     private String streamUrl(int row) {
         JSONObject ch = channels.optJSONObject(row);
         String ext = ch == null ? "ts" : ch.optString("container_extension", "ts");
         if (ext.isEmpty()) ext = "ts";
-        return a.saved("host") + "/live/" + a.enc(a.saved("user")) + "/" + a.enc(a.saved("pass")) + "/" + streamId(row) + "." + ext;
+        return a.streamUrl("live", streamId(row), ext);
     }
 
     private void schedulePreview(int row) {

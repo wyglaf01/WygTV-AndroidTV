@@ -153,7 +153,7 @@ final class TvRemote {
         final String forId = id;
         bannerNow.setText("Loading what's on…");
         bannerNext.setText("");
-        a.fetchQuiet(a.base() + "&action=get_short_epg&stream_id=" + a.enc(forId) + "&limit=2", o -> {
+        a.apiQuiet("get_short_epg&stream_id=" + a.enc(forId) + "&limit=2", o -> {
             if (ticket != epgTicket || !forId.equals(id)) return;
             JSONArray list = o == null ? null : o.optJSONArray("epg_listings");
             bannerNow.setText(list == null || list.length() == 0 ? "No guide information" : "Now  " + epgLine(list.optJSONObject(0)));
@@ -317,6 +317,7 @@ final class TvRemote {
         a.player.setMediaItem(MediaItem.fromUri(a.streamUrl("live", id, ext)));
         a.player.prepare();
         a.player.play();
+        a.library.recordPlay("live", id, ext, title);
         view.hideController();
         showBanner();
     }
@@ -388,7 +389,7 @@ final class TvRemote {
         if (a.liveIndex != null && a.liveIndexAccount.equals(a.accountPrefix())) { setAllLive(a.liveIndex); return; }
         loadingAllLive = true;
         final String account = a.accountPrefix();
-        a.fetchQuiet(a.base() + "&action=get_live_streams", o -> {
+        a.apiQuiet("get_live_streams", o -> {
             loadingAllLive = false;
             JSONArray list = o == null ? null : o.optJSONArray("list");
             if (list != null && account.equals(a.accountPrefix())) setAllLive(list);
