@@ -265,6 +265,9 @@ final class Library {
         return parsed;
     }
 
+    /** Forgets parsed playlists that aren't active (after a restore). */
+    void dropOtherPlaylists() { synchronized (otherM3u) { otherM3u.clear(); } }
+
     /** A channel's address in any saved playlist; null for an M3U playlist that isn't loaded yet (see {@link #m3uOf}). */
     String streamUrlFor(JSONObject p, String id, String ext) {
         if (M3U.equals(p.optString("type"))) {

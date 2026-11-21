@@ -32,7 +32,8 @@ import java.util.Set;
 
 /**
  * Settings → Back up / Restore. A backup is one JSON file, "WygTV-backup-YYYY-MM-DD_HH-MM.json", holding every
- * saved playlist plus favorites, hidden items, Recently watched and settings. It is written to Download/WygTV
+ * saved preference: playlists, favorites (every playlist), your own Live TV categories, My List, hidden items,
+ * Recently watched and all settings (theme, app mode, start-up, guide choice). It is written to Download/WygTV
  * (so it can be copied off the TV) and also kept inside the app.
  */
 final class Backup {
@@ -54,9 +55,10 @@ final class Backup {
         boolean outside = false;
         if (canUseShared(a)) { File dir = sharedDir(); dir.mkdirs(); outside = dir.isDirectory() && write(shared, bytes); }
         if (!inApp && !outside) { Menus.alert(a, "Couldn't save the backup."); return; }
-        int count = a.library.all().length();
+        String what;
+        try { what = summary(new JSONObject(text).getJSONObject("prefs")); } catch (Exception e) { what = "Everything"; }
         new AlertDialog.Builder(a).setTitle("Backup saved")
-                .setMessage(count + (count == 1 ? " playlist" : " playlists") + " plus favorites, hidden items and settings.\n\n"
+                .setMessage(what + ".\n\n"
                         + (outside ? "File: " + shared.getAbsolutePath() : "Saved inside the app as " + name + " (storage permission was not given, so it isn't in Downloads).")
                         + "\n\nThe file contains your playlist logins, so keep it private.")
                 .setPositiveButton("OK", null).show();
@@ -118,11 +120,8 @@ final class Backup {
         try { backup = new JSONObject(text); } catch (Exception e) { Menus.alert(a, "That file isn't a WygTV backup."); return; }
         JSONObject values = backup.optJSONObject("prefs");
         if (!"WygTV".equals(backup.optString("app")) || values == null) { Menus.alert(a, "That file isn't a WygTV backup."); return; }
-        int count = 0;
-        JSONObject pl = values.optJSONObject("playlists");
-        try { if (pl != null) count = new JSONArray(pl.optString("v", "[]")).length(); } catch (Exception ignored) { }
         new AlertDialog.Builder(a).setTitle("Restore " + label + "?")
-                .setMessage("This replaces your playlists, favorites, hidden items and settings with the " + count + (count == 1 ? " playlist" : " playlists") + " in the backup.")
+                .setMessage("This replaces what is on this TV with the backup: " + summary(values) + ".")
                 .setPositiveButton("Restore", (d, w) -> {
                     try { apply(a.prefs, values); } catch (Exception e) { Menus.alert(a, "Restore failed. Nothing was changed."); return; }
                     a.afterRestore();
@@ -156,6 +155,38 @@ final class Backup {
     }
 
     // ------------------------------------------------------------------ helpers
+
+    /**
+     * What a backup holds, counted from its saved values, e.g. "2 playlists, 14 favorites, 3 of your categories,
+     * 5 in My List, 7 hidden items and all settings (theme, app mode, start-up, TV guide choice)".
+     */
+    static String summary(JSONObject values) {
+        int playlists = arrayLength(values, "playlists"), categories = arrayLength(values, "virtual_categories"), favorites = 0, myList = 0, hidden = 0;
+        for (Iterator<String> it = values.keys(); it.hasNext(); ) {
+            String k = it.next();
+            JSONObject item = values.optJSONObject(k);
+            if (item == null || !k.startsWith("account_")) continue;
+            if (k.contains("_fav_") && "s".equals(item.optString("t")) && !item.optString("v").isEmpty()) favorites++;
+            else if (k.contains("_mylist_")) myList += arrayLength(values, k);
+            else if ((k.contains("_hidden_categories_") || k.contains("_hidden_channels_")) && "set".equals(item.optString("t"))) {
+                JSONArray arr = item.optJSONArray("v");
+                hidden += arr == null ? 0 : arr.length();
+            }
+        }
+        return count(playlists, "playlist", "playlists") + ", " + count(favorites, "favorite", "favorites") + ", "
+                + count(categories, "own category", "own categories") + ", "
+                + myList + " in My List, " + count(hidden, "hidden item", "hidden items")
+                + " and all settings (theme, app mode, start-up, TV guide choice)";
+    }
+
+    private static String count(int n, String one, String many) { return n + " " + (n == 1 ? one : many); }
+
+    /** Length of a JSON array saved as a string value; 0 when missing or unreadable. */
+    private static int arrayLength(JSONObject values, String key) {
+        JSONObject item = values.optJSONObject(key);
+        if (item == null) return 0;
+        try { return new JSONArray(item.optString("v", "[]")).length(); } catch (Exception e) { return 0; }
+    }
 
     /** "WygTV-backup-2026-11-21_16-54.json" → "2026-11-21 16:54". */
     static String label(String name) {
