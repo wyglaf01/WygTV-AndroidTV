@@ -4,7 +4,7 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 public class M3uTest {
-    private static final String SAMPLE = "﻿#EXTM3U url-tvg=\"http://epg.example/guide.xml.gz,http://other\"\n"
+    private static final String SAMPLE = (char) 0xFEFF + "#EXTM3U url-tvg=\"http://epg.example/guide.xml.gz,http://other\"\n"
             + "#EXTINF:-1 tvg-id=\"bbc1.uk\" tvg-name=\"BBC One\" tvg-logo=\"http://logo/bbc.png\" group-title=\"UK\",BBC One HD\n"
             + "http://s.example/live/1.ts\n"
             + "#EXTINF:-1 tvg-chno=\"7\" group-title=\"News, World\",CNN, International\r\n"

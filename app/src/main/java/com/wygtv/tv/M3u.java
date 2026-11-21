@@ -35,12 +35,13 @@ final class M3u {
         String guideUrl = "";
     }
 
+    private static final char BOM = (char) 0xFEFF;
     private static final Pattern ATTR = Pattern.compile("([A-Za-z0-9_-]+)=\"([^\"]*)\"");
 
     static Playlist parse(String text) {
         Playlist p = new Playlist();
         if (text == null) return p;
-        if (text.startsWith("﻿")) text = text.substring(1);
+        if (!text.isEmpty() && text.charAt(0) == BOM) text = text.substring(1);
         Map<String, String> pending = null;
         String pendingName = null, pendingGroup = null;
         Map<String, Integer> seen = new HashMap<>();
@@ -119,7 +120,7 @@ final class M3u {
     /** True when the text looks like an M3U playlist rather than an error page. */
     static boolean looksLikePlaylist(String text) {
         if (text == null) return false;
-        String t = text.startsWith("﻿") ? text.substring(1) : text;
+        String t = !text.isEmpty() && text.charAt(0) == BOM ? text.substring(1) : text;
         t = t.trim();
         return t.regionMatches(true, 0, "#EXTM3U", 0, 7) || t.contains("#EXTINF");
     }
