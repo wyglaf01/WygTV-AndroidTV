@@ -39,7 +39,20 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Load the WygTV signing key
+        env:
+          WYGTV_KEYSTORE_B64: ${{ secrets.WYGTV_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$WYGTV_KEYSTORE_B64" ]; then
+            echo "$WYGTV_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/wygtv-release.jks"
+            echo "WYGTV_KEYSTORE=$RUNNER_TEMP/wygtv-release.jks" >> "$GITHUB_ENV"
+          else
+            echo "::warning::WYGTV_KEYSTORE_B64 secret not set; signing with a temporary debug key."
+          fi
+
       - name: Check and build debug APK
+        env:
+          WYGTV_KEY_PASSWORD: ${{ secrets.WYGTV_KEY_PASSWORD }}
         run: gradle --no-daemon :app:lintDebug :app:testDebugUnitTest :app:assembleDebug
 
       - name: Name the APK wygtv.apk
@@ -62,3 +75,39 @@ jobs:
           name: WygTV-check-reports
           path: app/build/reports/
           if-no-files-found: ignore
+
+  # Publishes wygtv.apk to a public GitHub Release so it has a fixed direct link
+  # (for Downloader codes):
+  # https://github.com/wyglaf01/WygTV-AndroidTV/releases/latest/download/wygtv.apk
+  publish:
+    needs: build
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/app')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Download APK
+        uses: actions/download-artifact@v4
+        with:
+          name: wygtv
+          path: dist
+
+      - name: Update the WygTV release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: wygtv-latest
+        run: |
+          git tag -f "$TAG"
+          git push -f origin "refs/tags/$TAG"
+          NOTES="Latest WygTV build from ${GITHUB_REF_NAME} (${GITHUB_SHA::7}), $(date -u '+%Y-%m-%d %H:%M UTC').
+
+          Direct download: https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/wygtv.apk"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "WygTV (latest build)" --notes "$NOTES" --latest
+          else
+            gh release create "$TAG" --title "WygTV (latest build)" --notes "$NOTES" --latest
+          fi
+          gh release upload "$TAG" dist/wygtv.apk --clobber
