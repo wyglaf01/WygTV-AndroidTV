@@ -130,19 +130,21 @@ final class Subtitles {
     }
 
     /** "English (CC)", "Spanish", "Track 2", plus the stream's own label when it has one. */
-    static String label(Format f, int number) {
+    static String label(Format f, int number) { return label(f.language, f.label, f.sampleMimeType, f.roleFlags, f.selectionFlags, number); }
+
+    static String label(String language, String trackLabel, String mimeType, int roleFlags, int selectionFlags, int number) {
         String name = "";
-        if (f.language != null && !f.language.isEmpty() && !C.LANGUAGE_UNDETERMINED.equals(f.language)) {
-            name = new Locale(f.language).getDisplayLanguage();
-            if (name.isEmpty()) name = f.language;
+        if (language != null && !language.isEmpty() && !C.LANGUAGE_UNDETERMINED.equals(language)) {
+            name = new Locale(language).getDisplayLanguage();
+            if (name.isEmpty()) name = language;
         }
-        if (f.label != null && !f.label.isEmpty() && !f.label.equalsIgnoreCase(name)) name = name.isEmpty() ? f.label : name + " • " + f.label;
-        String mime = f.sampleMimeType == null ? "" : f.sampleMimeType;
+        if (trackLabel != null && !trackLabel.isEmpty() && !trackLabel.equalsIgnoreCase(name)) name = name.isEmpty() ? trackLabel : name + " • " + trackLabel;
+        String mime = mimeType == null ? "" : mimeType;
         boolean cc = MimeTypes.APPLICATION_CEA608.equals(mime) || MimeTypes.APPLICATION_CEA708.equals(mime) || mime.contains("cea-608") || mime.contains("cea-708");
         if (name.isEmpty()) name = cc ? "Closed captions" : "Track " + number;
         else if (cc) name += " (CC)";
-        if ((f.roleFlags & C.ROLE_FLAG_DESCRIBES_MUSIC_AND_SOUND) != 0 && !cc) name += " (SDH)";
-        if ((f.selectionFlags & C.SELECTION_FLAG_FORCED) != 0) name += " (forced)";
+        if ((roleFlags & C.ROLE_FLAG_DESCRIBES_MUSIC_AND_SOUND) != 0 && !cc) name += " (SDH)";
+        if ((selectionFlags & C.SELECTION_FLAG_FORCED) != 0) name += " (forced)";
         return name;
     }
 
