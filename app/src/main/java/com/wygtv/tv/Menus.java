@@ -282,6 +282,13 @@ final class Menus {
         JSONObject active = a.library.find(a.library.activeId());
 
         row(a, list, "Playlist", active == null ? "none" : active.optString("title") + "  (" + (m3u ? "M3U" : "Xtream Codes") + ")", () -> a.playlists());
+        final int modeRow = list.getChildCount();
+        boolean liveOnly = a.liveOnly();
+        row(a, list, "App mode", liveOnly ? "Live TV only  •  opens on the TV guide; press OK for the full app" : "Full  •  press OK for Live TV only (opens on the TV guide, hides Movies and Series)", () -> {
+            a.prefs.edit().putBoolean("live_only", !a.liveOnly()).apply();
+            Toast.makeText(a, a.liveOnly() ? "Live TV only. Settings stays in the side menu to switch back." : "Full app is back.", Toast.LENGTH_LONG).show();
+            settings(a, modeRow);
+        });
         final int themeRow = list.getChildCount();
         row(a, list, "Theme", Theme.LABELS[Theme.indexOf(a.prefs.getString("theme", Theme.DEFAULT))], () ->
                 choose(a, "Theme", Theme.LABELS, Theme.indexOf(a.prefs.getString("theme", Theme.DEFAULT)), i -> {
@@ -289,16 +296,18 @@ final class Menus {
                     a.applyTheme();
                     settings(a, themeRow);
                 }));
-        row(a, list, "Open at start-up", START_LABELS[indexOf(START_KEYS, a.prefs.getString("start_screen", "home"))], () ->
+        final int startRow = list.getChildCount();
+        if (!liveOnly) row(a, list, "Open at start-up", START_LABELS[indexOf(START_KEYS, a.prefs.getString("start_screen", "home"))], () ->
                 choose(a, "Open at start-up", START_LABELS, indexOf(START_KEYS, a.prefs.getString("start_screen", "home")), i -> {
                     a.prefs.edit().putString("start_screen", START_KEYS[i]).apply();
-                    settings(a, 2);
+                    settings(a, startRow);
                 }));
+        final int formatRow = list.getChildCount();
         if (!m3u) {
             row(a, list, "Live stream format", FORMAT_LABELS[indexOf(FORMAT_KEYS, a.prefs.getString("live_format", "auto"))], () ->
                     choose(a, "Live stream format (try HLS if channels stutter or won't start)", FORMAT_LABELS, indexOf(FORMAT_KEYS, a.prefs.getString("live_format", "auto")), i -> {
                         a.prefs.edit().putString("live_format", FORMAT_KEYS[i]).apply();
-                        settings(a, 3);
+                        settings(a, formatRow);
                     }));
         }
         final int guideRow = list.getChildCount();
