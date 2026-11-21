@@ -283,8 +283,8 @@ final class Menus {
 
         row(a, list, "Playlist", active == null ? "none" : active.optString("title") + "  (" + (m3u ? "M3U" : "Xtream Codes") + ")", () -> a.playlists());
         final int themeRow = list.getChildCount();
-        row(a, list, "Theme", Theme.LABELS[Theme.indexOf(a.prefs.getString("theme", "steampunk"))], () ->
-                choose(a, "Theme", Theme.LABELS, Theme.indexOf(a.prefs.getString("theme", "steampunk")), i -> {
+        row(a, list, "Theme", Theme.LABELS[Theme.indexOf(a.prefs.getString("theme", Theme.DEFAULT))], () ->
+                choose(a, "Theme", Theme.LABELS, Theme.indexOf(a.prefs.getString("theme", Theme.DEFAULT)), i -> {
                     a.prefs.edit().putString("theme", Theme.KEYS[i]).apply();
                     a.applyTheme();
                     settings(a, themeRow);

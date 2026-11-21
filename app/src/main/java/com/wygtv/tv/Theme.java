@@ -1,12 +1,12 @@
 package com.wygtv.tv;
 
 /**
- * Colour themes picked in Settings. Steampunk keeps the original brass-on-leather look and artwork;
+ * Colour themes picked in Settings (Blue unless changed). Steampunk keeps the original brass-on-leather look and artwork;
  * the others recolour every panel, button, menu and the guide, and wash the artwork in their own colour.
  */
 final class Theme {
     static final String[] KEYS = {"steampunk", "blue", "cyan", "brown", "gold", "green"};
-    static final String[] LABELS = {"Steampunk (brass & leather)", "Blue", "Cyan", "Brown", "Gold", "Green"};
+    static final String[] LABELS = {"Steampunk (brass & leather)", "Blue (default)", "Cyan", "Brown", "Gold", "Green"};
 
     // Order: BG, PANEL, PANEL_END, STROKE, STROKE_FOCUS, FOCUS, ACCENT, HEADER, TEXT, MUTED, HINT, INK, TILE_A, TILE_B, TILE_STROKE, COPPER, AIRING
     private static final int[][] PALETTES = {
@@ -18,10 +18,12 @@ final class Theme {
             {0xff07150A, 0xff173F22, 0xe60B2112, 0xff3F7F4E, 0xff9BE6A8, 0xff2E8A45, 0xffA6EBB2, 0xff8FDE9E, 0xffEAFBEE, 0xffB5DDBD, 0xff7FA889, 0xff06180B, 0xffB2F0BD, 0xff4FB866, 0xffE2FCE6, 0xff3FCF63, 0xff1F5A2E},
     };
 
-    static String key = "steampunk";
+    /** Used when no theme has been picked in Settings. */
+    static final String DEFAULT = "blue";
+    static String key = DEFAULT;
     static int BG, PANEL, PANEL_END, STROKE, STROKE_FOCUS, FOCUS, ACCENT, HEADER, TEXT, MUTED, HINT, INK, TILE_A, TILE_B, TILE_STROKE, COPPER, AIRING;
 
-    static { apply("steampunk"); }
+    static { apply(DEFAULT); }
 
     private Theme() { }
 
@@ -35,7 +37,7 @@ final class Theme {
 
     static int indexOf(String k) {
         for (int i = 0; i < KEYS.length; i++) if (KEYS[i].equals(k)) return i;
-        return 0;
+        return k.equals(DEFAULT) ? 0 : indexOf(DEFAULT);
     }
 
     static boolean steampunk() { return key.equals("steampunk"); }
