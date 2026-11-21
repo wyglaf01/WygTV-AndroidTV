@@ -59,6 +59,12 @@ final class Library {
 
     void saveAll(JSONArray list) { prefs.edit().putString("playlists", list.toString()).apply(); }
 
+    /** The prefix that a playlist's favorites, hidden items and lists are saved under (same as MainActivity.accountPrefix() while it is active). */
+    static String prefixOf(JSONObject p) {
+        boolean isM3u = M3U.equals(p.optString("type"));
+        return "account_" + b64((isM3u ? p.optString("url") : p.optString("host")) + "\n" + (isM3u ? "" : p.optString("user"))) + "_";
+    }
+
     String activeId() { return prefs.getString("active_playlist", ""); }
 
     JSONObject find(String id) {
