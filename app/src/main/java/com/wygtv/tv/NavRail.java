@@ -37,8 +37,14 @@ final class NavRail {
         NavRail r = new NavRail(a, current);
         frame.addView(r.rail, new FrameLayout.LayoutParams(a.dp(COLLAPSED_DP), -1, Gravity.START));
         // Remember where focus was in the screen, so Right (or OK on the current screen) goes back there.
-        frame.getViewTreeObserver().addOnGlobalFocusChangeListener((oldFocus, newFocus) -> {
+        // Registered on the window while this screen is showing, and removed when it goes, so old screens don't pile up.
+        android.view.ViewTreeObserver.OnGlobalFocusChangeListener track = (oldFocus, newFocus) -> {
             if (oldFocus != null && newFocus != null && r.inRail(newFocus) && !r.inRail(oldFocus)) r.lastContentFocus = oldFocus;
+        };
+        frame.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+            android.view.ViewTreeObserver observer;
+            @Override public void onViewAttachedToWindow(View v) { observer = v.getViewTreeObserver(); observer.addOnGlobalFocusChangeListener(track); }
+            @Override public void onViewDetachedFromWindow(View v) { if (observer != null && observer.isAlive()) observer.removeOnGlobalFocusChangeListener(track); observer = null; }
         });
         return frame;
     }
@@ -100,6 +106,8 @@ final class NavRail {
         // Right closes the menu and goes back into the screen.
         v.setOnKeyListener((w, code, e) -> {
             if (e.getAction() == android.view.KeyEvent.ACTION_DOWN && code == android.view.KeyEvent.KEYCODE_DPAD_RIGHT) { collapseAndReturn(); return true; }
+            // Back closes the menu first instead of leaving the screen.
+            if (code == android.view.KeyEvent.KEYCODE_BACK) { if (e.getAction() == android.view.KeyEvent.ACTION_UP) collapseAndReturn(); return true; }
             return false;
         });
         items.add(v);

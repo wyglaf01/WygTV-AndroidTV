@@ -123,7 +123,8 @@ final class Library {
         if (!host.isEmpty()) {
             JSONObject p = newPlaylist(XTREAM);
             try {
-                p.put("title", prefs.getString("title", "")).put("host", host).put("user", prefs.getString("user", ""))
+                String title = prefs.getString("title", "").trim();
+                p.put("title", title.isEmpty() ? Menus.hostOf(host) : title).put("host", host).put("user", prefs.getString("user", ""))
                         .put("pass", prefs.getString("pass", "")).put("expiry", prefs.getString("expiry", ""));
             } catch (JSONException ignored) { }
             l.put(p);

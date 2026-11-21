@@ -357,7 +357,9 @@ final class TvGuide {
                 return true;
             }
             if (key == KeyEvent.KEYCODE_DPAD_LEFT && first) {
-                if (winStart > EpgGrid.windowStart(now())) shiftWindow(row, -2 * EpgGrid.SLOT, c.start - 1);
+                // At "now" there is nothing earlier to show, so Left falls through to the side menu.
+                if (winStart <= EpgGrid.windowStart(now())) return false;
+                shiftWindow(row, -2 * EpgGrid.SLOT, c.start - 1);
                 return true;
             }
             return false;
