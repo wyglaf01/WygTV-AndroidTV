@@ -319,6 +319,11 @@ final class Menus {
             new Thread(a.library::dropGuide).start();
             Toast.makeText(a, "The guide will reload the next time it's shown.", Toast.LENGTH_SHORT).show();
         });
+        final int tmdbRow = list.getChildCount();
+        String mine = a.saved(Tmdb.PREF_KEY).trim();
+        row(a, list, "Movie & series info (TMDb)", !mine.isEmpty() ? "On  •  your TMDb key …" + mine.substring(Math.max(0, mine.length() - 4)) + "  •  press OK to change or remove it"
+                : !Tmdb.builtInKey().isEmpty() ? "On  •  built-in key  •  press OK to use your own"
+                : "Off  •  press OK to add a free TMDb API key for posters, plots, cast and ratings", () -> tmdbKey(a, tmdbRow));
         final int hiddenRow = list.getChildCount();
         int hidden = a.hiddenCount();
         row(a, list, "Hidden categories and channels", hidden == 0 ? "nothing hidden" : hidden + " hidden  •  press OK to show them all again", () -> {
@@ -347,6 +352,38 @@ final class Menus {
         row(a, list, "About", about, () -> Toast.makeText(a, about, Toast.LENGTH_SHORT).show());
         int i = Math.max(0, Math.min(focusIndex, list.getChildCount() - 1));
         list.getChildAt(i).requestFocus();
+    }
+
+    /** Settings → Movie & series info: type, test and save a TMDb API key (v3 key or v4 read access token). */
+    private static void tmdbKey(MainActivity a, int focusRow) {
+        LinearLayout box = new LinearLayout(a);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(a.dp(20), a.dp(8), a.dp(20), 0);
+        TextView help = a.label("Get a free key at themoviedb.org → Settings → API, then type the \"API Key\" here. Movie and series pages then show TMDb posters, plots, cast, ratings and age ratings.", 15);
+        help.setTextColor(Theme.MUTED);
+        box.addView(help, new LinearLayout.LayoutParams(-1, -2));
+        android.widget.EditText field = new android.widget.EditText(a);
+        field.setSingleLine(true);
+        field.setHint("TMDb API key");
+        field.setText(a.saved(Tmdb.PREF_KEY));
+        field.setTextColor(Theme.TEXT);
+        field.setHintTextColor(Theme.HINT);
+        box.addView(field, new LinearLayout.LayoutParams(-1, -2));
+        new AlertDialog.Builder(a).setTitle("TMDb API key").setView(box)
+                .setPositiveButton("Save", (d, w) -> {
+                    String key = field.getText().toString().replaceAll("\\s+", "");
+                    a.prefs.edit().putString(Tmdb.PREF_KEY, key).apply();
+                    settings(a, focusRow);
+                    if (key.isEmpty()) return;
+                    Toast.makeText(a, "Checking the key with TMDb…", Toast.LENGTH_SHORT).show();
+                    new Thread(() -> {
+                        boolean ok = Tmdb.works(key);
+                        a.runOnUiThread(() -> Toast.makeText(a, ok ? "TMDb key works. Open any movie or series to see its details." : "TMDb didn't accept that key (or there's no connection). Check it and try again.", Toast.LENGTH_LONG).show());
+                    }).start();
+                })
+                .setNeutralButton("Remove", (d, w) -> { a.prefs.edit().remove(Tmdb.PREF_KEY).apply(); settings(a, focusRow); })
+                .setNegativeButton("Cancel", null).show();
+        field.requestFocus();
     }
 
     private static void guideSource(MainActivity a, JSONObject active, int focusRow) {
