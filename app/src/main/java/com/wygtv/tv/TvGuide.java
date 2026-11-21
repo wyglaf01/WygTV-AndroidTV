@@ -115,11 +115,19 @@ final class TvGuide {
         LinearLayout bar = new LinearLayout(a);
         bar.setGravity(Gravity.CENTER_VERTICAL);
         bar.addView(header, new LinearLayout.LayoutParams(0, -1, 1));
+        // Pick what the guide lists: Favorites, all channels or one category (Up from the grid reaches it).
+        TextView source = a.button("☰  Showing: " + (categoryTitle.isEmpty() ? "All channels" : categoryTitle), bar, a::chooseGuideSource);
+        source.setTextSize(15);
+        source.setSingleLine(true);
+        source.setPadding(a.dp(14), 0, a.dp(14), 0);
+        LinearLayout.LayoutParams sourceLp = new LinearLayout.LayoutParams(-2, a.dp(38));
+        sourceLp.setMargins(a.dp(8), 0, a.dp(12), 0);
+        source.setLayoutParams(sourceLp);
         clock = text("", 20, GOLD, true);
         bar.addView(clock, new LinearLayout.LayoutParams(-2, -1));
         a.root.addView(bar, 0, new LinearLayout.LayoutParams(-1, a.dp(44)));
         a.status.setLayoutParams(new LinearLayout.LayoutParams(-1, a.dp(24)));
-        a.status.setText("OK  Watch full screen        ◀ ▶  Move through time        ▲ ▼  Change channel        BACK  Live TV");
+        a.status.setText("OK  Watch full screen      ◀ ▶  Move through time      ▲ ▼  Change channel      ▲ from the top  Pick Favorites or a category      BACK  Live TV");
 
         int screenW = a.getResources().getDisplayMetrics().widthPixels;
         chanW = a.dp(200);
