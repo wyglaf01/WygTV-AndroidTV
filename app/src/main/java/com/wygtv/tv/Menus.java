@@ -310,6 +310,16 @@ final class Menus {
                         settings(a, formatRow);
                     }));
         }
+        final int subsLiveRow = list.getChildCount();
+        row(a, list, "Subtitles for Live TV", onOff(Subtitles.defaultOn(a.prefs, true)) + "  •  closed captions start on for every channel that sends them. Press OK to switch", () -> {
+            a.prefs.edit().putBoolean(Subtitles.PREF_LIVE, !Subtitles.defaultOn(a.prefs, true)).apply();
+            settings(a, subsLiveRow);
+        });
+        final int subsVodRow = list.getChildCount();
+        if (!liveOnly) row(a, list, "Subtitles for Movies and Series", onOff(Subtitles.defaultOn(a.prefs, false)) + "  •  press OK to switch. In the player, MENU > Subtitles picks a language", () -> {
+            a.prefs.edit().putBoolean(Subtitles.PREF_VOD, !Subtitles.defaultOn(a.prefs, false)).apply();
+            settings(a, subsVodRow);
+        });
         final int guideRow = list.getChildCount();
         String custom = a.saved("epg_url");
         String guideState = a.library.guideStatus();
@@ -445,6 +455,8 @@ final class Menus {
         TextView v = a.button(name + "\n      " + value, list, action);
         v.setTextSize(19);
     }
+
+    private static String onOff(boolean on) { return on ? "On" : "Off"; }
 
     interface Pick { void run(int index); }
 
