@@ -31,7 +31,7 @@ public class MainActivity extends Activity {
  @Override protected void onActivityResult(int code,int result,Intent data){super.onActivityResult(code,result,data);if(code==Backup.REQ_PICK&&result==RESULT_OK&&data!=null)Backup.onPicked(this,data.getData());}
  void updateStatus(){String s=saved("host");if(s.isEmpty()){status.setText("No playlist connected");return;}String exp=Menus.expiryText(saved("expiry"));status.setText("Playlist: "+saved("title")+"  •  "+(library.activeIsM3u()?"M3U":"Xtream Codes")+"  •  "+Menus.hostOf(s)+(exp.isEmpty()?"":"  •  "+exp));}
  /** Which side-menu entry the current screen belongs to. */
- String railKey(){return mode.equals("episodes")?"series":mode.equals("login")?"playlists":mode;}
+ String railKey(){return mode.equals("search")?"live":mode.equals("episodes")?"series":mode.equals("login")?"playlists":mode;}
  void home(){
   mode="home";screenGeneration++;listGeneration++;
   FrameLayout scene=new FrameLayout(this);View frame=NavRail.wrap(this,scene,"home");frame.setBackground(new SteampunkBackdrop(getResources(),R.drawable.steampunk_home,true));setContentView(frame);
@@ -42,7 +42,7 @@ public class MainActivity extends Activity {
   TextView welcome=label("YOUR NEXT SAGA AWAITS",15);welcome.setTextColor(Theme.ACCENT);welcome.setLetterSpacing(.18f);welcome.setGravity(Gravity.CENTER);center.addView(welcome,new LinearLayout.LayoutParams(-1,dp(35)));
   TextView heading=label("Choose your adventure",30);heading.setTypeface(null,Typeface.BOLD);heading.setGravity(Gravity.CENTER);center.addView(heading,new LinearLayout.LayoutParams(-1,dp(60)));
   LinearLayout tiles=new LinearLayout(this);tiles.setGravity(Gravity.CENTER);center.addView(tiles,new LinearLayout.LayoutParams(-1,dp(135)));
-  TextView live=homeTile("▣","Live TV",tiles,()->browse("live"));if(library.activeIsM3u())homeTile("▦","TV Guide",tiles,()->openGuide(null));else{homeTile("▶","Movies",tiles,()->browse("vod"));homeTile("▤","Series",tiles,()->browse("series"));}homeTile("★","Favorites",tiles,()->favorites());homeTile("↺","Recent",tiles,()->recent());homeTile("⌕","Search",tiles,()->searchLive());
+  TextView live=homeTile("▣","Live TV",tiles,()->browse("live"));if(library.activeIsM3u())homeTile("▦","TV Guide",tiles,()->openGuide(null));else{homeTile("▶","Movies",tiles,()->browse("vod"));homeTile("▤","Series",tiles,()->browse("series"));}homeTile("★","Favorites",tiles,()->favorites());homeTile("↺","Recent",tiles,()->recent());
   LinearLayout footer=new LinearLayout(this);footer.setGravity(Gravity.CENTER_VERTICAL);layout.addView(footer,new LinearLayout.LayoutParams(-1,dp(56)));
   TextView manage=button("☰  Playlists",footer,()->playlists());manage.setTextSize(16);manage.setGravity(Gravity.CENTER);manage.setLayoutParams(new LinearLayout.LayoutParams(dp(170),dp(48)));TextView gear=button("⚙  Settings",footer,()->settings());gear.setTextSize(16);gear.setGravity(Gravity.CENTER);gear.setLayoutParams(new LinearLayout.LayoutParams(dp(170),dp(48)));
   status=label("",13);status.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);status.setTextColor(Theme.MUTED);footer.addView(status,new LinearLayout.LayoutParams(0,-1,1));status.setText(saved("host").isEmpty()?"Connect your playlist to begin":"Watching • "+saved("title")+(library.activeIsM3u()?"  (M3U)":""));
