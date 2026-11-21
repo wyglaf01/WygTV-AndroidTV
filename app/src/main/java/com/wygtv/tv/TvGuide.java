@@ -285,6 +285,7 @@ final class TvGuide {
         name.setEllipsize(TextUtils.TruncateAt.END);
         name.setPadding(a.dp(12), 0, a.dp(8), 0);
         name.setBackground(rowBg(false));
+        ChannelIcons.attach(name, ch.optString("stream_icon"), ch.optString("name", "Channel"), 24);
         LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(chanW, -1);
         np.setMargins(0, a.dp(2), a.dp(8), a.dp(2));
         row.addView(name, np);
