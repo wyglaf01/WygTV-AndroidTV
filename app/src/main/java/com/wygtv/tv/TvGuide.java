@@ -211,7 +211,6 @@ final class TvGuide {
         previewView = new PlayerView(a);
         previewView.setUseController(false);
         previewView.setFocusable(false);
-        previewView.setShutterBackgroundColor(0xff000000);
         frame.addView(previewView, new FrameLayout.LayoutParams(-1, -1));
         previewError = text("Preview unavailable", 14, TAN, false);
         previewError.setGravity(Gravity.CENTER);
