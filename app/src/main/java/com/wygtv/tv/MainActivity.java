@@ -26,7 +26,7 @@ public class MainActivity extends Activity {
  /** Loads the Settings theme; screens built after this use its colours. */
  void applyTheme(){Theme.apply(prefs.getString("theme",Theme.DEFAULT));BG=Theme.BG;PANEL=Theme.PANEL;BRASS=Theme.HEADER;getWindow().getDecorView().setBackgroundColor(Theme.BG);}
  /** After Settings → Restore: reload theme and playlists from the restored settings. */
- void afterRestore(){applyTheme();forgetPlaylistData();if(library.isEmpty()){setup();return;}JSONObject p=library.find(library.activeId());if(p==null)p=library.all().optJSONObject(0);switchPlaylist(p);home();}
+ void afterRestore(){applyTheme();forgetPlaylistData();otherLive.clear();activeLive=null;library.dropOtherPlaylists();if(library.isEmpty()){setup();return;}JSONObject p=library.find(library.activeId());if(p==null)p=library.all().optJSONObject(0);switchPlaylist(p);home();}
  @Override public void onRequestPermissionsResult(int code,String[] perms,int[] results){if(code==Backup.REQ_BACKUP)Backup.backup(this);else if(code==Backup.REQ_RESTORE)Backup.restore(this);}
  @Override protected void onActivityResult(int code,int result,Intent data){super.onActivityResult(code,result,data);if(code==Backup.REQ_PICK&&result==RESULT_OK&&data!=null)Backup.onPicked(this,data.getData());}
  void updateStatus(){String s=saved("host");if(s.isEmpty()){status.setText("No playlist connected");return;}String exp=Menus.expiryText(saved("expiry"));status.setText("Playlist: "+saved("title")+"  •  "+(library.activeIsM3u()?"M3U":"Xtream Codes")+"  •  "+Menus.hostOf(s)+(exp.isEmpty()?"":"  •  "+exp));}

@@ -333,7 +333,7 @@ final class Menus {
             new AlertDialog.Builder(a).setTitle("Clear Recently watched?").setPositiveButton("Clear", (d, w) -> { a.library.clearRecent(); settings(a, recentRow); })
                     .setNegativeButton("Cancel", null).show();
         });
-        row(a, list, "Back up playlists", "save playlists, favorites, hidden items and settings to a dated WygTV backup file", () -> Backup.backup(a));
+        row(a, list, "Back up playlists", "save playlists, favorites, your categories, My List, hidden items and all settings to a dated WygTV backup file", () -> Backup.backup(a));
         row(a, list, "Restore from a backup", "reload everything from a WygTV backup file", () -> Backup.restore(a));
         row(a, list, "Check for updates", "WygTV " + Updater.installedName(a) + "  •  press OK to look for a newer version and install it over this one", () -> Updater.check(a, true));
         final int autoRow = list.getChildCount();
