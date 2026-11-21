@@ -19,4 +19,22 @@ final class XtreamProtocol {
         try { return URLEncoder.encode(value, "UTF-8").replace("+", "%20"); }
         catch (java.io.UnsupportedEncodingException impossible) { throw new AssertionError(impossible); }
     }
+
+    /** Lower-cases, strips accents and punctuation so "BBC One HD" matches "bbc one" and "Télé" matches "tele". */
+    static String searchKey(String value) {
+        if (value == null) return "";
+        String plain = java.text.Normalizer.normalize(value, java.text.Normalizer.Form.NFD).replaceAll("\\p{M}+", "");
+        return plain.toLowerCase(java.util.Locale.ROOT).replaceAll("[^\\p{L}\\p{N}]+", " ").trim();
+    }
+
+    /**
+     * Ranks a channel name (already passed through searchKey) against a query (also searchKey'd).
+     * 0 = name starts with the query, 1 = every query word appears somewhere in the name, -1 = no match.
+     */
+    static int searchRank(String nameKey, String queryKey) {
+        if (queryKey.isEmpty()) return -1;
+        if (nameKey.startsWith(queryKey)) return 0;
+        for (String word : queryKey.split(" ")) if (!nameKey.contains(word)) return -1;
+        return 1;
+    }
 }

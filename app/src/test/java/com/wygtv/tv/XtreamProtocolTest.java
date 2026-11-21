@@ -18,4 +18,16 @@ public class XtreamProtocolTest {
         assertEquals("a%20b%2Bc%2Fd%26e%3Df%3F%23", XtreamProtocol.encode("a b+c/d&e=f?#"));
         assertEquals("%C3%A9", XtreamProtocol.encode("é"));
     }
+    @Test public void searchIgnoresCaseAccentsAndPunctuation() {
+        assertEquals("bbc one hd", XtreamProtocol.searchKey("  BBC-One | HD "));
+        assertEquals("tele quebec", XtreamProtocol.searchKey("Télé-Québec"));
+        assertEquals("", XtreamProtocol.searchKey(null));
+    }
+    @Test public void searchRanksPrefixMatchesFirstAndNeedsEveryWord() {
+        String name = XtreamProtocol.searchKey("US: ESPN 2 HD");
+        assertEquals(0, XtreamProtocol.searchRank(name, XtreamProtocol.searchKey("us espn")));
+        assertEquals(1, XtreamProtocol.searchRank(name, XtreamProtocol.searchKey("espn hd")));
+        assertEquals(-1, XtreamProtocol.searchRank(name, XtreamProtocol.searchKey("espn news")));
+        assertEquals(-1, XtreamProtocol.searchRank(name, ""));
+    }
 }
