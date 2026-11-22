@@ -51,7 +51,7 @@ final class LiveMenu {
         String active = a.library.activeId();
         for (int i = 0; i < pls.length(); i++) {
             JSONObject p = pls.optJSONObject(i);
-            if (p == null || Library.isHdhr(p)) continue; // tuners show as Local Antenna above
+            if (p == null || Library.isHdhr(p)) continue; // tuners show as Antenna TV above
             boolean on = p.optString("id").equals(active);
             a.button((on ? "▤ " : "▢ ") + Library.nameOf(p) + "  ›", a.side, () -> openPlaylist(a, p));
         }
