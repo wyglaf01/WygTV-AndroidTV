@@ -18,7 +18,8 @@ import androidx.media3.exoplayer.ExoPlayer;
  *  - reconnects after an error, waiting 1, 2, 4 then 8 seconds between tries, and gives up after 8 tries in a row;
  *  - jumps back to the live edge when a live stream falls behind (HLS "behind live window");
  *  - watches for silent stalls: buffering for 20 seconds, or a live picture that hasn't moved for 20 seconds,
- *    and reconnects then too.
+ *    and reconnects then too;
+ *  - switches to the FFmpeg audio decoder and tries again at once when the device's own audio decoder fails.
  * The try count resets once the stream has played smoothly for 30 seconds, or when the channel changes.
  */
 final class Recovery implements Player.Listener {
@@ -95,6 +96,11 @@ final class Recovery implements Player.Listener {
         ui.removeCallbacks(retry);
         retryPending = false;
         if (!everPlayed && refused(httpCode(error))) { giveUp.run(error); return; }
+        if (Players.useFfmpegAudio(p, error)) {
+            Toast.makeText(c, "This device's audio decoder failed. Trying the built-in (FFmpeg) one…", Toast.LENGTH_SHORT).show();
+            reconnect();
+            return;
+        }
         if (!retryable(error.errorCode, everPlayed) || tries >= MAX_TRIES) { giveUp.run(error); return; }
         say();
         retryPending = true;
