@@ -37,4 +37,20 @@ final class XtreamProtocol {
         for (String word : queryKey.split(" ")) if (!nameKey.contains(word)) return -1;
         return 1;
     }
+
+    /** Titles whose name starts with the query come first, then names that contain every word. */
+    static org.json.JSONArray filter(org.json.JSONArray all, String[] nameKeys, String queryKey) {
+        java.util.List<org.json.JSONObject> starts = new java.util.ArrayList<>(), contains = new java.util.ArrayList<>();
+        for (int i = 0; i < all.length(); i++) {
+            org.json.JSONObject it = all.optJSONObject(i);
+            if (it == null) continue;
+            int rank = XtreamProtocol.searchRank(i < nameKeys.length ? nameKeys[i] : XtreamProtocol.searchKey(it.optString("name")), queryKey);
+            if (rank == 0) starts.add(it); else if (rank > 0) contains.add(it);
+        }
+        org.json.JSONArray out = new org.json.JSONArray();
+        for (org.json.JSONObject o : starts) out.put(o);
+        for (org.json.JSONObject o : contains) out.put(o);
+        return out;
+    }
+
 }
