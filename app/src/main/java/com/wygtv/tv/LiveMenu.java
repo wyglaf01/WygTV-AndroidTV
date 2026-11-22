@@ -35,7 +35,7 @@ final class LiveMenu {
         tier = TOP;
         a.side.removeAllViews();
         a.button(a.liveOnly() ? "← TV Guide" : "← Home", a.side, a::home);
-        a.button("★ Favorites", a.side, () -> a.loadItems("fav"));
+        pick(a, "★ Favorites", "fav");
         a.sideFixed = 1;
         a.button("⌕ Search", a.side, a::searchLive);
         Antenna.addMenuEntries(a);
@@ -44,7 +44,7 @@ final class LiveMenu {
             JSONObject c = mine.optJSONObject(i);
             if (c == null) continue;
             String vid = c.optString("id");
-            a.button("◆ " + c.optString("name"), a.side, () -> a.loadItems(vid));
+            pick(a, "◆ " + c.optString("name"), vid);
         }
         a.button("+ New category", a.side, () -> VirtualCategories.create(a, c -> { a.resumeCategory = c.optString("id"); top(a); }));
         JSONArray pls = a.library.all();
@@ -58,7 +58,35 @@ final class LiveMenu {
         a.button("⚙ Manage playlists", a.side, a::playlists);
         String resume = a.resumeCategory;
         a.resumeCategory = null;
+        // Start in the menu (Favorites highlighted) unless coming back from a channel, which re-focuses that channel.
+        a.previewOnly = a.resumeStreamId == null;
+        if (a.previewOnly && a.side.getChildCount() > 1) a.side.getChildAt(1).requestFocus();
         a.loadItems(resume != null && (VirtualCategories.isVirtual(resume) || Antenna.isAntenna(resume)) ? resume : "fav");
+    }
+
+    private static final android.os.Handler UI = new android.os.Handler(android.os.Looper.getMainLooper());
+    private static Runnable pending;
+
+    /**
+     * A menu entry whose channels show in the guide on the right as soon as it is highlighted (after a short pause,
+     * so scrolling through the menu stays quick). OK on it moves into the guide.
+     */
+    static android.widget.TextView pick(MainActivity a, String label, String id) {
+        android.widget.TextView v = a.button(label, a.side, () -> {
+            if (pending != null) UI.removeCallbacks(pending);
+            a.previewOnly = false;
+            a.loadItems(id);
+        });
+        android.view.View.OnFocusChangeListener old = v.getOnFocusChangeListener();
+        v.setOnFocusChangeListener((w, f) -> {
+            if (old != null) old.onFocusChange(w, f);
+            if (!f) return;
+            if (pending != null) UI.removeCallbacks(pending);
+            if (id.equals(a.category)) return;
+            pending = () -> { if (v.hasFocus() && !id.equals(a.category)) { a.previewOnly = true; a.loadItems(id); } };
+            UI.postDelayed(pending, 450);
+        });
+        return v;
     }
 
     /** Second tier: the playlist's provider categories (switching to it first if needed). */

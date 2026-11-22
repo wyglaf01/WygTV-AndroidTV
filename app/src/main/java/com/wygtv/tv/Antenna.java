@@ -41,7 +41,7 @@ final class Antenna {
     static void addMenuEntries(MainActivity a) {
         for (JSONObject t : tuners(a)) {
             String id = PREFIX + t.optString("id");
-            a.button(label(a, t), a.side, () -> a.loadItems(id));
+            LiveMenu.pick(a, label(a, t), id);
         }
     }
 
