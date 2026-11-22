@@ -58,6 +58,7 @@ final class NavRail {
         if (a.liveOnly()) {
             // Live TV only (Settings → App mode): the guide is the main screen, plus Live TV and Settings.
             add("▦", "TV Guide", "guide", current, () -> a.openGuide(null));
+            add("★", "Favorites", "fav", current, () -> LiveMenu.openAt(a, "fav", true));
             add("▣", "Live TV", "live", current, () -> a.browse("live"));
             add("⌕", "Search channels", "search", current, () -> a.searchLive());
             rail.addView(new View(a), new LinearLayout.LayoutParams(-1, 0, 1));
@@ -66,8 +67,9 @@ final class NavRail {
             return;
         }
         add("⌂", "Home", "home", current, () -> a.home());
-        add("▣", "Live TV", "live", current, () -> a.browse("live"));
         add("▦", "TV Guide", "guide", current, () -> a.openGuide(null));
+        add("★", "Favorites", "fav", current, () -> LiveMenu.openAt(a, "fav", true));
+        add("▣", "Live TV", "live", current, () -> a.browse("live"));
         if (!m3u) {
             add("▶", "Movies", "vod", current, () -> a.browse("vod"));
             add("▤", "Series", "series", current, () -> a.browse("series"));
