@@ -10,5 +10,6 @@ public class AntennaNameTest {
         assertEquals("Antenna TV", Antenna.nameOf(new JSONObject()));
         assertEquals("Antenna TV", Antenna.nameOf(new JSONObject().put("title", "HDHomeRun FLEX 4K")));
         assertEquals("Bedroom", Antenna.nameOf(new JSONObject().put("title", "Bedroom")));
+        assertEquals("Local", Antenna.nameOf(new JSONObject().put("title", "local")));
     }
 }

@@ -445,9 +445,9 @@ final class Menus {
         JSONObject active = a.library.find(a.library.activeId());
         boolean liveOnly = a.liveOnly();
         if (g.isEmpty()) {
-            row(a, list, "▤  " + groupTitle(GROUP_PLAYLISTS), "playlists, HDHomeRun, hidden categories, channel groups, TV guide source, extra TV guides", () -> settingsGroup(a, GROUP_PLAYLISTS));
+            row(a, list, "▤  " + groupTitle(GROUP_PLAYLISTS), "playlists, HDHomeRun, manage categories, hide and show channels, channel groups, TV guide source, extra TV guides", () -> settingsGroup(a, GROUP_PLAYLISTS));
             row(a, list, "▶  " + groupTitle(GROUP_PLAYER), "live stream format, buffer, video decoder, subtitles", () -> settingsGroup(a, GROUP_PLAYER));
-            row(a, list, "◐  " + groupTitle(GROUP_APPEARANCE), "theme, app mode, start-up screen, guide rows, watched series, play next, movie and series info, IMDb ratings", () -> settingsGroup(a, GROUP_APPEARANCE));
+            row(a, list, "◐  " + groupTitle(GROUP_APPEARANCE), "theme, app mode, start-up screen, guide rows, live preview, watched series, play next, movie and series info, IMDb ratings", () -> settingsGroup(a, GROUP_APPEARANCE));
             row(a, list, "⟳  " + groupTitle(GROUP_BACKUP), "back up, restore, check for updates  •  WygTV " + Updater.installedName(a), () -> settingsGroup(a, GROUP_BACKUP));
         } else if (g.equals(GROUP_PLAYLISTS)) {
             row(a, list, "Manage playlists", (active == null ? "none" : "Watching " + active.optString("title") + "  (" + (a.library.activeIsHdhr() ? "HDHomeRun" : m3u ? "M3U" : "Xtream Codes") + ")") + "  •  press OK to add, edit, refresh or delete playlists", () -> a.playlists());
@@ -456,9 +456,15 @@ final class Menus {
                     ? "not added  •  press OK to add your tuner. Its channels show in Live TV as " + Antenna.DEFAULT_NAME
                     : (tuners.size() == 1 ? describe(tuners.get(0)) : tuners.size() + " tuners") + "  •  press OK to add, edit, refresh or remove",
                     () -> { if (tuners.isEmpty()) hdhrForm(a, null); else tunerList(a); });
+            final int catsRow = list.getChildCount();
+            row(a, list, "Manage categories", Manage.categorySummary(a) + "  •  press OK to hide or show categories, one at a time or all at once",
+                    () -> Manage.categories(a, () -> settings(a, catsRow)));
+            final int chansRow = list.getChildCount();
+            row(a, list, "Hide and show channels", Manage.channelSummary(a) + "  •  press OK to pick a category, then tick the channels to show",
+                    () -> Manage.channels(a, () -> settings(a, chansRow)));
             final int hiddenRow = list.getChildCount();
             int hidden = a.hiddenCount();
-            row(a, list, "Hidden categories and channels", hidden == 0 ? "nothing hidden" : hidden + " hidden  •  press OK to show them all again", () -> {
+            row(a, list, "Show everything again", hidden == 0 ? "nothing hidden" : hidden + " hidden  •  press OK to show every hidden category and channel", () -> {
                 if (a.hiddenCount() == 0) { Toast.makeText(a, "Nothing is hidden.", Toast.LENGTH_SHORT).show(); return; }
                 new Dialogs.Builder(a).setTitle("Show everything again?").setMessage("Every hidden category and channel in this playlist comes back.")
                         .setPositiveButton("Show all", (d, w) -> { a.unhideAll(); settings(a, hiddenRow); }).setNegativeButton("Cancel", null).show();
@@ -548,6 +554,12 @@ final class Menus {
                     choose(a, "Channel rows in the Live TV guide", new String[]{"3 rows", "4 rows", "5 rows"}, indexOf(guideRows, String.valueOf(a.prefs.getInt("guide_rows", 4))), i -> {
                         a.prefs.edit().putInt("guide_rows", 3 + i).apply();
                         settings(a, guideRowsRow);
+                    }));
+            final int previewRow = list.getChildCount();
+            row(a, list, "Live preview switches", PreviewDelay.label(a.prefs) + "  •  when the preview above the guide changes to the channel you highlight", () ->
+                    choose(a, "Change the live preview", PreviewDelay.LABELS, Menus.indexOf(PreviewDelay.KEYS, PreviewDelay.key(a.prefs)), i -> {
+                        a.prefs.edit().putString(PreviewDelay.PREF, PreviewDelay.KEYS[i]).apply();
+                        settings(a, previewRow);
                     }));
             if (!liveOnly) {
                 final int watchedRow = list.getChildCount();

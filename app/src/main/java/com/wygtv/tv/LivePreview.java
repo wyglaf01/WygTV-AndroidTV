@@ -23,7 +23,6 @@ import org.json.JSONObject;
  * screen changes, a channel opens full screen or the app goes to the background.
  */
 final class LivePreview {
-    private static final int DELAY_MS = 700;
     private static final Handler UI = new Handler(Looper.getMainLooper());
 
     private static PlayerView view;
@@ -55,7 +54,7 @@ final class LivePreview {
             @Override public void onViewAttachedToWindow(View v) { }
             @Override public void onViewDetachedFromWindow(View v) { if (view == mine) release(); }
         });
-        label = a.label("Highlight a channel to preview it", 14);
+        label = a.label(PreviewDelay.okOnly(a.prefs) ? "Press OK on a channel to preview it" : "Highlight a channel to preview it", 14);
         label.setTextColor(Theme.MUTED);
         label.setGravity(Gravity.CENTER);
         frame.addView(label, new FrameLayout.LayoutParams(-1, -1));
@@ -65,19 +64,39 @@ final class LivePreview {
         return frame;
     }
 
-    /** The guide's focused channel changed: preview it shortly. */
+    /** The guide's focused channel changed: preview it after the delay chosen in Settings (not at all for OK only). */
     static void show(MainActivity a, JSONObject item) {
         if (view == null || !view.isAttachedToWindow()) return;
         wanted = item;
         if (pending != null) UI.removeCallbacks(pending);
+        pending = null;
+        int delay = PreviewDelay.ms(a.prefs);
+        if (delay < 0) return;
         pending = () -> { if (wanted == item) start(a, item); };
-        UI.postDelayed(pending, DELAY_MS);
+        UI.postDelayed(pending, delay);
+    }
+
+    /**
+     * OK on a guide row. In "OK only" mode, a channel that isn't in the preview yet starts previewing and this
+     * returns true (OK is used up); OK on the channel already previewing returns false so it opens full screen.
+     */
+    static boolean previewOnOk(MainActivity a, JSONObject item) {
+        if (!PreviewDelay.okOnly(a.prefs) || view == null || !view.isAttachedToWindow()) return false;
+        if (player != null && keyOf(a, item).equals(playingKey)) return false;
+        wanted = item;
+        start(a, item);
+        return true;
+    }
+
+    private static String keyOf(MainActivity a, JSONObject item) {
+        String pid = item.optString("playlist");
+        return (pid.isEmpty() ? a.library.activeId() : pid) + "|" + item.optString("stream_id");
     }
 
     private static void start(MainActivity a, JSONObject item) {
         if (view == null || !view.isAttachedToWindow()) return;
         String pid = item.optString("playlist"), sid = item.optString("stream_id");
-        String key = (pid.isEmpty() ? a.library.activeId() : pid) + "|" + sid;
+        String key = keyOf(a, item);
         if (player != null && key.equals(playingKey)) return;
         String ext = item.optString("container_extension", "ts");
         if (ext.isEmpty()) ext = "ts";
