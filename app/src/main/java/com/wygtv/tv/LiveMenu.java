@@ -30,9 +30,26 @@ final class LiveMenu {
         }, "Unable to load categories");
     }
 
+    /** Menu entries made by {@link #pick} on the current first tier, by id. */
+    private static final Map<String, android.widget.TextView> picks = new HashMap<>();
+    /** Entry to highlight once the first tier is built (set by {@link #openAt}). */
+    private static String focusOnOpen;
+
+    /**
+     * Opens Live TV at the first tier showing one entry ("fav" or an Antenna TV tuner). With focusIt the menu
+     * highlights that entry; otherwise it starts on Favorites as usual.
+     */
+    static void openAt(MainActivity a, String id, boolean focusIt) {
+        tier = TOP;
+        a.resumeCategory = id;
+        focusOnOpen = focusIt ? id : null;
+        a.browse("live");
+    }
+
     /** First tier: Favorites, Search, added categories, added playlists. */
     static void top(MainActivity a) {
         tier = TOP;
+        picks.clear();
         a.side.removeAllViews();
         a.button(a.liveOnly() ? "← TV Guide" : "← Home", a.side, a::home);
         pick(a, "★ Favorites", "fav");
@@ -68,6 +85,9 @@ final class LiveMenu {
         a.previewOnly = a.resumeStreamId == null;
         if (a.previewOnly && a.side.getChildCount() > 1) a.side.getChildAt(1).requestFocus();
         a.loadItems(resume != null && (VirtualCategories.isVirtual(resume) || Antenna.isAntenna(resume)) ? resume : "fav");
+        android.widget.TextView want = focusOnOpen == null ? null : picks.get(focusOnOpen);
+        focusOnOpen = null;
+        if (want != null && a.resumeStreamId == null) want.requestFocus();
     }
 
     private static final android.os.Handler UI = new android.os.Handler(android.os.Looper.getMainLooper());
@@ -92,6 +112,7 @@ final class LiveMenu {
             pending = () -> { if (v.hasFocus() && !id.equals(a.category)) { a.previewOnly = true; a.loadItems(id); } };
             UI.postDelayed(pending, 450);
         });
+        picks.put(id, v);
         return v;
     }
 
