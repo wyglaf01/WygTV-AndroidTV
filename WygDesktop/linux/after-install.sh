@@ -20,7 +20,7 @@ if [ -e /etc/apparmor.d/abi/4.0 ]; then
 abi <abi/4.0>,
 include <tunables/global>
 
-profile wygdesktop /opt/WygDesktop/wygdesktop flags=(unconfined) {
+profile wygdesktop /opt/WygDesktop/wygdesktop-bin flags=(unconfined) {
   userns,
 
   include if exists <local/wygdesktop>

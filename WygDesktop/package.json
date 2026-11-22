@@ -120,6 +120,7 @@
         "ffmpeg"
       ]
     },
-    "publish": null
+    "publish": null,
+    "afterPack": "linux/after-pack.js"
   }
 }
