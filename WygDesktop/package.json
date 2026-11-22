@@ -98,7 +98,9 @@
       "recommends": [
         "ffmpeg"
       ],
-      "maintainer": "Eddie <wyglaf01@users.noreply.github.com>"
+      "maintainer": "Eddie <wyglaf01@users.noreply.github.com>",
+      "afterInstall": "linux/after-install.sh",
+      "afterRemove": "linux/after-remove.sh"
     },
     "publish": null
   }

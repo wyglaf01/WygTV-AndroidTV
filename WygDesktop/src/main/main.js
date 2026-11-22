@@ -12,8 +12,13 @@ const { EpgStore } = require('./epg');
 const smoke = require('./smoke');
 
 // AppImages can't use Chromium's setuid sandbox helper, and Ubuntu 24.04 blocks the namespace sandbox
-// for apps without an AppArmor profile, so the AppImage would not start at all with it on.
-if (process.platform === 'linux' && process.env.APPIMAGE) app.commandLine.appendSwitch('no-sandbox');
+// for apps without an AppArmor profile, so an AppImage won't start with the sandbox on. The switch only
+// works when given at launch (adding it here is too late for Chromium's helper processes), so the
+// AppImage starts itself again with it and passes back its exit code.
+if (process.platform === 'linux' && process.env.APPIMAGE && !process.argv.includes('--no-sandbox')) {
+  const r = require('child_process').spawnSync(process.env.APPIMAGE, [...process.argv.slice(1), '--no-sandbox'], { stdio: 'inherit' });
+  process.exit(r.status == null ? 1 : r.status);
+}
 const smokeTest = smoke.prepare(app);
 
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');

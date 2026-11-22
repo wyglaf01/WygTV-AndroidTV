@@ -112,6 +112,7 @@ jobs:
           sudo apt-get install -y -q --no-install-recommends xvfb ./pkg/WygDesktop-linux.deb
           dpkg -s wygdesktop | grep -E '^(Version|Depends)'
           ls -l /opt/WygDesktop/chrome-sandbox
+          ls -l /etc/apparmor.d/wygdesktop || echo "no AppArmor profile (not needed on this Ubuntu)"
 
       - name: Run the installed app
         run: timeout 300 xvfb-run -a -s "-screen 0 1600x900x24" wygdesktop --smoke=http://127.0.0.1:8765 2>&1 | tee deb.log | grep -E 'WYG-SMOKE|rror' ; test "${PIPESTATUS[0]}" = 0
