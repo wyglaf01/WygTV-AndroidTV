@@ -6,7 +6,9 @@ import android.os.Looper;
 import android.os.SystemClock;
 import android.widget.Toast;
 
+import androidx.annotation.OptIn;
 import androidx.media3.common.MediaItem;
+import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.datasource.HttpDataSource;
@@ -20,6 +22,7 @@ import androidx.media3.datasource.HttpDataSource;
  *    and reconnects then too.
  * The try count resets once the stream has played smoothly for 30 seconds, or when the channel changes.
  */
+@OptIn(markerClass = UnstableApi.class) // PlaybackException constructor for a start that never got going
 final class Recovery implements Player.Listener {
     interface GiveUp { void run(PlaybackException error); }
 
