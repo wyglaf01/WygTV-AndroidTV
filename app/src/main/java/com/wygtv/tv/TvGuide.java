@@ -57,6 +57,8 @@ final class TvGuide {
 
     private long winStart;
     private int page, focusRow, session, chanW, timelineW;
+    /** Id of the "Showing" button at the top right: Up from the first row and Right from the top of the side menu go there. */
+    private int sourceId = View.NO_ID;
     private long focusTime;
     private boolean rebuilding;
     private View shownRoot;
@@ -133,6 +135,9 @@ final class TvGuide {
         LinearLayout.LayoutParams sourceLp = new LinearLayout.LayoutParams(-2, a.dp(38));
         sourceLp.setMargins(a.dp(8), 0, a.dp(12), 0);
         source.setLayoutParams(sourceLp);
+        source.setId(View.generateViewId());
+        sourceId = source.getId();
+        source.setTag(NavRail.TOP_TARGET);
         // Channel search (same screen as Live TV → Search): 3+ letters, every playlist, favorites from the results.
         TextView find = a.button("⌕  Search", bar, a::searchLive);
         find.setTextSize(15);
@@ -273,7 +278,7 @@ final class TvGuide {
         rowNames.clear();
         int total = channels.length();
         int from = page * PAGE, to = Math.min(total, from + PAGE);
-        if (page > 0) navButton("▲ Previous channels", () -> { page--; focusRow = page * PAGE + PAGE - 1; buildRows(); });
+        if (page > 0) navButton("▲ Previous channels", () -> { page--; focusRow = page * PAGE + PAGE - 1; buildRows(); }).setNextFocusUpId(sourceId);
         for (int i = from; i < to; i++) addRow(i);
         if (to < total) navButton("▼ More channels (" + (total - to) + " left)", () -> { page++; focusRow = page * PAGE; buildRows(); });
         if (total == 0) rows.addView(text("No channels in this category.", 18, Theme.TEXT, false), new LinearLayout.LayoutParams(-1, a.dp(60)));
@@ -288,10 +293,14 @@ final class TvGuide {
         if (to > from) rows.post(() -> focusCell(focusRow, focusTime));
     }
 
-    private void navButton(String label, Runnable r) {
+    private TextView navButton(String label, Runnable r) {
         TextView b = a.button(label, rows, r);
         b.setTextSize(16);
+        return b;
     }
+
+    /** Up from the top row goes to the buttons at the top right, not into the side menu on the left. */
+    private boolean topRow(int i) { return page == 0 && i == 0; }
 
     private void addRow(int i) {
         JSONObject ch = channels.optJSONObject(i);
@@ -305,6 +314,7 @@ final class TvGuide {
         star.setFocusable(true);
         star.setClickable(true);
         star.setContentDescription("Favorite");
+        if (topRow(i)) star.setNextFocusUpId(sourceId);
         star.setBackground(rowBg(false));
         star.setOnFocusChangeListener((v, f) -> {
             star.setBackground(rowBg(f));
@@ -412,6 +422,7 @@ final class TvGuide {
             if (focused && !rebuilding) onCellFocused(row, c);
         });
         v.setOnClickListener(view -> playFullScreen(row));
+        if (topRow(row)) v.setNextFocusUpId(sourceId);
         v.setOnKeyListener((view, key, e) -> {
             if (e.getAction() != KeyEvent.ACTION_DOWN) return false;
             if (key == KeyEvent.KEYCODE_DPAD_RIGHT && last) {
