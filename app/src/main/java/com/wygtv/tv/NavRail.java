@@ -74,6 +74,10 @@ final class NavRail {
             add("▶", "Movies", "vod", current, () -> a.browse("vod"));
             add("▤", "Series", "series", current, () -> a.browse("series"));
         }
+        for (org.json.JSONObject t : Antenna.tuners(a)) { // each HDHomeRun tuner, when there is one
+            String id = Antenna.PREFIX + t.optString("id");
+            add("📡", Antenna.nameOf(t), id, current, () -> LiveMenu.openAt(a, id, true));
+        }
         add("↺", "Recently watched", "recent", current, () -> a.recent());
         rail.addView(new View(a), new LinearLayout.LayoutParams(-1, 0, 1));
         add("☰", "Playlists", "playlists", current, () -> a.playlists());
