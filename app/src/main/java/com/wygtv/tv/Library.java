@@ -253,6 +253,28 @@ final class Library {
         return out;
     }
 
+    /**
+     * Every movie ("vod") or series of a saved Xtream playlist (for the master Search), each tagged with
+     * "playlist" = its id. Hidden categories are left out; M3U playlists have none. Call off the UI thread.
+     */
+    JSONArray vodOf(JSONObject p, String type) throws Exception {
+        JSONArray out = new JSONArray();
+        if (M3U.equals(p.optString("type"))) return out;
+        String body = download(p.optString("host") + "/player_api.php?username=" + java.net.URLEncoder.encode(p.optString("user"), "UTF-8")
+                + "&password=" + java.net.URLEncoder.encode(p.optString("pass"), "UTF-8")
+                + "&action=" + (type.equals("series") ? "get_series" : "get_vod_streams"), 90000);
+        JSONArray raw = new JSONArray(body.trim());
+        java.util.Set<String> hiddenCats = prefs.getStringSet(prefixOf(p) + "hidden_categories_" + type, java.util.Collections.<String>emptySet());
+        String id = p.optString("id");
+        for (int i = 0; i < raw.length(); i++) {
+            JSONObject o = raw.optJSONObject(i);
+            if (o == null || hiddenCats.contains(o.optString("category_id"))) continue;
+            o.put("playlist", id);
+            out.put(o);
+        }
+        return out;
+    }
+
     // ---------------------------------------------------------------- other (not active) playlists
 
     /** Parsed M3U playlists other than the active one, by link, so their channels can play and preview without switching. */
