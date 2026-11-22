@@ -41,7 +41,6 @@ import org.json.JSONObject;
  */
 final class TvGuide {
     private static final int PAGE = 40;
-    private static final int PREVIEW_DELAY_MS = 700;
     private static final long HORIZON = 24 * 60 * EpgGrid.MINUTE;
 
     private final MainActivity a;
@@ -62,7 +61,7 @@ final class TvGuide {
     private View shownRoot;
     private ExecutorService pool;
     private ExoPlayer preview;
-    private String previewId;
+    private String previewId, previewName;
     private Runnable pendingPreview, ticker;
     private java.text.DateFormat timeFmt;
 
@@ -411,7 +410,13 @@ final class TvGuide {
             if (subText != null) subText.setTextColor(focused ? Theme.mix(Theme.INK,Theme.FOCUS,0.4f) : Theme.MUTED);
             if (focused && !rebuilding) onCellFocused(row, c);
         });
-        v.setOnClickListener(view -> playFullScreen(row));
+        v.setOnClickListener(view -> {
+            // "OK only" preview: the first OK previews this channel, OK again opens it full screen.
+            if (PreviewDelay.okOnly(a.prefs) && !(preview != null && key(row).equals(previewId)) && !streamId(row).isEmpty()) {
+                if (pendingPreview != null) ui.removeCallbacks(pendingPreview);
+                startPreview(row);
+            } else playFullScreen(row);
+        });
         v.setOnKeyListener((view, key, e) -> {
             if (e.getAction() != KeyEvent.ACTION_DOWN) return false;
             if (key == KeyEvent.KEYCODE_DPAD_RIGHT && last) {
@@ -506,6 +511,7 @@ final class TvGuide {
         }
         View f = a.getCurrentFocus();
         if (f != null && f.getTag() instanceof EpgGrid.Cell && rowCells.get(focusRow) == f.getParent()) showInfo(focusRow, (EpgGrid.Cell) f.getTag());
+        syncPreviewLabel();
     }
 
     // ---------------------------------------------------------------- info panel
@@ -633,9 +639,20 @@ final class TvGuide {
 
     private void schedulePreview(int row) {
         if (pendingPreview != null) ui.removeCallbacks(pendingPreview);
+        pendingPreview = null;
+        syncPreviewLabel();
+        int delay = PreviewDelay.ms(a.prefs);
+        if (delay < 0) return; // "OK only": OK on a channel previews it
         final int s = session;
-        pendingPreview = () -> { if (s == session) startPreview(row); };
-        ui.postDelayed(pendingPreview, PREVIEW_DELAY_MS);
+        pendingPreview = () -> { if (s == session && focusRow == row) startPreview(row); };
+        ui.postDelayed(pendingPreview, delay);
+    }
+
+    /** The preview's caption names the channel actually playing (with a delay or "OK only" it can lag the highlight). */
+    private void syncPreviewLabel() {
+        if (previewLabel == null || PreviewDelay.DEFAULT.equals(PreviewDelay.key(a.prefs))) return;
+        if (preview != null && previewName != null) previewLabel.setText(previewName + " · live preview");
+        else previewLabel.setText(PreviewDelay.okOnly(a.prefs) ? "Press OK to preview" : "Rest on a channel to preview it");
     }
 
     private void startPreview(int row) {
@@ -653,6 +670,8 @@ final class TvGuide {
             return;
         }
         previewId = id;
+        JSONObject ch = channels.optJSONObject(row);
+        previewName = ch == null ? "Channel" : ch.optString("name", "Channel");
         previewError.setVisibility(View.GONE);
         if (preview == null) {
             preview = Players.create(a);
@@ -667,6 +686,7 @@ final class TvGuide {
         preview.setMediaItem(MediaItem.fromUri(url));
         preview.prepare();
         preview.play();
+        syncPreviewLabel();
     }
 
     private void releasePreview() {
@@ -677,6 +697,7 @@ final class TvGuide {
             preview = null;
         }
         previewId = null;
+        previewName = null;
     }
 
     private void playFullScreen(int row) {

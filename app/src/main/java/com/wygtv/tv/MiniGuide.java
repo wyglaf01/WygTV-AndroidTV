@@ -72,7 +72,7 @@ final class MiniGuide {
         for (int i = from; i < limit; i++) {
             JSONObject item = items.optJSONObject(i);
             if (item == null) continue;
-            View row = addRow(a, list, item, ok, more);
+            View row = addRow(a, list, item, it -> { if (!LivePreview.previewOnOk(a, it)) ok.run(it); }, more);
             rows.add(row);
             data.add(item);
         }
