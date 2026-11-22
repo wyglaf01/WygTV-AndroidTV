@@ -279,7 +279,6 @@ final class Manage {
                 int step = Math.max(1, lv.getChildCount() - 1) * (key == KeyEvent.KEYCODE_CHANNEL_DOWN ? 1 : -1);
                 lv.setSelection(Math.max(0, Math.min(n - 1, lv.getSelectedItemPosition() + step)));
                 return true;
-                return false;
             });
             return lv;
         }
