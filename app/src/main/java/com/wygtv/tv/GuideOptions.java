@@ -19,14 +19,17 @@ final class GuideOptions {
 
     static void show(MainActivity a, JSONObject ch, Changed changed) { show(a, ch, null, changed); }
 
+    // Positions of the fixed items.
+    private static final int FAV = 0, HIDE = 1, ADD = 2, NEW = 3, REMOVE = 4;
+
     /** group: a channel group (◆) the list is showing, which adds "Remove from" it; null otherwise. */
-    static void show(MainActivity a, JSONObject ch, String group, Changed changed) {
-        if (ch == null) return;
+    static android.app.AlertDialog show(MainActivity a, JSONObject ch, String group, Changed changed) {
+        if (ch == null) return null;
         String pid = ch.optString("playlist");
         JSONObject pl = pid.isEmpty() || pid.equals(a.library.activeId()) ? null : a.library.find(pid);
         if (!pid.isEmpty() && !pid.equals(a.library.activeId()) && pl == null) {
             Toast.makeText(a, "This channel's playlist was removed.", Toast.LENGTH_SHORT).show();
-            return;
+            return null;
         }
         final String pre = pl == null ? a.accountPrefix() : Library.prefixOf(pl);
         final String sid = ch.optString("stream_id"), title = ch.optString("name", "Channel");
@@ -37,33 +40,37 @@ final class GuideOptions {
         items.add(fav ? "★  Remove from Favorites" : "☆  Add to Favorites");
         items.add(hideLabel(hidden));
         items.add("◆  Add to channel group…");
+        items.add("＋  New channel group…");
         if (group != null) items.add("✕  Remove from \"" + VirtualCategories.name(a, group) + "\"");
         items.add("Close");
         final String[] labels = items.toArray(new String[0]);
         android.app.AlertDialog dlg = new Dialogs.Builder(a).setTitle(title)
                 .setItems(labels, (d, w) -> {
-                    if (w == 0) {
+                    if (w == FAV) {
                         boolean added = a.toggleFavoriteIn(pre, "live", sid, title, ext);
                         Toast.makeText(a, added ? "★ Added to Favorites" : "Removed from Favorites", Toast.LENGTH_SHORT).show();
                         if (changed != null) changed.run(isHidden(a, pre, sid), added);
-                    } else if (w == 2) {
+                    } else if (w == ADD) {
                         VirtualCategories.addDialog(a, ch);
-                    } else if (w == 3 && group != null) {
+                    } else if (w == NEW) {
+                        VirtualCategories.addToNew(a, ch);
+                    } else if (w == REMOVE && group != null) {
                         VirtualCategories.removeFrom(a, group, pid.isEmpty() ? a.library.activeId() : pid, sid);
                         a.loadItems(group);
                     }
                 }).show();
         // "Hidden" is a switch: OK flips it and the pop-up stays open, so it can be flipped straight back.
         android.widget.ListView lv = dlg.getListView();
-        if (lv == null) return;
+        if (lv == null) return dlg;
         final android.widget.AdapterView.OnItemClickListener others = lv.getOnItemClickListener();
         lv.setOnItemClickListener((parent, view, pos, id) -> {
-            if (pos != 1) { if (others != null) others.onItemClick(parent, view, pos, id); return; }
+            if (pos != HIDE) { if (others != null) others.onItemClick(parent, view, pos, id); return; }
             boolean nowHidden = toggleHidden(a, pre, sid);
-            labels[1] = hideLabel(nowHidden);
+            labels[HIDE] = hideLabel(nowHidden);
             if (parent.getAdapter() instanceof android.widget.BaseAdapter) ((android.widget.BaseAdapter) parent.getAdapter()).notifyDataSetChanged();
             if (changed != null) changed.run(nowHidden, a.isFavoriteIn(pre, "live", sid));
         });
+        return dlg;
     }
 
     private static String hideLabel(boolean hidden) { return hidden ? "☑  Hidden: on  (OK to show)" : "☐  Hidden: off  (OK to hide)"; }
