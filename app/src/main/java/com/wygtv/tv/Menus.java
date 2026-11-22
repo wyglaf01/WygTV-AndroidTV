@@ -329,6 +329,12 @@ final class Menus {
             new Thread(a.library::dropGuide).start();
             Toast.makeText(a, "The guide will reload the next time it's shown.", Toast.LENGTH_SHORT).show();
         });
+        final int extraRow = list.getChildCount();
+        int extraCount = a.library.extras.urls().size();
+        row(a, list, "Extra TV guides (XMLTV)", extraCount == 0
+                ? "none  •  press OK to add guide links that fill in channels with no program info"
+                : extraCount + (extraCount == 1 ? " link" : " links") + "  •  " + (a.library.extras.first() ? "used first, the playlist's guide fills the rest" : "fill in channels the playlist's guide leaves empty"),
+                () -> extraGuides(a, extraRow));
         final int tmdbRow = list.getChildCount();
         keyRow(a, list, "Movie & series info (TMDb)", Tmdb.PREF_KEY, Tmdb.builtInKey(), "TMDb", "posters, plots, cast and ratings", tmdbRow);
         final int omdbRow = list.getChildCount();
@@ -431,6 +437,108 @@ final class Menus {
         a.library.activate(active);
         new Thread(a.library::dropGuide).start();
         settings(a, focusRow);
+    }
+
+    // ------------------------------------------------------------------ extra (supplemental) TV guides
+
+    /** Free XMLTV guides by country (epg.pw), offered when adding a link. */
+    static final String[] FREE_GUIDE_LABELS = {"USA", "Canada", "United Kingdom", "Ireland", "Australia", "Mexico", "Spain", "Germany", "France", "Italy", "Portugal", "Brazil", "India"};
+    static final String[] FREE_GUIDE_CODES = {"US", "CA", "GB", "IE", "AU", "MX", "ES", "DE", "FR", "IT", "PT", "BR", "IN"};
+
+    static String freeGuideUrl(String code) { return "https://epg.pw/xmltv/epg_" + code + ".xml.gz"; }
+
+    /** Settings → Extra TV guides: the saved links, add, priority. */
+    static void extraGuides(MainActivity a, int focusRow) {
+        java.util.List<String> urls = a.library.extras.urls();
+        java.util.List<String> labels = new java.util.ArrayList<>();
+        for (String u : urls) {
+            String st = a.library.extras.status(u);
+            labels.add((labels.size() + 1) + ".  " + hostOf(u) + "  " + tail(u) + (st.isEmpty() ? "" : "   (" + st + ")"));
+        }
+        final int add = labels.size();
+        labels.add("+ Add a guide link");
+        labels.add("+ Add a free guide by country");
+        final int prio = labels.size();
+        labels.add(a.library.extras.first() ? "Order: extra guides first, then the playlist's  (press OK to change)"
+                : "Order: the playlist's guide first, extra guides fill the gaps  (press OK to change)");
+        new Dialogs.Builder(a).setTitle("Extra TV guides")
+                .setItems(labels.toArray(new String[0]), (d, w) -> {
+                    if (w < add) extraGuide(a, urls.get(w), focusRow);
+                    else if (w == add) addExtraGuide(a, focusRow);
+                    else if (w == add + 1) choose(a, "Free guide for which country?", FREE_GUIDE_LABELS, -1, i -> saveExtraGuide(a, freeGuideUrl(FREE_GUIDE_CODES[i]), focusRow));
+                    else if (w == prio) {
+                        a.prefs.edit().putBoolean(ExtraGuides.PREF_FIRST, !a.library.extras.first()).apply();
+                        settings(a, focusRow);
+                        extraGuides(a, focusRow);
+                    }
+                })
+                .setNegativeButton("Close", null).show();
+    }
+
+    private static String tail(String url) {
+        int slash = url.lastIndexOf('/');
+        return slash < 0 || slash == url.length() - 1 ? "" : url.substring(slash + 1);
+    }
+
+    private static void addExtraGuide(MainActivity a, int focusRow) {
+        EditText input = new EditText(a);
+        input.setSingleLine(true);
+        input.setHint("http://…/guide.xml or .xml.gz");
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        new Dialogs.Builder(a).setTitle("Add an extra TV guide")
+                .setMessage("An XMLTV link. Channels are matched by their guide id (tvg-id), then by name. It is used for every playlist.")
+                .setView(input)
+                .setPositiveButton("Add", (d, w) -> {
+                    String link = input.getText().toString().trim();
+                    if (!(link.startsWith("http://") || link.startsWith("https://"))) { alert(a, "Enter a link that starts with http:// or https://."); return; }
+                    saveExtraGuide(a, link, focusRow);
+                })
+                .setNegativeButton("Cancel", null).show();
+        input.requestFocus();
+    }
+
+    private static void saveExtraGuide(MainActivity a, String link, int focusRow) {
+        java.util.List<String> urls = a.library.extras.urls();
+        if (!urls.contains(link)) urls.add(link);
+        ExtraGuides.save(a.prefs, urls);
+        settings(a, focusRow);
+        Toast.makeText(a, "Loading the guide in the background. Large guides can take a minute.", Toast.LENGTH_LONG).show();
+        new Thread(() -> {
+            Xmltv.Guide g = a.library.extras.guide(link);
+            String st = a.library.extras.status(link);
+            a.runOnUiThread(() -> {
+                if (!a.isFinishing()) Toast.makeText(a, g != null ? "Extra guide " + st + "." : "Extra guide " + (st.isEmpty() ? "could not load" : st) + ". Check the link.", Toast.LENGTH_LONG).show();
+                if ("settings".equals(a.mode)) settings(a, focusRow);
+            });
+        }).start();
+    }
+
+    private static void extraGuide(MainActivity a, String url, int focusRow) {
+        java.util.List<String> urls = a.library.extras.urls();
+        int at = urls.indexOf(url);
+        String st = a.library.extras.status(url);
+        java.util.List<String> opts = new java.util.ArrayList<>();
+        opts.add("Reload now");
+        if (at > 0) opts.add("Move up (tried earlier)");
+        opts.add("Remove");
+        new Dialogs.Builder(a).setTitle(url + (st.isEmpty() ? "" : "  •  " + st))
+                .setItems(opts.toArray(new String[0]), (d, w) -> {
+                    String o = opts.get(w);
+                    if (o.startsWith("Reload")) { a.library.extras.drop(url); saveExtraGuide(a, url, focusRow); }
+                    else if (o.startsWith("Move")) {
+                        urls.remove(at);
+                        urls.add(at - 1, url);
+                        ExtraGuides.save(a.prefs, urls);
+                        extraGuides(a, focusRow);
+                    } else {
+                        urls.remove(url);
+                        ExtraGuides.save(a.prefs, urls);
+                        a.library.extras.drop(url);
+                        settings(a, focusRow);
+                        extraGuides(a, focusRow);
+                    }
+                })
+                .setNegativeButton("Close", null).show();
     }
 
     // ------------------------------------------------------------------ recently watched

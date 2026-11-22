@@ -47,7 +47,10 @@ final class Library {
     private final Object guideLock = new Object();
     private final Object m3uLoadLock = new Object();
 
-    Library(MainActivity a, SharedPreferences prefs) { this.a = a; this.prefs = prefs; }
+    /** Supplemental XMLTV guides set in Settings, used for channels the playlist's guide leaves empty. */
+    final ExtraGuides extras;
+
+    Library(MainActivity a, SharedPreferences prefs) { this.a = a; this.prefs = prefs; this.extras = new ExtraGuides(a.getCacheDir(), prefs); }
 
     // ------------------------------------------------------------------ saved playlists
 
@@ -266,7 +269,11 @@ final class Library {
     }
 
     /** Forgets parsed playlists that aren't active (after a restore). */
-    void dropOtherPlaylists() { synchronized (otherM3u) { otherM3u.clear(); } }
+    void dropOtherPlaylists() {
+        synchronized (otherM3u) { otherM3u.clear(); }
+        synchronized (otherXtreamIds) { otherXtreamIds.clear(); }
+        extras.clear();
+    }
 
     /** A channel's address in any saved playlist; null for an M3U playlist that isn't loaded yet (see {@link #m3uOf}). */
     String streamUrlFor(JSONObject p, String id, String ext) {
@@ -284,10 +291,12 @@ final class Library {
 
     /** The provider's short guide for a channel of another Xtream playlist (M3U playlists that aren't active have none here). Call off the UI thread. */
     JSONObject epgFor(JSONObject p, String action) throws Exception {
-        if (M3U.equals(p.optString("type"))) return new JSONObject().put("epg_listings", new JSONArray());
-        String body = download(p.optString("host") + "/player_api.php?username=" + XtreamProtocol.encode(p.optString("user"))
-                + "&password=" + XtreamProtocol.encode(p.optString("pass")) + "&action=" + action, 20000);
-        return new JSONObject(body.trim());
+        return shortEpgWithExtras(action, p, () -> {
+            if (M3U.equals(p.optString("type"))) return new JSONObject().put("epg_listings", new JSONArray());
+            String body = download(p.optString("host") + "/player_api.php?username=" + XtreamProtocol.encode(p.optString("user"))
+                    + "&password=" + XtreamProtocol.encode(p.optString("pass")) + "&action=" + action, 20000);
+            return new JSONObject(body.trim());
+        });
     }
 
     /** A playlist's name for labels: its title, else its server. */
@@ -376,9 +385,14 @@ final class Library {
         }
         List<Xmltv.Program> progs = g.find(tvgId, name);
         if (progs.isEmpty()) return activeIsM3u() ? new JSONArray() : null;
+        return listings(Xmltv.upcoming(progs, System.currentTimeMillis(), Math.max(1, limit)));
+    }
+
+    /** XMLTV programmes in the provider's get_short_epg format (base64 title and description). */
+    static JSONArray listings(List<Xmltv.Program> progs) {
         JSONArray out = new JSONArray();
         java.text.SimpleDateFormat f = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.ROOT);
-        for (Xmltv.Program p : Xmltv.upcoming(progs, System.currentTimeMillis(), Math.max(1, limit))) {
+        for (Xmltv.Program p : progs) {
             try {
                 out.put(new JSONObject()
                         .put("title", b64(p.title)).put("description", b64(p.desc))
@@ -387,6 +401,86 @@ final class Library {
             } catch (JSONException ignored) { }
         }
         return out;
+    }
+
+    // ------------------------------------------------------------------ supplemental guides
+
+    /**
+     * Answers get_short_epg with the supplemental guides mixed in: {@code provider} gives the playlist's own
+     * answer (provider guide or its XMLTV guide). By default the playlist's answer wins and the extra guides
+     * only fill channels it has nothing for; with "use first" set, the extra guides are tried first.
+     * {@code other} is a saved playlist that isn't active, or null for the active one. Call off the UI thread.
+     */
+    JSONObject shortEpgWithExtras(String action, JSONObject other, java.util.concurrent.Callable<JSONObject> provider) throws Exception {
+        if (!action.startsWith("get_short_epg")) return provider.call();
+        String sid = "";
+        int limit = 4;
+        for (String part : action.split("&")) {
+            if (part.startsWith("stream_id=")) sid = URLDecoder.decode(part.substring(10), "UTF-8");
+            else if (part.startsWith("limit=")) try { limit = Integer.parseInt(part.substring(6)); } catch (NumberFormatException ignored) { }
+        }
+        List<String> sources = new java.util.ArrayList<>(extras.urls());
+        // A saved M3U playlist that isn't active has no provider guide here: use the guide it names first.
+        if (other != null && M3U.equals(other.optString("type"))) {
+            String own = other.optString("epg");
+            if (own.isEmpty()) try { own = m3uOf(other).guideUrl; } catch (Exception ignored) { }
+            if (!own.isEmpty() && !sources.contains(own)) sources.add(extras.first() ? sources.size() : 0, own);
+        }
+        if (sources.isEmpty() || sid.isEmpty()) return provider.call();
+        boolean first = extras.first();
+        if (first) { JSONArray e = extraEpg(other, sid, sources, limit); if (e.length() > 0) return ExtraGuides.wrap(e); }
+        JSONObject own = null;
+        Exception failed = null;
+        try { own = provider.call(); }
+        catch (InterruptedException | java.io.InterruptedIOException stop) { throw stop; }
+        catch (Exception e) { failed = e; }
+        JSONArray list = own == null ? null : own.optJSONArray("epg_listings");
+        if (list != null && list.length() > 0) return own;
+        if (!first) { JSONArray e = extraEpg(other, sid, sources, limit); if (e.length() > 0) return ExtraGuides.wrap(e); }
+        if (own == null) throw failed != null ? failed : new IllegalStateException("no guide answer");
+        return own;
+    }
+
+    /** One channel's programmes from the given guides, matched by its tvg-id, then its name. */
+    private JSONArray extraEpg(JSONObject other, String sid, List<String> sources, int limit) throws InterruptedException {
+        String[] ids = channelIds(other, sid);
+        if (ids == null) return new JSONArray();
+        return extras.lookup(sources, ids[0], ids[1], limit);
+    }
+
+    /** {tvg-id, name} of a channel in the active playlist (other == null) or a saved one; null if unknown. */
+    private String[] channelIds(JSONObject other, String sid) {
+        try {
+            boolean m3uList = other == null ? activeIsM3u() : M3U.equals(other.optString("type"));
+            if (m3uList) {
+                M3u.Channel c = (other == null ? m3uBlocking() : m3uOf(other)).byId.get(sid);
+                return c == null ? null : new String[]{c.tvgId, c.tvgName.isEmpty() ? c.name : c.tvgName};
+            }
+            return (other == null ? xtreamEpgIds() : otherXtreamIds(other)).get(sid);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** stream_id -> {epg_channel_id, name} for saved Xtream playlists that aren't active, by playlist id. */
+    private final Map<String, Map<String, String[]>> otherXtreamIds = new HashMap<>();
+
+    private Map<String, String[]> otherXtreamIds(JSONObject p) throws Exception {
+        String key = prefixOf(p);
+        synchronized (otherXtreamIds) {
+            Map<String, String[]> got = otherXtreamIds.get(key);
+            if (got != null) return got;
+            Map<String, String[]> m = new HashMap<>();
+            String body = download(p.optString("host") + "/player_api.php?username=" + XtreamProtocol.encode(p.optString("user"))
+                    + "&password=" + XtreamProtocol.encode(p.optString("pass")) + "&action=get_live_streams", 60000);
+            JSONArray list = new JSONArray(body.trim());
+            for (int i = 0; i < list.length(); i++) {
+                JSONObject o = list.optJSONObject(i);
+                if (o != null) m.put(o.optString("stream_id"), new String[]{o.optString("epg_channel_id"), o.optString("name")});
+            }
+            otherXtreamIds.put(key, m);
+            return m;
+        }
     }
 
     /** stream_id -> {epg_channel_id, name} for an Xtream playlist that uses a custom guide. */
