@@ -88,6 +88,7 @@ final class VodMenu {
         }
         a.button(hiddenCount == 0 ? "◐ Hide / show categories" : "◐ Hide / show categories (" + hiddenCount + " hidden)", a.side, () -> { String m = a.mode; Manage.categories(a, null, m, () -> a.browse(m)); });
         if (focusMe != null) focusMe.requestFocus();
+        LiveMenu.restyle(a); // rebuilt while shrunk beside the posters: keep the narrow look
     }
 
     /** One category under a playlist heading. */
