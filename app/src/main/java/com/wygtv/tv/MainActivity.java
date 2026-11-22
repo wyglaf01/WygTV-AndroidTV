@@ -55,9 +55,9 @@ public class MainActivity extends Activity {
   TextView heading=label("Choose your adventure",30);heading.setTypeface(null,Typeface.BOLD);heading.setGravity(Gravity.CENTER);center.addView(heading,new LinearLayout.LayoutParams(-1,dp(60)));
   LinearLayout tiles=new LinearLayout(this);tiles.setGravity(Gravity.CENTER);center.addView(tiles,new LinearLayout.LayoutParams(-1,dp(125)));
   TextView live=homeTile("▣","Live TV",tiles,()->browse("live"));if(library.activeIsM3u())homeTile("▦","TV Guide",tiles,()->openGuide(null));else{homeTile("▶","Movies",tiles,()->browse("vod"));homeTile("▤","Series",tiles,()->browse("series"));}
-  /* Second row: Search (everything, every playlist), Favorites, and each HDHomeRun tuner as "Antenna TV" when one is set up. */
+  /* Second row: Search (everything, every playlist) and each HDHomeRun tuner as "Antenna TV" when one is set up. Favorites live inside Live TV. */
   LinearLayout shortcuts=new LinearLayout(this);shortcuts.setGravity(Gravity.CENTER);center.addView(shortcuts,new LinearLayout.LayoutParams(-1,dp(105)));
-  homeTile("⌕","Search",shortcuts,()->MasterSearch.show(this));homeTile("★","Favorites",shortcuts,()->LiveMenu.openAt(this,"fav",true));for(JSONObject t:Antenna.tuners(this)){String aid=Antenna.PREFIX+t.optString("id");homeTile("📡",Antenna.nameOf(t),shortcuts,()->LiveMenu.openAt(this,aid,true));}
+  homeTile("⌕","Search",shortcuts,()->MasterSearch.show(this));for(JSONObject t:Antenna.tuners(this)){String aid=Antenna.PREFIX+t.optString("id");homeTile("📡",Antenna.nameOf(t),shortcuts,()->LiveMenu.openAt(this,aid,true));}
   for(int i=0;i<shortcuts.getChildCount();i++)((TextView)shortcuts.getChildAt(i)).setTextSize(20);
   LinearLayout footer=new LinearLayout(this);footer.setGravity(Gravity.CENTER_VERTICAL);layout.addView(footer,new LinearLayout.LayoutParams(-1,dp(56)));
   TextView manage=button("☰  Playlists",footer,()->playlists());manage.setTextSize(16);manage.setGravity(Gravity.CENTER);manage.setLayoutParams(new LinearLayout.LayoutParams(dp(170),dp(48)));TextView gear=button("⚙  Settings",footer,()->settings());gear.setTextSize(16);gear.setGravity(Gravity.CENTER);gear.setLayoutParams(new LinearLayout.LayoutParams(dp(170),dp(48)));
