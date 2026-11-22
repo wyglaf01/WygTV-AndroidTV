@@ -206,7 +206,7 @@ final class Manage {
         String onWord = "shown", offWord = "hidden";
         Check check;
         List<String> ids = new ArrayList<>(), names = new ArrayList<>();
-        LinearLayout bar; TextView save, info; ListView left, right; BaseAdapter leftAdapter, rightAdapter;
+        LinearLayout bar; TextView save, info, tickBtn, untickBtn; ListView left, right; BaseAdapter leftAdapter, rightAdapter;
 
         Page(MainActivity a, String title, String what, List<Group> groups, int start, Runnable after) {
             this.a = a; this.title = title; this.what = what; this.groups = groups; this.after = after; this.current = start;
@@ -245,8 +245,8 @@ final class Manage {
             bar = new LinearLayout(a);
             root.addView(bar, new LinearLayout.LayoutParams(-1, -2));
             save = a.button("✓ Save", bar, this::save);
-            TextView tickAll = a.button("☑ Tick all", bar, () -> tickAll(true));
-            TextView untickAll = a.button("☐ Untick all", bar, () -> tickAll(false));
+            TextView tickAll = tickBtn = a.button("☑ Tick all", bar, () -> tickAll(true));
+            TextView untickAll = untickBtn = a.button("☐ Untick all", bar, () -> tickAll(false));
             TextView exit = a.button("✕ Exit", bar, this::exit);
             for (TextView t : new TextView[]{save, tickAll, untickAll, exit}) { t.setLayoutParams(a.rowLp()); t.setTextSize(16); t.setGravity(Gravity.CENTER); t.setPadding(a.dp(10), a.dp(7), a.dp(10), a.dp(7)); }
 
@@ -277,7 +277,9 @@ final class Manage {
             left.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
                     ui.removeCallbacksAndMessages(null);
-                    if (pos != current) ui.postDelayed(() -> show(pos, false), 350);
+                    // Not once focus is on the top bar: passing over entries on the way up to the top bar must not switch
+                    // the list, or Tick all / Untick all would hit a different category (e.g. All channels).
+                    if (pos != current) ui.postDelayed(() -> { View f = a.getCurrentFocus(); if (f == null || f.getParent() != bar) show(pos, false); }, 350);
                 }
                 @Override public void onNothingSelected(AdapterView<?> p) { }
             });
@@ -402,7 +404,13 @@ final class Manage {
             info.setText(name + "   •   " + on + " " + onWord + ", " + (ids.size() - on) + " " + offWord + "   •   ticked are " + onWord + ", OK ticks or unticks"
                     + (changed() ? "   •   unsaved changes" : "") + "   •   Back = menu bar");
             save.setText(changed() ? "✓ Save changes" : "✓ Save");
+            // Tick all / Untick all change only the list on the right, so say which one.
+            String scope = groups.size() > 1 ? " in " + shortName(name) : "";
+            tickBtn.setText("☑ Tick all" + scope);
+            untickBtn.setText("☐ Untick all" + scope);
         }
+
+        static String shortName(String name) { return name.length() > 18 ? name.substring(0, 17) + "…" : name; }
 
         void tickAll(boolean show) {
             if (ids.isEmpty()) return;
