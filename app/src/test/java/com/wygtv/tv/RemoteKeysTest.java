@@ -39,4 +39,15 @@ public class RemoteKeysTest {
         assertEquals(49, RemoteKeys.pageJump(45, 10, 50));
         assertEquals(0, RemoteKeys.pageJump(3, -10, 50));
     }
+
+    @Test public void menusWrapAroundTheEnds() {
+        boolean[] f = {false, true, true, false, true, false};
+        assertEquals(2, RemoteKeys.nextFocusable(f, 1, 1));
+        assertEquals(4, RemoteKeys.nextFocusable(f, 2, 1));
+        assertEquals(-1, RemoteKeys.nextFocusable(f, 4, 1));
+        assertEquals(-1, RemoteKeys.nextFocusable(f, 1, -1));
+        assertEquals(1, RemoteKeys.wrapTarget(f, true));
+        assertEquals(4, RemoteKeys.wrapTarget(f, false));
+        assertEquals(-1, RemoteKeys.wrapTarget(new boolean[]{false, false}, true));
+    }
 }

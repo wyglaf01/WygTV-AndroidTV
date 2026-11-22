@@ -41,4 +41,17 @@ final class RemoteKeys {
         if (size <= 0) return -1;
         return Math.max(0, Math.min(size - 1, index + delta));
     }
+
+    /** The next item that can take focus from {@code at}, stepping by {@code step} (1 down, -1 up), or -1 at the end of the list. */
+    static int nextFocusable(boolean[] focusable, int at, int step) {
+        if (focusable == null) return -1;
+        for (int i = at + step; i >= 0 && i < focusable.length; i += step) if (focusable[i]) return i;
+        return -1;
+    }
+
+    /** Where focus wraps to from the end of a list: the first item going down, the last item going up, or -1 if none. */
+    static int wrapTarget(boolean[] focusable, boolean down) {
+        if (focusable == null) return -1;
+        return down ? nextFocusable(focusable, -1, 1) : nextFocusable(focusable, focusable.length, -1);
+    }
 }
