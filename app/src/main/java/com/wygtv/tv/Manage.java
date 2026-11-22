@@ -64,26 +64,72 @@ final class Manage {
 
     // ---------- Categories ----------
 
-    /** Opens the full-screen category page: Live TV, Movies and Series on the left (just Live TV in Live-TV-only mode). */
-    static void categories(MainActivity a, Runnable after) {
-        List<Group> groups = new ArrayList<>();
-        int n = a.liveOnly() ? 1 : SECTIONS.length;
-        for (int i = 0; i < n; i++) {
-            String section = SECTIONS[i], name = SECTION_NAMES[i];
-            groups.add(new Group(name + " categories", a.hiddenKey(section), true, got ->
-                    a.request("get_" + section + "_categories", o -> {
-                        JSONArray cats = o == null ? null : o.optJSONArray("list");
-                        List<String> ids = new ArrayList<>(), titles = new ArrayList<>();
-                        for (int j = 0; cats != null && j < cats.length(); j++) {
-                            JSONObject c = cats.optJSONObject(j);
-                            if (c == null) continue;
-                            ids.add(c.optString("category_id"));
-                            titles.add(c.optString("category_name", "Category"));
-                        }
-                        got.run(ids, titles, "This playlist has no " + name + " categories.");
-                    }, "Unable to load categories")));
+    /** Opens the full-screen category page on the first playlist. */
+    static void categories(MainActivity a, Runnable after) { categories(a, null, after); }
+
+    /**
+     * Opens the full-screen category page. The left column lists every playlist (HDHomeRun tuners aside) with its
+     * Live TV / Movies / Series under it (just Live TV for M3U playlists and in Live-TV-only mode), so each
+     * playlist's categories are hidden or shown separately. {@code startAt} picks the playlist to open on.
+     */
+    static void categories(MainActivity a, JSONObject startAt, Runnable after) {
+        List<JSONObject> pls = new ArrayList<>();
+        JSONArray all = a.library.all();
+        for (int i = 0; i < all.length(); i++) {
+            JSONObject p = all.optJSONObject(i);
+            if (p != null && !Library.isHdhr(p)) pls.add(p);
         }
-        new Page(a, "MANAGE CATEGORIES", "categories", groups, 0, after).open();
+        if (pls.isEmpty()) { Menus.alert(a, "Add a playlist first."); return; }
+        boolean headings = pls.size() > 1;
+        String startId = startAt != null ? startAt.optString("id") : a.library.activeId();
+        List<Group> groups = new ArrayList<>();
+        int start = -1;
+        for (JSONObject p : pls) {
+            String title = Library.nameOf(p);
+            if (headings) groups.add(Group.heading("▤  " + title));
+            boolean m3u = Library.M3U.equals(p.optString("type"));
+            int n = a.liveOnly() || m3u ? 1 : SECTIONS.length;
+            for (int i = 0; i < n; i++) {
+                String section = SECTIONS[i], name = SECTION_NAMES[i];
+                if (start < 0 && p.optString("id").equals(startId)) start = groups.size();
+                Group g = new Group((headings ? "      " : "") + name + " categories", Library.prefixOf(p) + "hidden_categories_" + section, true,
+                        got -> fetchCategories(a, p, section, got, (headings ? title + ": " : "This playlist has no ") + (headings ? "no " : "") + name + " categories."));
+                g.name = headings ? name + " (" + title + ")" : name + " categories";
+                groups.add(g);
+            }
+        }
+        if (start < 0) start = headings ? 1 : 0;
+        Page page = new Page(a, "MANAGE CATEGORIES", "categories", groups, start, after);
+        page.onSaved = () -> { a.otherLive.clear(); MasterSearch.clear(); };
+        page.open();
+    }
+
+    /** Loads one playlist's Live TV / Movies / Series categories without switching to it. */
+    private static void fetchCategories(MainActivity a, JSONObject p, String section, Got got, String empty) {
+        new Thread(() -> {
+            List<String> ids = new ArrayList<>(), titles = new ArrayList<>();
+            boolean failed = false;
+            try {
+                if (Library.M3U.equals(p.optString("type"))) {
+                    if (section.equals("live")) for (String g : a.library.m3uOf(p).groups) { ids.add(g); titles.add(g); }
+                } else {
+                    String url = p.optString("host") + "/player_api.php?username=" + a.enc(p.optString("user")) + "&password=" + a.enc(p.optString("pass"))
+                            + "&action=get_" + section + "_categories";
+                    String text = Library.download(url, 30000).trim();
+                    JSONArray cats = text.startsWith("[") ? new JSONArray(text) : new JSONArray();
+                    for (int j = 0; j < cats.length(); j++) {
+                        JSONObject c = cats.optJSONObject(j);
+                        if (c == null) continue;
+                        ids.add(c.optString("category_id"));
+                        titles.add(c.optString("category_name", "Category"));
+                    }
+                }
+            } catch (Exception e) {
+                failed = true;
+            }
+            String msg = failed ? "Couldn't load " + Library.nameOf(p) + ". Check its connection, then try again." : empty;
+            a.runOnUiThread(() -> { if (!a.isFinishing()) got.run(ids, titles, msg); });
+        }).start();
     }
 
     // ---------- Channels ----------
@@ -182,7 +228,15 @@ final class Manage {
     /** One entry on the left: what it is called, which hidden-set pref it edits, and how to load its rows. */
     static final class Group {
         final String label, key; final boolean showCount; final Loader loader;
-        Group(String label, String key, boolean showCount, Loader loader) { this.label = label; this.key = key; this.showCount = showCount; this.loader = loader; }
+        /** The name used in the info line and on Tick all / Untick all. */
+        String name;
+        Group(String label, String key, boolean showCount, Loader loader) {
+            this.label = label; this.key = key; this.showCount = showCount; this.loader = loader;
+            this.name = label.replaceAll("^[^A-Za-z0-9]+", "");
+        }
+        /** A playlist name on the left: not selectable, just groups the entries under it. */
+        static Group heading(String label) { return new Group(label, null, false, null); }
+        boolean isHeading() { return loader == null; }
     }
 
     /** The page that is open now (mode "manage"), for the Back key. */
@@ -198,6 +252,8 @@ final class Manage {
 
     static final class Page {
         final MainActivity a; final String title, what; final List<Group> groups; final Runnable after;
+        /** Runs after a Save that changed something (e.g. to drop cached lists of other playlists). */
+        Runnable onSaved;
         /** Hidden ids per pref key: as saved, and as edited on this page. */
         final Map<String, Set<String>> saved = new HashMap<>(), edited = new HashMap<>();
         final Handler ui = new Handler(Looper.getMainLooper());
@@ -210,7 +266,7 @@ final class Manage {
 
         Page(MainActivity a, String title, String what, List<Group> groups, int start, Runnable after) {
             this.a = a; this.title = title; this.what = what; this.groups = groups; this.after = after; this.current = start;
-            for (Group g : groups) if (!saved.containsKey(g.key)) {
+            for (Group g : groups) if (!g.isHeading() && !saved.containsKey(g.key)) {
                 saved.put(g.key, new HashSet<>(a.prefs.getStringSet(g.key, new HashSet<>())));
                 edited.put(g.key, new HashSet<>(saved.get(g.key)));
             }
@@ -266,12 +322,21 @@ final class Manage {
                 @Override public int getCount() { return groups.size(); }
                 @Override public View getView(int i, View v, ViewGroup parent) {
                     Group g = groups.get(i);
+                    if (g.isHeading()) {
+                        TextView t = text(v, g.label);
+                        t.setBackground(null);
+                        t.setTextColor(a.BRASS);
+                        return t;
+                    }
                     int n = g.showCount ? edited.get(g.key).size() : -1;
                     TextView t = text(v, g.label + (n > 0 ? "   (" + n + " " + offWord + ")" : ""));
                     t.setBackground(i == current ? a.bg(a.PANEL) : null);
                     t.setTextColor(i == current ? Theme.TEXT : Theme.MUTED);
                     return t;
                 }
+                // Playlist names are headings: the remote skips over them.
+                @Override public boolean areAllItemsEnabled() { return false; }
+                @Override public boolean isEnabled(int i) { return !groups.get(i).isHeading(); }
             };
             left.setAdapter(leftAdapter);
             left.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -383,7 +448,7 @@ final class Manage {
             ids = new ArrayList<>(); names = new ArrayList<>();
             rightAdapter.notifyDataSetChanged();
             leftAdapter.notifyDataSetChanged();
-            info.setText("Loading " + groups.get(i).label.replaceAll("^[^A-Za-z0-9]+", "") + "…");
+            info.setText("Loading " + groups.get(i).name + "…");
             groups.get(i).loader.load((newIds, newNames, empty) -> {
                 if (page != this || gen != loadGeneration) return;
                 ids = newIds; names = newNames;
@@ -400,7 +465,7 @@ final class Manage {
             int on = 0;
             Set<String> h = hidden();
             for (String id : ids) if (!h.contains(id)) on++;
-            String name = groups.get(current).label.replaceAll("^[^A-Za-z0-9]+", "");
+            String name = groups.get(current).name;
             info.setText(name + "   •   " + on + " " + onWord + ", " + (ids.size() - on) + " " + offWord + "   •   ticked are " + onWord + ", OK ticks or unticks"
                     + (changed() ? "   •   unsaved changes" : "") + "   •   Back = menu bar");
             save.setText(changed() ? "✓ Save changes" : "✓ Save");
@@ -449,6 +514,7 @@ final class Manage {
                 e.putStringSet(k, new HashSet<>(now));
             }
             e.apply();
+            if ((hid > 0 || back > 0) && onSaved != null) onSaved.run();
             String msg = hid == 0 && back == 0 ? "No changes" : (hid > 0 ? hid + " " + offWord : "") + (hid > 0 && back > 0 ? ", " : "") + (back > 0 ? back + " " + onWord + " again" : "");
             Toast.makeText(a, msg, Toast.LENGTH_SHORT).show();
             close();
