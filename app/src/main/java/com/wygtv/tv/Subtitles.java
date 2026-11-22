@@ -11,7 +11,6 @@ import androidx.media3.common.TrackSelectionOverride;
 import androidx.media3.common.TrackSelectionParameters;
 import androidx.media3.common.Tracks;
 import androidx.media3.common.util.UnstableApi;
-import androidx.media3.exoplayer.ExoPlayer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -28,11 +27,11 @@ final class Subtitles {
     static final String PREF_LIVE = "subtitles_live", PREF_VOD = "subtitles_vod";
 
     private final MainActivity a;
-    private final ExoPlayer player;
+    private final Player player;
     private boolean wanted;      // show a subtitle track whenever the stream has one
     private boolean forcedHere;  // already picked a track for what is playing now
 
-    private Subtitles(MainActivity a, ExoPlayer player, boolean on) {
+    private Subtitles(MainActivity a, Player player, boolean on) {
         this.a = a;
         this.player = player;
         player.addListener(new Player.Listener() {
@@ -43,7 +42,7 @@ final class Subtitles {
     }
 
     /** Sets up subtitles for a new player, switched on or off from the Settings choice for live or on-demand. */
-    static Subtitles attach(MainActivity a, ExoPlayer player, boolean live) {
+    static Subtitles attach(MainActivity a, Player player, boolean live) {
         return new Subtitles(a, player, defaultOn(a.prefs, live));
     }
 

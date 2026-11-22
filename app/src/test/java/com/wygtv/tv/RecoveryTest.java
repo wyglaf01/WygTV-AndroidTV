@@ -35,4 +35,14 @@ public class RecoveryTest {
         assertEquals(Players.BUFFER_KEYS.length, Players.BUFFER_LABELS.length);
         assertEquals(Players.DECODER_KEYS.length, Players.DECODER_LABELS.length);
     }
+    @Test public void givesUpSoonerBeforePlayingWhenVlcIsWaiting() {
+        assertEquals(2, Recovery.allowedTries(false, 2));
+        assertEquals(Recovery.MAX_TRIES, Recovery.allowedTries(true, 2));
+        assertEquals(Recovery.MAX_TRIES, Recovery.allowedTries(false, Recovery.MAX_TRIES));
+    }
+    @Test public void playerChoices() {
+        assertEquals(Players.ENGINE_KEYS.length, Players.ENGINE_LABELS.length);
+        assertEquals("auto", Players.ENGINE_KEYS[0]);
+        assertEquals(Players.ENGINE_DEFAULT, Players.ENGINE_KEYS[0]);
+    }
 }

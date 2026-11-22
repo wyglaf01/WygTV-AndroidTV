@@ -46,6 +46,26 @@ final class Players {
     static final String[] DECODER_KEYS = {"auto", "hardware", "software"};
     static final String[] DECODER_LABELS = {"Automatic (device default)", "Hardware first", "Software first"};
 
+    /** Settings: which player engine plays full-screen video. "auto" = ExoPlayer, and VLC when ExoPlayer can't play a stream. */
+    static final String PREF_ENGINE = "player_engine";
+    static final String[] ENGINE_KEYS = {"auto", "exo", "vlc"};
+    static final String[] ENGINE_LABELS = {"ExoPlayer, then VLC if a stream won't play (recommended)", "ExoPlayer only", "VLC"};
+    static final String ENGINE_DEFAULT = "auto";
+
+    static String engine(SharedPreferences prefs) {
+        String k = prefs.getString(PREF_ENGINE, ENGINE_DEFAULT);
+        for (String e : ENGINE_KEYS) if (e.equals(k)) return k;
+        return ENGINE_DEFAULT;
+    }
+
+    /** Whether a stream ExoPlayer gave up on should be tried again in VLC. */
+    static boolean vlcFallback(SharedPreferences prefs) { return "auto".equals(engine(prefs)); }
+
+    /** The full-screen player: VLC when chosen in Settings, otherwise ExoPlayer. */
+    static Player main(Context c, SharedPreferences prefs) {
+        return "vlc".equals(engine(prefs)) ? new VlcPlayer(c, prefs) : create(c, prefs);
+    }
+
     /** Seconds loaded before playback starts for a buffer choice; 0 keeps Media3's own 2.5 s start. */
     static int bufferSeconds(String key) {
         switch (key == null ? "" : key) {
@@ -115,7 +135,7 @@ final class Players {
     }
 
     /** Tells the viewer when this device can't decode an HDHomeRun channel's video. Errors are explained by {@link #tunerMessage} once {@link Recovery} gives up. */
-    static void explainTunerProblems(Context c, ExoPlayer player) {
+    static void explainTunerProblems(Context c, Player player) {
         player.addListener(new Player.Listener() {
             boolean toldVideo;
 

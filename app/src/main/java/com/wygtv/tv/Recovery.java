@@ -10,7 +10,6 @@ import androidx.media3.common.MediaItem;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.datasource.HttpDataSource;
-import androidx.media3.exoplayer.ExoPlayer;
 
 /**
  * Keeps a stream going when the connection hiccups. Without this the player stops on the first network
@@ -28,7 +27,8 @@ final class Recovery implements Player.Listener {
     static final long STALL_MS = 20_000, HEALTHY_MS = 30_000, CHECK_MS = 5_000;
 
     private final Context c;
-    private final ExoPlayer p;
+    private final Player p;
+    private final int triesBeforePlay;
     private final boolean live;
     private final GiveUp giveUp;
     private final Handler ui = new Handler(Looper.getMainLooper());
@@ -37,8 +37,9 @@ final class Recovery implements Player.Listener {
     private boolean everPlayed, stopped, toldUser, retryPending;
     private long bufferingSince = -1, playingSince = -1, lastPos = -1, posSince;
 
-    private Recovery(Context c, ExoPlayer p, boolean live, GiveUp giveUp) {
+    private Recovery(Context c, Player p, boolean live, int triesBeforePlay, GiveUp giveUp) {
         this.c = c;
+        this.triesBeforePlay = triesBeforePlay;
         this.p = p;
         this.live = live;
         this.giveUp = giveUp;
@@ -46,7 +47,14 @@ final class Recovery implements Player.Listener {
         ui.postDelayed(watchdog, CHECK_MS);
     }
 
-    static Recovery attach(Context c, ExoPlayer p, boolean live, GiveUp giveUp) { return new Recovery(c, p, live, giveUp); }
+    static Recovery attach(Context c, Player p, boolean live, GiveUp giveUp) { return new Recovery(c, p, live, MAX_TRIES, giveUp); }
+
+    /** Like {@link #attach}, but gives up sooner (after {@code triesBeforePlay} tries, or a start that stalls that
+     *  often) while the stream has never played, so another player can have a go. */
+    static Recovery attach(Context c, Player p, boolean live, int triesBeforePlay, GiveUp giveUp) { return new Recovery(c, p, live, triesBeforePlay, giveUp); }
+
+    /** How many tries are allowed: fewer before the stream has ever played when another player is waiting. */
+    static int allowedTries(boolean everPlayed, int triesBeforePlay) { return everPlayed ? MAX_TRIES : Math.min(MAX_TRIES, triesBeforePlay); }
 
     /** Wait before try number {@code attempt} (0 = first): 1 s, 2 s, 4 s, then 8 s. */
     static long delayMs(int attempt) { return 1000L << Math.max(0, Math.min(attempt, 3)); }
@@ -95,7 +103,7 @@ final class Recovery implements Player.Listener {
         ui.removeCallbacks(retry);
         retryPending = false;
         if (!everPlayed && refused(httpCode(error))) { giveUp.run(error); return; }
-        if (!retryable(error.errorCode, everPlayed) || tries >= MAX_TRIES) { giveUp.run(error); return; }
+        if (!retryable(error.errorCode, everPlayed) || tries >= allowedTries(everPlayed, triesBeforePlay)) { giveUp.run(error); return; }
         say();
         retryPending = true;
         ui.postDelayed(retry, delayMs(tries++));
@@ -120,6 +128,12 @@ final class Recovery implements Player.Listener {
     }
 
     private void stalled() {
+        if (!everPlayed && triesBeforePlay < MAX_TRIES && tries >= triesBeforePlay) {
+            // Never got going: let the other player try instead of reconnecting forever.
+            stopped = true;
+            giveUp.run(new PlaybackException("The stream never started.", null, PlaybackException.ERROR_CODE_TIMEOUT));
+            return;
+        }
         if (tries >= MAX_TRIES) return;
         tries++;
         say();

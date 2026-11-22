@@ -469,6 +469,13 @@ final class Menus {
                         settings(a, formatRow);
                     }));
         }
+        final int engineRow = list.getChildCount();
+        final String engineKey = Players.engine(a.prefs);
+        row(a, list, "Player", Players.ENGINE_LABELS[Math.max(0, indexOf(Players.ENGINE_KEYS, engineKey))] + "  •  VLC plays some streams ExoPlayer can't", () ->
+                choose(a, "Player for Live TV, Movies and Series", Players.ENGINE_LABELS, Math.max(0, indexOf(Players.ENGINE_KEYS, engineKey)), i -> {
+                    a.prefs.edit().putString(Players.PREF_ENGINE, Players.ENGINE_KEYS[i]).apply();
+                    settings(a, engineRow);
+                }));
         final int bufferRow = list.getChildCount();
         final String bufferKey = a.prefs.getString(Players.PREF_BUFFER, Players.BUFFER_DEFAULT);
         row(a, list, "Buffer", Players.BUFFER_LABELS[Math.max(0, indexOf(Players.BUFFER_KEYS, bufferKey))] + "  •  more buffer rides out a shaky connection but takes longer to start a channel", () ->

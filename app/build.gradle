@@ -1,6 +1,8 @@
 plugins { id 'com.android.application' }
 android { namespace 'com.wygtv.tv'; compileSdk 35
     defaultConfig { applicationId 'com.wygtv.tv'; minSdk 23; targetSdk 28; versionCode((System.getenv('GITHUB_RUN_NUMBER') ?: '1') as int); versionName "1.0.${System.getenv('GITHUB_RUN_NUMBER') ?: '0'}"
+        // TV boxes and tablets are ARM; leaving out x86 keeps VLC from doubling the APK size.
+        ndk { abiFilters 'armeabi-v7a', 'arm64-v8a' }
         // Optional TMDb key for movie/series details, from the GitHub secret TMDB_API_KEY (Settings can override it).
         buildConfigField 'String', 'TMDB_API_KEY', "\"${(System.getenv('TMDB_API_KEY') ?: '').replaceAll('[^A-Za-z0-9._-]', '')}\""
         // Eddie's OMDb key is the default (a GitHub secret OMDB_API_KEY replaces it; Settings overrides both).
@@ -21,9 +23,13 @@ android { namespace 'com.wygtv.tv'; compileSdk 35
         }
         buildTypes { debug { signingConfig signingConfigs.wygtv } }
     }
+    // Compress native libraries (VLC is large) so the APK stays small enough for Downloader.
+    packaging { jniLibs { useLegacyPackaging true; pickFirsts += ['**/libc++_shared.so'] } }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
 dependencies { testImplementation 'junit:junit:4.13.2'; testImplementation 'org.json:json:20231013'; implementation 'androidx.media3:media3-exoplayer:1.5.1'; implementation 'androidx.media3:media3-ui:1.5.1'
     // FFmpeg audio decoders (AC-3 / E-AC-3 for over-the-air TV from HDHomeRun tuners), built for Media3 1.5 by Jellyfin.
-    implementation 'org.jellyfin.media3:media3-ffmpeg-decoder:1.5.0+1' }
+    implementation 'org.jellyfin.media3:media3-ffmpeg-decoder:1.5.0+1'
+    // VLC (LibVLC) as a second player engine, chosen in Settings > Player or used when ExoPlayer can't play a stream.
+    implementation 'org.videolan.android:libvlc-all:3.7.7' }
 
