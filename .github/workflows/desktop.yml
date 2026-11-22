@@ -55,7 +55,7 @@ jobs:
         if: matrix.target == 'linux'
         run: |
           mkdir -p vendor/ffmpeg-linux "$RUNNER_TEMP/ffdl"
-          curl -sfL --retry 3 -o "$RUNNER_TEMP/ffdl/ff.tar.xz" https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n7.1-latest-linux64-gpl-7.1.tar.xz
+          curl -sfL --retry 3 -o "$RUNNER_TEMP/ffdl/ff.tar.xz" https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz
           tar -xJf "$RUNNER_TEMP/ffdl/ff.tar.xz" -C "$RUNNER_TEMP/ffdl"
           cp "$RUNNER_TEMP"/ffdl/ffmpeg-*/bin/ffmpeg vendor/ffmpeg-linux/ffmpeg
           chmod +x vendor/ffmpeg-linux/ffmpeg
