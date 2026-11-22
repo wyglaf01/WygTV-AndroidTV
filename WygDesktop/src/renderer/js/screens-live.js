@@ -80,7 +80,7 @@
       return h('div', { class: 'home' },
         h('div', { class: 'home-top' },
           h('img', { class: 'home-logo', src: 'assets/icon.png', alt: '' }),
-          h('div', { class: 'home-brand' }, h('div', { class: 'brand' }, 'WygDesktop'), h('div', { class: 'brand-sub' }, 'Live TV · Movies · Series · Antenna')),
+          h('div', { class: 'home-brand' }, h('div', { class: 'brand' }, W.brand), h('div', { class: 'brand-sub' }, 'Live TV · Movies · Series · Antenna')),
           h('div', { class: 'clock big' }, W.fmtTime(Date.now()))),
         h('div', { class: 'tiles' }, tiles.map(([k, icon, label, fn], i) => btn({ class: 'tile', 'data-k': k, 'data-autofocus': i === 0 ? '' : null, onclick: fn },
           h('div', { class: 'tile-icon' }, icon), h('div', { class: 'tile-label' }, label)))),
@@ -92,7 +92,7 @@
     welcome() {
       return h('div', { class: 'home welcome' },
         h('img', { class: 'welcome-logo', src: 'assets/icon.png', alt: '' }),
-        h('div', { class: 'brand' }, 'Welcome to WygDesktop'),
+        h('div', { class: 'brand' }, 'Welcome to ' + W.brand),
         h('div', { class: 'welcome-text' }, 'Add your IPTV service or antenna tuner to get started.'),
         h('div', { class: 'tiles' },
           btn({ class: 'tile', 'data-autofocus': '', onclick: () => W.addPlaylist('xtream') }, h('div', { class: 'tile-icon' }, '🔑'), h('div', { class: 'tile-label' }, 'Xtream login')),

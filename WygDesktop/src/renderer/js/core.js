@@ -144,3 +144,6 @@ W.toast = (msg, ms = 3200) => {
 
 /** The bridge to the main process; a stand-in that works in a plain browser for design previews. */
 W.api = window.wyg || null;
+W.brand = (W.api && W.api.brand) || 'WygDesktop';
+W.isMac = !!(W.api && W.api.platform === 'darwin');
+document.title = W.brand;

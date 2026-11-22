@@ -32,6 +32,7 @@
     <a class="l2" href="#install-firetv">Fire TV (Downloader)</a>
     <a class="l2" href="#install-androidtv">Android / Google TV</a>
     <a class="l2" href="#install-desktop">Windows &amp; Ubuntu</a>
+    <a class="l2" href="#install-mac">Mac</a>
     <a href="#setup">2. First-time setup</a>
     <a class="l2" href="#setup-xtream">Xtream Codes</a>
     <a class="l2" href="#setup-m3u">M3U link</a>
@@ -82,6 +83,16 @@
     <p><b>Windows:</b> download <code>WygDesktop-Setup.exe</code> (installs and adds a Start menu entry) or <code>WygDesktop-Portable.exe</code> (runs without installing). If Windows shows "Windows protected your PC", click <b>More info → Run anyway</b>.</p>
     <p><b>Ubuntu 22.04 and newer:</b> download the <code>.deb</code> and run <code>sudo apt install ./WygDesktop-linux.deb</code>, or download the AppImage, run <code>chmod +x WygDesktop-linux.AppImage</code> and open it.</p>
     <p>WygDesktop has the same playlists, Live TV, TV Guide, Movies and Series. Keys: arrows move, <kbd>Enter</kbd> plays, hold <kbd>Enter</kbd> / right-click / <kbd>M</kbd> for options, <kbd>Esc</kbd> or <kbd>Backspace</kbd> goes back, <kbd>S</kbd> searches, <kbd>F11</kbd> full screen. In the player, <kbd>↑</kbd><kbd>↓</kbd> or <kbd>PgUp</kbd><kbd>PgDn</kbd> change channel, number keys jump to a channel, <kbd>Space</kbd> pauses, <kbd>I</kbd> shows info.</p>
+
+    <h3 id="install-mac">Mac (WygTV-Mac)</h3>
+    <p>WygTV-Mac is the same desktop app for macOS 11 Big Sur and newer. Check  → <b>About This Mac</b>: if it says <b>Chip: Apple M…</b>, download <code>WygTV-Mac-AppleSilicon.dmg</code>; if it says <b>Processor: Intel</b>, download <code>WygTV-Mac-Intel.dmg</code>.</p>
+    <ol>
+      <li>Open the downloaded <code>.dmg</code> and drag <b>WygTV-Mac</b> onto the <b>Applications</b> folder.</li>
+      <li>Open WygTV-Mac from Applications. Because it isn't signed by Apple yet, macOS says it can't check it for malicious software. Click <b>Done</b> (or <b>OK</b>).</li>
+      <li>Open <b>System Settings → Privacy &amp; Security</b>, scroll down to the message about WygTV-Mac and click <b>Open Anyway</b>, then confirm with your password. On macOS 14 and older you can instead right-click WygTV-Mac in Applications, choose <b>Open</b>, then <b>Open</b> again.</li>
+      <li>If macOS ever says the app "is damaged", open Terminal and run <code>xattr -cr /Applications/WygTV-Mac.app</code>, then open it again.</li>
+    </ol>
+    <p>The first time you add an HDHomeRun tuner, allow WygTV-Mac to find devices on your local network. <kbd>⌘</kbd><kbd>Q</kbd> quits, <kbd>⌘</kbd><kbd>V</kbd> pastes playlist addresses and <kbd>F</kbd> toggles full screen in the player. Settings → About &amp; updates → Check for updates downloads newer builds; drag the new one into Applications to replace the old one. External player: install VLC in Applications and WygTV-Mac uses it.</p>
 
     <!-- ============================================================ SETUP -->
     <h2 id="setup">2. First-time setup</h2>

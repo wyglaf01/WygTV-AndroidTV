@@ -2,7 +2,7 @@
   "name": "wygdesktop",
   "productName": "WygDesktop",
   "version": "1.0.0",
-  "description": "WygDesktop - IPTV player for Windows and Ubuntu (desktop copy of WygTV)",
+  "description": "WygDesktop - IPTV player for Windows, Ubuntu and macOS (WygTV-Mac); desktop copy of WygTV",
   "author": "Eddie <wyglaf01@users.noreply.github.com>",
   "homepage": "https://github.com/wyglaf01/WygTV-AndroidTV",
   "license": "MIT",
@@ -11,7 +11,8 @@
     "start": "electron .",
     "test": "node --test test/*.test.js",
     "dist:win": "electron-builder --win --publish never",
-    "dist:linux": "electron-builder --linux --publish never"
+    "dist:linux": "electron-builder --linux --publish never",
+    "dist:mac": "electron-builder --mac dmg --publish never -c.productName=WygTV-Mac -c.appId=com.wygtv.mac"
   },
   "dependencies": {
     "ffmpeg-static": "5.2.0",
@@ -120,7 +121,24 @@
         "ffmpeg"
       ]
     },
+    "mac": {
+      "category": "public.app-category.video",
+      "icon": "build/icon.png",
+      "identity": null,
+      "hardenedRuntime": false,
+      "minimumSystemVersion": "11.0",
+      "artifactName": "WygTV-Mac.${ext}",
+      "extendInfo": {
+        "CFBundleDisplayName": "WygTV-Mac",
+        "NSLocalNetworkUsageDescription": "WygTV-Mac looks for HDHomeRun antenna tuners and plays TV from them on your home network."
+      }
+    },
+    "dmg": {
+      "title": "WygTV-Mac",
+      "writeUpdateInfo": false
+    },
     "publish": null,
-    "afterPack": "linux/after-pack.js"
+    "afterPack": "linux/after-pack.js",
+    "afterSign": "mac/after-sign.js"
   }
 }

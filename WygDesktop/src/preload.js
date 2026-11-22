@@ -14,6 +14,9 @@ for (const name of ['app:info', 'net:setUserAgent', 'net:text', 'net:json', 'm3u
   const [a, b] = name.split(':');
   (api[a] ||= {})[b] = (...args) => call(name, ...args);
 }
+// The Mac build is called WygTV-Mac; Windows and Ubuntu builds are WygDesktop.
+api.brand = process.platform === 'darwin' ? 'WygTV-Mac' : 'WygDesktop';
+api.platform = process.platform;
 api.onUpdateProgress = (fn) => ipcRenderer.on('update:progress', (_e, p) => fn(p));
 
 contextBridge.exposeInMainWorld('wyg', api);

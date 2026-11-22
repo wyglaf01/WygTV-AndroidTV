@@ -11,6 +11,11 @@ const updater = require('./updater');
 const { EpgStore } = require('./epg');
 const smoke = require('./smoke');
 
+// The Mac build is WygTV-Mac (its settings live in ~/Library/Application Support/WygTV-Mac).
+const MAC = process.platform === 'darwin';
+const BRAND = MAC ? 'WygTV-Mac' : 'WygDesktop';
+if (MAC) app.setName(BRAND);
+
 // The AppImage gets --no-sandbox from its launcher script (linux/after-pack.js).
 const smokeTest = smoke.prepare(app);
 
@@ -24,7 +29,7 @@ let epg = null;
 function createWindow() {
   win = new BrowserWindow({
     width: 1600, height: 900, minWidth: 960, minHeight: 600,
-    backgroundColor: '#060C24', title: 'WygDesktop', show: false,
+    backgroundColor: '#060C24', title: BRAND, show: false,
     icon: path.join(__dirname, '..', 'renderer', 'assets', 'icon.png'),
     autoHideMenuBar: true,
     webPreferences: {
@@ -36,7 +41,11 @@ function createWindow() {
       backgroundThrottling: false,
     },
   });
-  Menu.setApplicationMenu(null);
+  // Windows/Ubuntu: no menu bar. macOS always shows one at the top of the screen, and Cmd+Q, Cmd+C/V
+  // (pasting playlist addresses) and Cmd+Ctrl+F only work through it, so the Mac keeps a small standard menu.
+  Menu.setApplicationMenu(MAC ? Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' },
+    { label: 'View', submenu: [{ role: 'togglefullscreen' }, { type: 'separator' }, { role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' }] },
+    { role: 'windowMenu' }]) : null);
   win.once('ready-to-show', () => win.show());
   if (smokeTest) smoke.run(app, win, stream);
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
@@ -63,7 +72,7 @@ const handle = (name, fn) => ipcMain.handle(name, async (_e, ...a) => {
   try { return { ok: true, value: await fn(...a) }; } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
-handle('app:info', () => ({ version: app.getVersion(), platform: process.platform, userData: app.getPath('userData') }));
+handle('app:info', () => ({ version: app.getVersion(), platform: process.platform, arch: process.arch, brand: BRAND, userData: app.getPath('userData') }));
 handle('net:setUserAgent', (ua) => net.setUserAgent(ua));
 handle('net:text', (url, timeout) => net.text(url, { timeout: timeout || 60000 }));
 handle('net:json', (url, timeout) => net.json(url, { timeout: timeout || 60000 }));
@@ -82,6 +91,7 @@ handle('shell:open', (url) => { if (/^https?:/.test(url)) return shell.openExter
 handle('win:fullscreen', (on) => { if (win) win.setFullScreen(on === undefined ? !win.isFullScreen() : !!on); return win && win.isFullScreen(); });
 handle('win:quit', () => app.quit());
 handle('ext:play', (playerPath, url, title) => {
+  if (MAC) return macPlay(playerPath, url, title);
   const exe = playerPath || (process.platform === 'win32' ? findVlc() : 'vlc');
   if (!exe) throw new Error('No external player set. Pick VLC or mpv in Settings → Player.');
   const args = /mpv/i.test(exe) ? [url, '--force-media-title=' + (title || '')] : [url, '--meta-title=' + (title || '')];
@@ -90,11 +100,12 @@ handle('ext:play', (playerPath, url, title) => {
 });
 handle('ext:pick', async () => {
   const r = await dialog.showOpenDialog(win, { title: 'Pick VLC or mpv', properties: ['openFile'],
-    filters: process.platform === 'win32' ? [{ name: 'Programs', extensions: ['exe'] }] : [] });
+    defaultPath: MAC ? '/Applications' : undefined,
+    filters: process.platform === 'win32' ? [{ name: 'Programs', extensions: ['exe'] }] : MAC ? [{ name: 'Apps', extensions: ['app'] }] : [] });
   return r.canceled ? '' : r.filePaths[0];
 });
 handle('file:save', async (name, text) => {
-  const r = await dialog.showSaveDialog(win, { defaultPath: name, filters: [{ name: 'WygDesktop backup', extensions: ['json'] }] });
+  const r = await dialog.showSaveDialog(win, { defaultPath: name, filters: [{ name: BRAND + ' backup', extensions: ['json'] }] });
   if (r.canceled || !r.filePath) return '';
   fs.writeFileSync(r.filePath, text);
   return r.filePath;
@@ -106,6 +117,24 @@ handle('file:open', async () => {
 });
 handle('update:check', () => updater.check(app.getVersion()));
 handle('update:install', (info) => updater.install(info, (p) => win && win.webContents.send('update:progress', p)));
+
+/** macOS: apps are opened with `open -a`; VLC from /Applications is the default. */
+function macPlay(playerPath, url, title) {
+  let appPath = playerPath || '';
+  if (!appPath) {
+    appPath = ['/Applications/VLC.app', path.join(require('os').homedir(), 'Applications', 'VLC.app'), '/Applications/mpv.app'].find((p) => fs.existsSync(p)) || '';
+    if (!appPath) throw new Error('VLC is not installed. Get it from videolan.org, or pick another player in Settings → Player.');
+  }
+  // A plain program (for example mpv from Homebrew) is started directly.
+  if (!/\.app\/?$/i.test(appPath)) {
+    const args = /mpv/i.test(appPath) ? [url, '--force-media-title=' + (title || '')] : [url, '--meta-title=' + (title || '')];
+    spawn(appPath, args, { detached: true, stdio: 'ignore' }).on('error', () => { }).unref();
+    return appPath;
+  }
+  const extra = /mpv/i.test(appPath) ? ['--force-media-title=' + (title || '')] : /vlc/i.test(appPath) ? ['--meta-title=' + (title || '')] : [];
+  spawn('open', ['-na', appPath, '--args', url, ...extra], { detached: true, stdio: 'ignore' }).on('error', () => { }).unref();
+  return appPath;
+}
 
 function findVlc() {
   const dirs = [process.env.ProgramFiles, process.env['ProgramFiles(x86)']].filter(Boolean);
