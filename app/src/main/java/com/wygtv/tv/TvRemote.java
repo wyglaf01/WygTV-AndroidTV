@@ -86,6 +86,7 @@ final class TvRemote {
         playerView.setKeepScreenOn(true); // stop the TV screensaver from starting while something plays
         playerView.setControllerShowTimeoutMs(4000);
         playerView.setShowSubtitleButton(true); // CC button in the on-screen controls
+        if (a.subs != null) a.subs.useView(playerView, type, title);
 
         zapList = null;
         zapIndex = -1;
