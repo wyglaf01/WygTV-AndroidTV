@@ -16,8 +16,8 @@ import java.util.Set;
 
 /**
  * The TV guide's "Showing" pop-up: Favorites, antenna tuners and your channel groups at the top, then each playlist as a
- * heading (OK opens or closes it) with its own "All channels" and live categories underneath. Picking another
- * playlist's category switches to that playlist and opens the guide on it.
+ * heading (OK opens or closes it) with its own "All channels" and live categories underneath. Every switched-on
+ * playlist is listed; a category from any of them opens in the guide without changing playlists.
  */
 final class GuideSources {
     private GuideSources() {}
@@ -58,7 +58,7 @@ final class GuideSources {
             sawActive |= isActive;
             boolean expanded = open.contains(pid);
             final int headAt = labels.size();
-            labels.add((expanded ? "▼  " : "▶  ") + Library.nameOf(p) + (isActive ? "  ●" : ""));
+            labels.add((expanded ? "▼  " : "▶  ") + Library.nameOf(p));
             actions.add(() -> { if (!open.remove(pid)) open.add(pid); show(a, activeCats, headAt); });
             if (!expanded) continue;
             JSONArray cats = isActive ? activeCats : CACHE.get(pid);
@@ -101,11 +101,64 @@ final class GuideSources {
         if (lv != null && select >= 0) lv.post(() -> { lv.requestFocus(); lv.setSelection(select); });
     }
 
+    private static final String PREFIX = "plcat:";
+
     private static Runnable pick(MainActivity a, JSONObject p, boolean isActive, String src) {
-        return () -> {
-            if (!isActive) a.switchPlaylist(p);
-            a.openGuideSource(src, null);
-        };
+        return () -> a.openGuideSource(isActive ? src : PREFIX + p.optString("id") + "|" + src, null);
+    }
+
+    /** A category's name in a playlist whose categories this pop-up has loaded, else "". */
+    static String categoryName(String pid, String catId) {
+        JSONArray cats = CACHE.get(pid);
+        for (int k = 0; cats != null && catId != null && !catId.isEmpty() && k < cats.length(); k++) {
+            JSONObject c = cats.optJSONObject(k);
+            if (c != null && catId.equals(c.optString("category_id"))) return c.optString("category_name");
+        }
+        return "";
+    }
+
+    /** A guide choice for a category ("all" for every channel) of a playlist other than the one the app loads by default. */
+    static boolean isOther(String src) { return src != null && src.startsWith(PREFIX); }
+
+    /** Opens the full TV guide on such a choice: that playlist's channels, tagged with it, so nothing switches. */
+    static void openOther(MainActivity a, String src, String focusId, boolean picked) {
+        int bar = src.indexOf('|');
+        JSONObject p = bar < 0 ? null : a.library.find(src.substring(PREFIX.length(), bar));
+        if (p == null || !a.library.isOn(p)) { a.showGuide("all", focusId, false); return; }
+        if (p.optString("id").equals(a.library.activeId())) { a.showGuide(src.substring(bar + 1), focusId, picked); return; }
+        final String cat = src.substring(bar + 1);
+        final int ticket = ++a.listGeneration;
+        if (a.status != null) a.status.setText("Loading " + Library.nameOf(p) + " channels…");
+        new Thread(() -> {
+            JSONArray list;
+            try { list = a.library.liveChannelsOf(p); } catch (Exception e) { list = null; }
+            JSONArray kept = new JSONArray();
+            for (int i = 0; list != null && i < list.length(); i++) {
+                JSONObject o = list.optJSONObject(i);
+                if (o != null && (cat.equals("all") || cat.equals(o.optString("category_id")))) kept.put(o);
+            }
+            final JSONArray got = list == null ? null : kept;
+            String catName = cat.equals("all") ? "All channels" : cat;
+            JSONArray cats = CACHE.get(p.optString("id"));
+            for (int k = 0; cats != null && k < cats.length(); k++) {
+                JSONObject c = cats.optJSONObject(k);
+                if (c != null && cat.equals(c.optString("category_id"))) catName = c.optString("category_name", catName);
+            }
+            final String title = Library.nameOf(p) + " › " + catName;
+            a.runOnUiThread(() -> {
+                if (a.isFinishing() || a.isDestroyed() || ticket != a.listGeneration) return;
+                if (got == null || got.length() == 0) {
+                    Toast.makeText(a, got == null ? "Couldn't load " + Library.nameOf(p) + ". Showing all channels." : "That category is empty. Showing all channels.", Toast.LENGTH_LONG).show();
+                    a.showGuide("all", focusId, false);
+                    return;
+                }
+                a.items = got;
+                a.category = src;
+                a.categories = new JSONArray();
+                try { a.categories.put(new JSONObject().put("category_id", src).put("category_name", title)); } catch (org.json.JSONException ignored) { }
+                TvGuide.open(a, focusId);
+            });
+        }).start();
     }
 
     /** Loads a playlist's live categories in the background, then redraws the pop-up if it is still open. */
