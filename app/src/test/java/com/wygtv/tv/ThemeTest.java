@@ -4,10 +4,11 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 public class ThemeTest {
-    @Test public void everyThemeHasAPaletteAndUnknownFallsBackToBlue() {
+    @Test public void everyThemeHasAPaletteAndUnknownFallsBackToRoyal() {
         for (String k : Theme.KEYS) { Theme.apply(k); assertEquals(k, Theme.key); assertNotEquals(0, Theme.PANEL); }
         Theme.apply("nonsense");
-        assertEquals("blue", Theme.key);
+        assertEquals("royal", Theme.key);
+        assertEquals(Theme.DEFAULT, Theme.KEYS[0]);
         assertFalse(Theme.steampunk());
         assertEquals(Theme.KEYS.length, Theme.LABELS.length);
     }
