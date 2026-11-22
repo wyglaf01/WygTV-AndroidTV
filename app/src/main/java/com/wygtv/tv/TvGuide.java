@@ -311,7 +311,8 @@ final class TvGuide {
         LinearLayout row = new LinearLayout(a);
         rows.addView(row, new LinearLayout.LayoutParams(-1, a.dp(40)));
         // Just the channel's logo, its name and (small, underneath) its category; hold OK on a programme for ★ Favorites.
-        String chLabel = ch.optString("name", "Channel"), sub = subLabel(i);
+        boolean hiddenCh = GuideOptions.isHidden(a, ch);
+        String chLabel = ch.optString("name", "Channel"), sub = hiddenCh ? "Hidden" : subLabel(i);
         TextView name = text(chLabel, 14, Theme.TEXT, true);
         name.setSingleLine(true);
         if (!sub.isEmpty()) {
@@ -328,6 +329,7 @@ final class TvGuide {
         name.setPadding(a.dp(12), 0, a.dp(8), 0);
         name.setBackground(rowBg(false));
         ChannelIcons.attach(name, ch.optString("stream_icon"), ch.optString("name", "Channel"), 24);
+        if (hiddenCh) name.setAlpha(.45f);
         LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(chanW, -1);
         np.setMargins(0, a.dp(2), a.dp(8), a.dp(2));
         row.addView(name, np);
@@ -586,8 +588,8 @@ final class TvGuide {
         final int s = session;
         GuideOptions.show(a, ch, (hidden, fav) -> {
             if (s != session) return;
-            // A hidden channel (or one taken off Favorites while showing Favorites) leaves the list.
-            if (hidden || (!fav && "fav".equals(a.category))) {
+            // Taken off Favorites while showing Favorites: the row leaves. A hidden row stays, dimmed, so it can be switched back.
+            if (!fav && "fav".equals(a.category)) {
                 if (row < channels.length() && channels.optJSONObject(row) == ch) channels.remove(row);
                 focusRow = Math.max(0, Math.min(row, channels.length() - 1));
                 page = focusRow / PAGE;

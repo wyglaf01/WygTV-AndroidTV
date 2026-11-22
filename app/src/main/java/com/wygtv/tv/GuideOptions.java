@@ -35,20 +35,17 @@ final class GuideOptions {
         final boolean fav = a.isFavoriteIn(pre, "live", sid), hidden = isHidden(a, pre, sid);
         java.util.List<String> items = new java.util.ArrayList<>();
         items.add(fav ? "★  Remove from Favorites" : "☆  Add to Favorites");
-        items.add(hidden ? "◉  Unhide channel" : "◌  Hide channel");
+        items.add(hideLabel(hidden));
         items.add("◆  Add to channel group…");
         if (group != null) items.add("✕  Remove from \"" + VirtualCategories.name(a, group) + "\"");
         items.add("Close");
-        new Dialogs.Builder(a).setTitle(title)
-                .setItems(items.toArray(new String[0]), (d, w) -> {
+        final String[] labels = items.toArray(new String[0]);
+        android.app.AlertDialog dlg = new Dialogs.Builder(a).setTitle(title)
+                .setItems(labels, (d, w) -> {
                     if (w == 0) {
                         boolean added = a.toggleFavoriteIn(pre, "live", sid, title, ext);
                         Toast.makeText(a, added ? "★ Added to Favorites" : "Removed from Favorites", Toast.LENGTH_SHORT).show();
                         if (changed != null) changed.run(isHidden(a, pre, sid), added);
-                    } else if (w == 1) {
-                        boolean nowHidden = toggleHidden(a, pre, sid);
-                        Toast.makeText(a, nowHidden ? "Channel hidden. Unhide it in Settings › Manage playlists." : "Channel shown again", Toast.LENGTH_LONG).show();
-                        if (changed != null) changed.run(nowHidden, a.isFavoriteIn(pre, "live", sid));
                     } else if (w == 2) {
                         VirtualCategories.addDialog(a, ch);
                     } else if (w == 3 && group != null) {
@@ -56,6 +53,28 @@ final class GuideOptions {
                         a.loadItems(group);
                     }
                 }).show();
+        // "Hidden" is a switch: OK flips it and the pop-up stays open, so it can be flipped straight back.
+        android.widget.ListView lv = dlg.getListView();
+        if (lv == null) return;
+        final android.widget.AdapterView.OnItemClickListener others = lv.getOnItemClickListener();
+        lv.setOnItemClickListener((parent, view, pos, id) -> {
+            if (pos != 1) { if (others != null) others.onItemClick(parent, view, pos, id); return; }
+            boolean nowHidden = toggleHidden(a, pre, sid);
+            labels[1] = hideLabel(nowHidden);
+            if (parent.getAdapter() instanceof android.widget.BaseAdapter) ((android.widget.BaseAdapter) parent.getAdapter()).notifyDataSetChanged();
+            if (changed != null) changed.run(nowHidden, a.isFavoriteIn(pre, "live", sid));
+        });
+    }
+
+    private static String hideLabel(boolean hidden) { return hidden ? "☑  Hidden: on  (OK to show)" : "☐  Hidden: off  (OK to hide)"; }
+
+    /** True when this channel is hidden in its own playlist. Guides show such a row dimmed until the list reloads. */
+    static boolean isHidden(MainActivity a, JSONObject ch) {
+        if (ch == null) return false;
+        String pid = ch.optString("playlist");
+        JSONObject pl = pid.isEmpty() || pid.equals(a.library.activeId()) ? null : a.library.find(pid);
+        if (pl == null && !pid.isEmpty() && !pid.equals(a.library.activeId())) return false;
+        return isHidden(a, pl == null ? a.accountPrefix() : Library.prefixOf(pl), ch.optString("stream_id"));
     }
 
     private static boolean isHidden(MainActivity a, String pre, String sid) {
