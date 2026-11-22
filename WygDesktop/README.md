@@ -19,7 +19,7 @@ The Windows build isn't code-signed, so SmartScreen may say "Windows protected y
 On Ubuntu (22.04 and 24.04 are checked on every build):
 - **.deb** (recommended): `sudo apt install ./WygDesktop-linux.deb`, then open WygDesktop from the app menu or run `wygdesktop`.
 - **AppImage**: AppImages need FUSE 2, which Ubuntu no longer installs by default: `sudo apt install libfuse2t64` on 24.04 (`libfuse2` on 22.04). Then `chmod +x WygDesktop-linux.AppImage` and run it.
-- FFmpeg is built in. If `ffmpeg` is installed from apt, WygDesktop uses that one instead.
+- FFmpeg (for antenna channels and AC-3/DTS sound): the .deb installs Ubuntu's `ffmpeg` package; the AppImage carries its own.
 
 ## Features
 

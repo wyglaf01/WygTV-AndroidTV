@@ -49,6 +49,18 @@ jobs:
         if: matrix.target == 'linux'
         run: npm test
 
+      # ffmpeg-static's Linux build crashes on newer kernels (Ubuntu 24.04), so the AppImage also ships a
+      # current static FFmpeg from BtbN/FFmpeg-Builds. The .deb uses Ubuntu's own ffmpeg package.
+      - name: Get a current static FFmpeg for Linux
+        if: matrix.target == 'linux'
+        run: |
+          mkdir -p vendor/ffmpeg-linux "$RUNNER_TEMP/ffdl"
+          curl -sfL --retry 3 -o "$RUNNER_TEMP/ffdl/ff.tar.xz" https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n7.1-latest-linux64-gpl-7.1.tar.xz
+          tar -xJf "$RUNNER_TEMP/ffdl/ff.tar.xz" -C "$RUNNER_TEMP/ffdl"
+          cp "$RUNNER_TEMP"/ffdl/ffmpeg-*/bin/ffmpeg vendor/ffmpeg-linux/ffmpeg
+          chmod +x vendor/ffmpeg-linux/ffmpeg
+          vendor/ffmpeg-linux/ffmpeg -hide_banner -version | head -1
+
       - name: Set the version (1.0.<build number>)
         run: npm version "1.0.${{ github.run_number }}" --no-git-tag-version --allow-same-version
 
@@ -106,9 +118,6 @@ jobs:
 
       - name: Install the .deb (apt resolves its dependencies)
         run: |
-          # No system FFmpeg, so the app must use the one it ships with.
-          sudo apt-get remove -y -q ffmpeg || true
-          ! command -v ffmpeg
           sudo apt-get install -y -q --no-install-recommends xvfb ./pkg/WygDesktop-linux.deb
           dpkg -s wygdesktop | grep -E '^(Version|Depends)'
           ls -l /opt/WygDesktop/chrome-sandbox
@@ -121,7 +130,8 @@ jobs:
         run: |
           if [ "${{ matrix.os }}" = "ubuntu-24.04" ]; then sudo apt-get install -y -q libfuse2t64; else sudo apt-get install -y -q libfuse2; fi
           chmod +x pkg/WygDesktop-linux.AppImage
-          timeout 300 xvfb-run -a -s "-screen 0 1600x900x24" ./pkg/WygDesktop-linux.AppImage --smoke=http://127.0.0.1:8765 2>&1 | tee appimage.log | grep -E 'WYG-SMOKE|rror' ; test "${PIPESTATUS[0]}" = 0
+          # WYG_NO_SYSTEM_FFMPEG: ignore apt's ffmpeg (pulled in by the .deb) so the AppImage's own FFmpeg is tested.
+          WYG_NO_SYSTEM_FFMPEG=1 timeout 300 xvfb-run -a -s "-screen 0 1600x900x24" ./pkg/WygDesktop-linux.AppImage --smoke=http://127.0.0.1:8765 2>&1 | tee appimage.log | grep -E 'WYG-SMOKE|rror' ; test "${PIPESTATUS[0]}" = 0
 
       - name: Logs
         if: failure()
