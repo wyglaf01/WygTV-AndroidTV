@@ -60,6 +60,40 @@ final class Library {
 
     boolean isEmpty() { return all().length() == 0; }
 
+    // ------------------------------------------------------------------ on / off
+
+    /** Pref: ids of saved playlists that are switched off (Settings > Manage playlists > Turn playlists on or off). */
+    static final String OFF = "playlists_off";
+
+    java.util.Set<String> offIds() { return prefs.getStringSet(OFF, java.util.Collections.<String>emptySet()); }
+
+    boolean isOn(JSONObject p) { return p != null && !offIds().contains(p.optString("id")); }
+
+    /**
+     * The saved playlists that are switched on: everything the menus, guides, Favorites and Search read from.
+     * A switched-off playlist is skipped (never downloaded or refreshed) until it is switched back on.
+     */
+    JSONArray inUse() {
+        JSONArray l = all(), out = new JSONArray();
+        java.util.Set<String> off = offIds();
+        for (int i = 0; i < l.length(); i++) { JSONObject p = l.optJSONObject(i); if (p != null && !off.contains(p.optString("id"))) out.put(p); }
+        return out;
+    }
+
+    /**
+     * When the playlist in use was switched off, the first switched-on one takes over (a regular playlist
+     * before an antenna tuner). Returns that playlist, or null when nothing had to change.
+     */
+    JSONObject replacementForActive() {
+        JSONObject active = find(activeId());
+        if (active != null && isOn(active)) return null;
+        JSONArray on = inUse();
+        JSONObject pick = null;
+        for (int i = 0; i < on.length() && pick == null; i++) { JSONObject p = on.optJSONObject(i); if (!isHdhr(p)) pick = p; }
+        if (pick == null) pick = on.optJSONObject(0);
+        return pick;
+    }
+
     void saveAll(JSONArray list) { prefs.edit().putString("playlists", list.toString()).apply(); }
 
     /** The prefix that a playlist's favorites, hidden items and lists are saved under (same as MainActivity.accountPrefix() while it is active). */
@@ -93,11 +127,15 @@ final class Library {
         JSONArray l = all(), out = new JSONArray();
         for (int i = 0; i < l.length(); i++) { JSONObject q = l.optJSONObject(i); if (q != null && !q.optString("id").equals(id)) out.put(q); }
         saveAll(out);
+        java.util.Set<String> off = new java.util.HashSet<>(offIds());
+        if (off.remove(id)) prefs.edit().putStringSet(OFF, off).apply();
         JSONObject gone = null;
         for (int i = 0; i < l.length(); i++) { JSONObject q = l.optJSONObject(i); if (q != null && q.optString("id").equals(id)) gone = q; }
         if (gone != null && M3U.equals(gone.optString("type"))) m3uFile(gone.optString("url")).delete();
         if (id.equals(activeId())) {
-            if (out.length() > 0) activate(out.optJSONObject(0));
+            JSONObject next = replacementForActive();
+            if (next == null && out.length() > 0) next = out.optJSONObject(0);
+            if (next != null) activate(next);
             else prefs.edit().remove("active_playlist").remove("title").remove("host").remove("user").remove("pass").remove("expiry")
                     .remove("type").remove("m3u_url").remove("epg_url").apply();
         }

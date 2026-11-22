@@ -50,8 +50,11 @@ final class VirtualCategories {
     /** All channels in the category, each tagged with the playlist it came from. */
     static JSONArray channels(MainActivity a, String id) {
         JSONObject c = find(a, id);
-        JSONArray ch = c == null ? null : c.optJSONArray("channels");
-        return ch == null ? new JSONArray() : ch;
+        JSONArray ch = c == null ? null : c.optJSONArray("channels"), out = new JSONArray();
+        java.util.Set<String> off = a.library.offIds();
+        // Channels from a switched-off playlist stay saved, but don't show until it is switched back on.
+        for (int i = 0; ch != null && i < ch.length(); i++) { JSONObject o = ch.optJSONObject(i); if (o != null && !off.contains(o.optString("playlist"))) out.put(o); }
+        return out;
     }
 
     /** Only the channels that belong to the given playlist (what CH+/CH- and the TV guide can use). */
