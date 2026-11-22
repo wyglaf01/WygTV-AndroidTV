@@ -85,12 +85,16 @@ final class MiniGuide {
                 if (r != null) render(r, f);
                 if (!f) return;
                 showDetails(a, data.get(at));
+                LivePreview.show(a, data.get(at));
                 for (int k = Math.max(0, at - 2); k < Math.min(rows.size(), at + AHEAD); k++) request(a, data.get(k));
             });
         }
         for (int k = 0; k < Math.min(rows.size(), AHEAD); k++) request(a, data.get(k));
         startTicker();
     }
+
+    /** The channel a guide row shows, or null for any other view. */
+    static JSONObject itemOf(View v) { Row r = ROWS.get(v); return r == null ? null : r.item; }
 
     private static void addHeader(MainActivity a, LinearLayout list) {
         if (!(list.getParent() instanceof View) || !(((View) list.getParent()).getParent() instanceof ViewGroup)) return;
