@@ -4,8 +4,10 @@ on:
   workflow_dispatch:
   push:
     branches: [app, main, "codex/**"]
+    paths-ignore: ["WygDesktop/**", ".github/workflows/desktop.yml"]
   pull_request:
     branches: [app, main]
+    paths-ignore: ["WygDesktop/**", ".github/workflows/desktop.yml"]
 
 jobs:
   build:
