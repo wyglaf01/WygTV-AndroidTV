@@ -96,6 +96,12 @@ final class Menus {
         if (all.length() > 1) a.button("☑  Turn playlists on or off…", list, () -> Manage.playlistsOnOff(a, () -> playlists(a)));
         TextView addX = a.button("+  Add an Xtream Codes login", list, () -> xtreamForm(a, null, null));
         a.button("+  Add an M3U playlist link", list, () -> m3uForm(a, null));
+        int extraCount = a.library.extras.urls().size();
+        a.button("▦  TV guides (EPG)" + "\n      " + (extraCount == 0 ? "extra XMLTV guide links, free guides by country, which guide wins" : extraCount + (extraCount == 1 ? " extra guide link" : " extra guide links")), list, () -> extraGuides(a, () -> playlists(a)));
+        a.button("⟳  Reload TV guides\n      download every playlist's guide again", list, () -> {
+            new Thread(() -> { a.library.dropGuide(); for (String u : a.library.extras.urls()) a.library.extras.drop(u); }).start();
+            Toast.makeText(a, "The guides will reload the next time they're shown.", Toast.LENGTH_SHORT).show();
+        });
         (focus == null ? addX : focus).requestFocus();
     }
 
@@ -139,12 +145,13 @@ final class Menus {
 
     private static void playlistActions(MainActivity a, JSONObject p) {
         boolean on = a.library.isOn(p);
-        String[] items = {on ? "Turn off (skip it in menus, guides, Search and updates)" : "Turn on (show it everywhere again)", "Edit", "Refresh now", "Manage categories (hide or show)", "Delete"};
+        String[] items = {on ? "Turn off (skip it in menus, guides, Search and updates)" : "Turn on (show it everywhere again)", "Edit", "Refresh now", "Manage categories (hide or show)", "TV guide (EPG) link" + (p.optString("epg").isEmpty() ? "" : "  •  " + hostOf(p.optString("epg"))), "Delete"};
         new Dialogs.Builder(a).setTitle(p.optString("title", "Playlist") + (on ? "" : "   (off)")).setItems(items, (d, which) -> {
             if (which == 0) setOn(a, p, !on);
             else if (which == 1) { if (Library.isHdhr(p)) hdhrForm(a, p); else if (Library.M3U.equals(p.optString("type"))) m3uForm(a, p); else xtreamForm(a, p, null); }
             else if (which == 2) refresh(a, p);
             else if (which == 3) Manage.categories(a, p, () -> playlists(a));
+            else if (which == 4) guideSource(a, p, () -> playlists(a));
             else new Dialogs.Builder(a).setTitle("Delete “" + p.optString("title", "Playlist") + "”?")
                         .setMessage("Its favorites stay saved, so they come back if you add the same playlist again.")
                         .setPositiveButton("Delete", (d2, w2) -> {
@@ -462,9 +469,9 @@ final class Menus {
         JSONObject active = a.library.find(a.library.activeId());
         boolean liveOnly = a.liveOnly();
         if (g.isEmpty()) {
-            row(a, list, groupIcon(GROUP_PLAYLISTS) + "  " + groupTitle(GROUP_PLAYLISTS), "playlists, HDHomeRun, manage categories, hide and show channels, channel groups, TV guide source, extra TV guides", () -> settingsGroup(a, GROUP_PLAYLISTS));
-            row(a, list, groupIcon(GROUP_PLAYER) + "  " + groupTitle(GROUP_PLAYER), "live stream format, buffer, video decoder, subtitles, watched series, play next", () -> settingsGroup(a, GROUP_PLAYER));
-            row(a, list, groupIcon(GROUP_APPEARANCE) + "  " + groupTitle(GROUP_APPEARANCE), "theme, glass effect, app mode, start-up screen, side menu order, Exit button, guide rows, live preview, movie and series info, IMDb ratings", () -> settingsGroup(a, GROUP_APPEARANCE));
+            row(a, list, groupIcon(GROUP_PLAYLISTS) + "  " + groupTitle(GROUP_PLAYLISTS), "playlists, HDHomeRun, manage categories, hide and show channels, channel groups, TV guides (EPG)", () -> settingsGroup(a, GROUP_PLAYLISTS));
+            row(a, list, groupIcon(GROUP_PLAYER) + "  " + groupTitle(GROUP_PLAYER), "built-in or external player, live stream format, buffer, video decoder, subtitles, watched series, play next", () -> settingsGroup(a, GROUP_PLAYER));
+            row(a, list, groupIcon(GROUP_APPEARANCE) + "  " + groupTitle(GROUP_APPEARANCE), "theme, glass effect, app mode, start-up screen, side menu order, Exit button, guide rows, channel order, live preview, movie and series info, IMDb ratings", () -> settingsGroup(a, GROUP_APPEARANCE));
             row(a, list, groupIcon(GROUP_BACKUP) + "  " + groupTitle(GROUP_BACKUP), "back up, restore, check for updates  •  WygTV " + Updater.installedName(a), () -> settingsGroup(a, GROUP_BACKUP));
         } else if (g.equals(GROUP_PLAYLISTS)) {
             row(a, list, "Manage playlists", Manage.playlistSummary(a) + "  •  press OK to add, edit, refresh, delete or turn playlists on and off", () -> { playlistsFromSettings = true; playlists(a); });
@@ -496,7 +503,7 @@ final class Menus {
             String custom = a.saved("epg_url");
             String guideState = a.library.guideStatus();
             String source = !custom.isEmpty() ? hostOf(custom) + " (your link)" : a.library.activeIsHdhr() ? "HDHomeRun guide (from the tuner)" : m3u ? (a.library.guideUrl().isEmpty() ? "none in this playlist" : hostOf(a.library.guideUrl()) + " (from the playlist)") : "the provider's guide";
-            row(a, list, "TV guide source", source + (guideState.isEmpty() ? "" : "  •  " + guideState), () -> guideSource(a, active, guideRow));
+            row(a, list, "TV guide source", source + (guideState.isEmpty() ? "" : "  •  " + guideState), () -> guideSource(a, active, () -> settings(a, guideRow)));
             if (!custom.isEmpty() || m3u) row(a, list, "Reload TV guide", "download the guide again now", () -> {
                 new Thread(a.library::dropGuide).start();
                 Toast.makeText(a, "The guide will reload the next time it's shown.", Toast.LENGTH_SHORT).show();
@@ -506,7 +513,7 @@ final class Menus {
             row(a, list, "Extra TV guides (XMLTV)", extraCount == 0
                     ? "none  •  press OK to add guide links that fill in channels with no program info"
                     : extraCount + (extraCount == 1 ? " link" : " links") + "  •  " + (a.library.extras.first() ? "used first, the playlist's guide fills the rest" : "fill in channels the playlist's guide leaves empty"),
-                    () -> extraGuides(a, extraRow));
+                    () -> extraGuides(a, () -> settings(a, extraRow)));
             final int recentRow = list.getChildCount();
             int recent = a.library.recent().length();
             row(a, list, "Recently watched", recent == 0 ? "empty" : recent + " items  •  press OK to clear", () -> {
@@ -515,6 +522,16 @@ final class Menus {
                         .setNegativeButton("Cancel", null).show();
             });
         } else if (g.equals(GROUP_PLAYER)) {
+            final int playerRow = list.getChildCount();
+            row(a, list, "Player", ExternalPlayer.label(a) + "  •  press OK to keep WygTV's own player or use another video app such as VLC or MX Player", () -> choosePlayer(a, playerRow));
+            if (!ExternalPlayer.choice(a.prefs).isEmpty()) {
+                final int forRow = list.getChildCount();
+                row(a, list, "Use the external player for", ExternalPlayer.FOR_LABELS[ExternalPlayer.forIndex(ExternalPlayer.forKey(a.prefs))] + "  •  everything else plays in WygTV's own player", () ->
+                        choose(a, "Use the external player for", ExternalPlayer.FOR_LABELS, ExternalPlayer.forIndex(ExternalPlayer.forKey(a.prefs)), i -> {
+                            a.prefs.edit().putString(ExternalPlayer.PREF_FOR, ExternalPlayer.FOR_KEYS[i]).apply();
+                            settings(a, forRow);
+                        }));
+            }
             final int formatRow = list.getChildCount();
             if (!m3u) {
                 row(a, list, "Live stream format", FORMAT_LABELS[indexOf(FORMAT_KEYS, a.prefs.getString("live_format", "auto"))], () ->
@@ -625,6 +642,12 @@ final class Menus {
                     choose(a, "Channel rows in the Live TV guide", new String[]{"3 rows", "4 rows", "5 rows"}, indexOf(guideRows, String.valueOf(a.prefs.getInt("guide_rows", 4))), i -> {
                         a.prefs.edit().putInt("guide_rows", 3 + i).apply();
                         settings(a, guideRowsRow);
+                    }));
+            final int orderChRow = list.getChildCount();
+            row(a, list, "Channel order", ChannelOrder.label(a.prefs) + "  •  how channels line up in the TV guide, Live TV and CH+/CH-", () ->
+                    choose(a, "Channel order in the guides", ChannelOrder.LABELS, ChannelOrder.index(ChannelOrder.key(a.prefs)), i -> {
+                        a.prefs.edit().putString(ChannelOrder.PREF, ChannelOrder.KEYS[i]).apply();
+                        settings(a, orderChRow);
                     }));
             final int previewRow = list.getChildCount();
             row(a, list, "Live preview switches", PreviewDelay.label(a.prefs) + "  •  Live preview guide change delay", () ->
@@ -801,7 +824,7 @@ final class Menus {
         return field;
     }
 
-    private static void guideSource(MainActivity a, JSONObject active, int focusRow) {
+    private static void guideSource(MainActivity a, JSONObject active, Runnable after) {
         if (active == null) return;
         EditText input = new EditText(a);
         input.setSingleLine(true);
@@ -815,18 +838,38 @@ final class Menus {
                 .setPositiveButton("Save", (d, w) -> {
                     String link = input.getText().toString().trim();
                     if (!link.isEmpty() && !(link.startsWith("http://") || link.startsWith("https://"))) { alert(a, "Enter a link that starts with http:// or https://."); return; }
-                    setGuide(a, active, link, focusRow);
+                    setGuide(a, active, link, after);
                 })
-                .setNeutralButton("Use default", (d, w) -> setGuide(a, active, "", focusRow))
+                .setNeutralButton("Use default", (d, w) -> setGuide(a, active, "", after))
                 .setNegativeButton("Cancel", null).show();
     }
 
-    private static void setGuide(MainActivity a, JSONObject active, String link, int focusRow) {
-        try { active.put("epg", link); } catch (JSONException ignored) { }
-        a.library.put(active);
-        a.library.activate(active);
+    private static void setGuide(MainActivity a, JSONObject p, String link, Runnable after) {
+        try { p.put("epg", link); } catch (JSONException ignored) { }
+        a.library.put(p);
+        if (p.optString("id").equals(a.library.activeId())) a.library.activate(p);
         new Thread(a.library::dropGuide).start();
-        settings(a, focusRow);
+        after.run();
+    }
+
+    /** Settings → Manage player → Player: WygTV's own player (default), Android asks, or one installed video app. */
+    private static void choosePlayer(MainActivity a, int focusRow) {
+        java.util.List<android.content.pm.ResolveInfo> apps = ExternalPlayer.apps(a);
+        java.util.List<String> keys = new java.util.ArrayList<>();
+        java.util.List<String> labels = new java.util.ArrayList<>();
+        keys.add(""); labels.add("WygTV built-in player (default)");
+        for (android.content.pm.ResolveInfo r : apps) {
+            keys.add(r.activityInfo.packageName);
+            labels.add(r.loadLabel(a.getPackageManager()) + "  (external)");
+        }
+        keys.add(ExternalPlayer.ASK); labels.add("Ask which app every time");
+        String current = ExternalPlayer.choice(a.prefs);
+        if (!current.isEmpty() && !keys.contains(current)) { keys.add(1, current); labels.add(1, ExternalPlayer.appName(a, current) + "  (not installed)"); }
+        choose(a, apps.isEmpty() ? "Player  •  no other video app found. Install VLC or MX Player from the store to use one" : "Play videos with",
+                labels.toArray(new String[0]), keys.indexOf(current), i -> {
+                    a.prefs.edit().putString(ExternalPlayer.PREF, keys.get(i)).apply();
+                    settings(a, focusRow);
+                });
     }
 
     // ------------------------------------------------------------------ extra (supplemental) TV guides
@@ -838,7 +881,7 @@ final class Menus {
     static String freeGuideUrl(String code) { return "https://epg.pw/xmltv/epg_" + code + ".xml.gz"; }
 
     /** Settings → Extra TV guides: the saved links, add, priority. */
-    static void extraGuides(MainActivity a, int focusRow) {
+    static void extraGuides(MainActivity a, Runnable redraw) {
         java.util.List<String> urls = a.library.extras.urls();
         java.util.List<String> labels = new java.util.ArrayList<>();
         for (String u : urls) {
@@ -853,13 +896,13 @@ final class Menus {
                 : "Order: the playlist's guide first, extra guides fill the gaps  (press OK to change)");
         new Dialogs.Builder(a).setTitle("Extra TV guides")
                 .setItems(labels.toArray(new String[0]), (d, w) -> {
-                    if (w < add) extraGuide(a, urls.get(w), focusRow);
-                    else if (w == add) addExtraGuide(a, focusRow);
-                    else if (w == add + 1) choose(a, "Free guide for which country?", FREE_GUIDE_LABELS, -1, i -> saveExtraGuide(a, freeGuideUrl(FREE_GUIDE_CODES[i]), focusRow));
+                    if (w < add) extraGuide(a, urls.get(w), redraw);
+                    else if (w == add) addExtraGuide(a, redraw);
+                    else if (w == add + 1) choose(a, "Free guide for which country?", FREE_GUIDE_LABELS, -1, i -> saveExtraGuide(a, freeGuideUrl(FREE_GUIDE_CODES[i]), redraw));
                     else if (w == prio) {
                         a.prefs.edit().putBoolean(ExtraGuides.PREF_FIRST, !a.library.extras.first()).apply();
-                        settings(a, focusRow);
-                        extraGuides(a, focusRow);
+                        redraw.run();
+                        extraGuides(a, redraw);
                     }
                 })
                 .setNegativeButton("Close", null).show();
@@ -870,7 +913,7 @@ final class Menus {
         return slash < 0 || slash == url.length() - 1 ? "" : url.substring(slash + 1);
     }
 
-    private static void addExtraGuide(MainActivity a, int focusRow) {
+    private static void addExtraGuide(MainActivity a, Runnable redraw) {
         EditText input = new EditText(a);
         input.setSingleLine(true);
         input.setHint("http://…/guide.xml or .xml.gz");
@@ -881,29 +924,29 @@ final class Menus {
                 .setPositiveButton("Add", (d, w) -> {
                     String link = input.getText().toString().trim();
                     if (!(link.startsWith("http://") || link.startsWith("https://"))) { alert(a, "Enter a link that starts with http:// or https://."); return; }
-                    saveExtraGuide(a, link, focusRow);
+                    saveExtraGuide(a, link, redraw);
                 })
                 .setNegativeButton("Cancel", null).show();
         input.requestFocus();
     }
 
-    private static void saveExtraGuide(MainActivity a, String link, int focusRow) {
+    private static void saveExtraGuide(MainActivity a, String link, Runnable redraw) {
         java.util.List<String> urls = a.library.extras.urls();
         if (!urls.contains(link)) urls.add(link);
         ExtraGuides.save(a.prefs, urls);
-        settings(a, focusRow);
+        redraw.run();
         Toast.makeText(a, "Loading the guide in the background. Large guides can take a minute.", Toast.LENGTH_LONG).show();
         new Thread(() -> {
             Xmltv.Guide g = a.library.extras.guide(link);
             String st = a.library.extras.status(link);
             a.runOnUiThread(() -> {
                 if (!a.isFinishing()) Toast.makeText(a, g != null ? "Extra guide " + st + "." : "Extra guide " + (st.isEmpty() ? "could not load" : st) + ". Check the link.", Toast.LENGTH_LONG).show();
-                if ("settings".equals(a.mode)) settings(a, focusRow);
+                if ("settings".equals(a.mode) || "playlists".equals(a.mode)) redraw.run();
             });
         }).start();
     }
 
-    private static void extraGuide(MainActivity a, String url, int focusRow) {
+    private static void extraGuide(MainActivity a, String url, Runnable redraw) {
         java.util.List<String> urls = a.library.extras.urls();
         int at = urls.indexOf(url);
         String st = a.library.extras.status(url);
@@ -914,18 +957,18 @@ final class Menus {
         new Dialogs.Builder(a).setTitle(url + (st.isEmpty() ? "" : "  •  " + st))
                 .setItems(opts.toArray(new String[0]), (d, w) -> {
                     String o = opts.get(w);
-                    if (o.startsWith("Reload")) { a.library.extras.drop(url); saveExtraGuide(a, url, focusRow); }
+                    if (o.startsWith("Reload")) { a.library.extras.drop(url); saveExtraGuide(a, url, redraw); }
                     else if (o.startsWith("Move")) {
                         urls.remove(at);
                         urls.add(at - 1, url);
                         ExtraGuides.save(a.prefs, urls);
-                        extraGuides(a, focusRow);
+                        extraGuides(a, redraw);
                     } else {
                         urls.remove(url);
                         ExtraGuides.save(a.prefs, urls);
                         a.library.extras.drop(url);
-                        settings(a, focusRow);
-                        extraGuides(a, focusRow);
+                        redraw.run();
+                        extraGuides(a, redraw);
                     }
                 })
                 .setNegativeButton("Close", null).show();
