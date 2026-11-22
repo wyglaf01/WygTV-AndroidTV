@@ -1,9 +1,32 @@
-# WygTV Android TV — source project
+# WygTv v2.0 — Four-option opening screen
 
-Android TV / Google TV remote-friendly Xtream Codes client. Includes TV launcher, dark glass-style menus, Home, saved playlist login, Live TV, Movies, Series, category browsing, favorites, series episodes, and Media3 playback. Uses the Xtream Codes `player_api.php` API. Use only playlists/content you are authorized to access.
+Opens directly to a glass-themed Home dashboard with Manage / Login to Playlist, Live TV, Movies and Series. Live TV, Movies and Series use the selected saved playlist or offer a playlist picker; credentials are not requested on every startup. Existing cascading menus, themes and launcher icon remain.
 
-## Build
-Install Android Studio with JDK 17 and Android SDK Platform 35. Open this folder as an Android Studio project and run **Build > Build APK(s)**. Output: `app/build/outputs/apk/debug/app-debug.apk`. You can install via `adb install -r app/build/outputs/apk/debug/app-debug.apk` with Android TV developer/USB or network debugging enabled.
+Build: `export ANDROID_HOME="$HOME/Library/Android/sdk" && bash build-on-mac.sh`. Install: `adb install -r output/WygTv.apk`.
 
-## Status / limitations
-Source is provided; **APK was not compiled or device-tested** in this environment. This is a starter TV version, not the fully polished WygTV design: satellite art and logo assets from the prior project are not embedded. The EPG side-by-side guide, multiple named playlists, search, settings startup toggle, category side-by-side submenus, and persistent back stack need additional implementation. Login data is stored in app-private SharedPreferences without encryption. Android targetSdk 28 is used for compatibility with HTTP Xtream servers; prefer HTTPS. Long category lists are not virtualized. Some providers may use different stream formats or URL conventions.
+This source has not been compiled or device-tested here. Keep a backup of your working APK and saved playlists.
+
+## Home screen visual update
+- Locally drawn starfield and satellite illustration on the opening dashboard (no network image dependency).
+- Existing app launcher icon displayed at top right as WygTV branding.
+- Four consistently aligned, equal-height glass buttons.
+- Saved playlist name and Xtream `user_info.exp_date` shown on Home; date is refreshed asynchronously and cached per playlist. Missing expiry is labeled as unavailable. M3U has no Xtream expiration API.
+- Other screens and existing navigation remain unchanged.
+
+## Old West home background
+The start screen now draws a sunset desert with mesas, a ranch silhouette, fence and cacti. The WygTV top-right logo, glass buttons, playlist expiration and split Live TV layout are retained.
+
+
+## Steampunk Main Home theme
+The main landing page uses a locally bundled steampunk backdrop (`res/drawable-nodpi/steampunk_home.jpg`), brass-rimmed smoked-glass Live TV / Movies / Series buttons, and a matching Settings button and playlist-account panel. Existing menu behavior, split Live TV guide, and Xtream expiration lookup are unchanged.
+
+## HDHomeRun antenna TV
+WygTV can watch free over-the-air channels from a SiliconDust HDHomeRun network tuner, on Android TV (remote / D-pad) and on tablets (touch).
+
+- **Add it:** first-time setup → *HDHomeRun*, or Playlists → *Add an HDHomeRun antenna tuner*. The address starts as `hdhomerun.local`; *Find tuners on my network* searches by UDP broadcast (port 65001) and SiliconDust's cloud lookup, and any IP address can be typed instead.
+- **Channels** come from the tuner's lineup (`/lineup.json`, the same list as `/lineup.html`), grouped by channel number (4.1, 4.2 and 4.3 sit under "Channel 4 · WNBC"). Copy-protected cable channels are left out. Playlists → Refresh re-reads the lineup after a channel scan.
+- **TV guide** comes from SiliconDust's free HDHomeRun guide (`api.hdhomerun.com/api/guide.php`, authorised with the tuner's own DeviceAuth), about 12 hours ahead, refreshed every 30 minutes. An XMLTV link can be set instead.
+- **Playback** uses Media3 with the Jellyfin FFmpeg audio extension, so Dolby AC-3 / E-AC-3 sound plays even on devices without a Dolby decoder (the device's own decoder and HDMI passthrough are still preferred). MPEG-2 video needs a hardware decoder: most Android TV boxes have one, many tablets don't (those get sound only and a message saying why).
+- Each playing channel uses one of the tuner's tuners; the TV guide's preview window uses one too. When every tuner is busy the app says so.
+- The tuner is saved by its IP address, so give it a fixed address (DHCP reservation) in your router.
+- **Where it lives:** add, edit, refresh or remove tuners in **Settings → HDHomeRun antenna TV**. Each tuner shows in Live TV as its own category, **📡 Antenna TV**, next to Favorites and your own categories. Playing an antenna channel uses the tuner; Home, Movies and Series switch back to your main playlist automatically.
