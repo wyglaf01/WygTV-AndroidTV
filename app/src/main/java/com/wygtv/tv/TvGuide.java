@@ -145,7 +145,7 @@ final class TvGuide {
         bar.addView(clock, new LinearLayout.LayoutParams(-2, -1));
         a.root.addView(bar, 0, new LinearLayout.LayoutParams(-1, a.dp(44)));
         a.status.setLayoutParams(new LinearLayout.LayoutParams(-1, a.dp(24)));
-        a.status.setText("OK  Watch full screen      ◀ ▶  Move through time      ▲ ▼  Change channel      ◀ to ☆  Favorite      ▲ from the top  Pick Favorites or a category, or Search      BACK  " + (a.liveOnly() ? "Exit" : "Live TV"));
+        a.status.setText("OK  Watch full screen      ◀ ▶  Move through time      ▲ ▼  Change channel      " + ("fav".equals(a.category) ? "" : "◀ to ☆  Favorite      ") + "▲ from the top  Pick Favorites or a category, or Search      BACK  " + (a.liveOnly() ? "Exit" : "Live TV"));
 
         int screenW = a.getResources().getDisplayMetrics().widthPixels;
         chanW = a.dp(200);
@@ -320,6 +320,9 @@ final class TvGuide {
         LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(a.dp(36), -1);
         sp.setMargins(0, a.dp(2), a.dp(4), a.dp(2));
         row.addView(star, sp);
+        // Showing Favorites: every row is a favorite, so the star is left out.
+        boolean favList = "fav".equals(a.category);
+        if (favList) star.setVisibility(android.view.View.GONE);
         String num = ch.optString("num", "");
         String label = (num.isEmpty() || num.equals("0") || mixed ? "" : num + "   ") + ch.optString("name", "Channel");
         TextView name = text(label, 14, Theme.TEXT, true);
@@ -340,7 +343,7 @@ final class TvGuide {
         name.setPadding(a.dp(12), 0, a.dp(8), 0);
         name.setBackground(rowBg(false));
         ChannelIcons.attach(name, ch.optString("stream_icon"), ch.optString("name", "Channel"), 24);
-        LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(chanW - a.dp(40), -1);
+        LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(favList ? chanW : chanW - a.dp(40), -1);
         np.setMargins(0, a.dp(2), a.dp(8), a.dp(2));
         row.addView(name, np);
         LinearLayout cells = new LinearLayout(a);
