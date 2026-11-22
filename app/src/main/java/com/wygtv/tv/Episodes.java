@@ -22,6 +22,7 @@ final class Episodes {
     private Episodes() { }
 
     static void show(MainActivity a, String sid, String title) {
+        a.seriesTitle = title;
         a.playerReturn = () -> show(a, sid, title);
         a.mode = "episodes";
         a.shell("SERIES  •  " + title);

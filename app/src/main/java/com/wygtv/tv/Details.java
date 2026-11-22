@@ -28,7 +28,7 @@ import java.util.concurrent.Executors;
 
 /**
  * The movie / series details screen: poster, backdrop, year, runtime, rating, age rating, genres, plot, director and
- * cast, with Play (or Episodes), Favorite and My List. It shows the list's own info at once, then the provider's
+ * cast, with three buttons: Play (or Episodes for a series), My List and Trailer. It shows the list's own info at once, then the provider's
  * get_vod_info / get_series_info, then TMDb's when a key is set (see {@link Tmdb}).
  */
 final class Details {
@@ -101,16 +101,14 @@ final class Details {
             a.zapList = list;
             a.play("vod", id, ext, name);
         });
-        TextView[] fav = new TextView[1], mine = new TextView[1];
-        fav[0] = action(a, buttons, favLabel(a, type, id), () -> {
-            a.toggleFavorite(type, id, name, ext);
-            fav[0].setText(favLabel(a, type, id));
-        });
+        TextView[] mine = new TextView[1];
         mine[0] = action(a, buttons, listLabel(a, type, id), () -> {
             boolean added = a.toggleMyList(type, item);
             mine[0].setText(listLabel(a, type, id));
             Toast.makeText(a, added ? "Added to My List" : "Removed from My List", Toast.LENGTH_SHORT).show();
         });
+        JSONObject[] shown = {Tmdb.fromProvider(item, null)};
+        action(a, buttons, "▷  Trailer", () -> trailer(a, shown[0], name));
 
         TextView tagline = text(a, col, 17, Theme.ACCENT);
         tagline.setTypeface(null, Typeface.ITALIC);
@@ -125,9 +123,8 @@ final class Details {
         TextView source = text(a, col, 13, Theme.HINT);
         source.setPadding(a.dp(8), a.dp(14), a.dp(8), a.dp(10));
 
-        JSONObject[] provider = {Tmdb.fromProvider(item, null)};
+        JSONObject[] provider = {shown[0]};
         Runnable[] render = new Runnable[1];
-        JSONObject[] shown = {provider[0]};
         render[0] = () -> {
             JSONObject m = shown[0];
             title.setText(m.optString("title", name));
@@ -186,7 +183,37 @@ final class Details {
         return "Details from your provider.";
     }
 
-    private static String favLabel(MainActivity a, String type, String id) { return a.isFavorite(type, id) ? "★  Favorite" : "☆  Add Favorite"; }
+    /**
+     * Plays the trailer in the YouTube app (Android TV's, else the phone one), else a browser. With no trailer
+     * known (no TMDb key, nothing from the provider) it opens a YouTube search for "title year trailer".
+     */
+    static void trailer(MainActivity a, JSONObject m, String rawName) {
+        String key = m.optString("trailer");
+        String title = m.optString("title", Tmdb.cleanTitle(rawName)[0]), year = m.optString("year");
+        String query = (title + " " + year).trim() + " trailer";
+        java.util.List<android.content.Intent> tries = new ArrayList<>();
+        if (!key.isEmpty()) {
+            for (String pkg : new String[]{"com.google.android.youtube.tv", "com.google.android.youtube", null}) {
+                android.content.Intent i = new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://www.youtube.com/watch?v=" + key));
+                if (pkg != null) i.setPackage(pkg);
+                tries.add(i);
+            }
+        } else {
+            for (String pkg : new String[]{"com.google.android.youtube.tv", "com.google.android.youtube"}) {
+                android.content.Intent i = new android.content.Intent(android.content.Intent.ACTION_SEARCH);
+                i.setPackage(pkg);
+                i.putExtra(android.app.SearchManager.QUERY, query);
+                i.putExtra("query", query);
+                tries.add(i);
+            }
+            tries.add(new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://www.youtube.com/results?search_query=" + android.net.Uri.encode(query))));
+        }
+        for (android.content.Intent i : tries) {
+            try { a.startActivity(i); return; }
+            catch (android.content.ActivityNotFoundException | SecurityException ignored) { }
+        }
+        Toast.makeText(a, "Install YouTube to watch trailers.", Toast.LENGTH_LONG).show();
+    }
 
     private static String listLabel(MainActivity a, String type, String id) { return a.inMyList(type, id) ? "✓  My List" : "＋  My List"; }
 
