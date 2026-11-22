@@ -49,6 +49,7 @@ final class LiveMenu {
     /** First tier: Favorites, Search, added categories, added playlists. */
     static void top(MainActivity a) {
         tier = TOP;
+        hideParent();
         picks.clear();
         a.side.removeAllViews();
         a.button(a.liveOnly() ? "← TV Guide" : "← Home", a.side, a::home);
@@ -126,6 +127,142 @@ final class LiveMenu {
         }
         a.switchPlaylist(p);
         a.browse("live");
+    }
+
+    // ---------------------------------------------------------------- first tier kept on the far left
+
+    /** The narrow first-tier column shown on the far left while a playlist's categories are open. */
+    private static android.widget.ScrollView parentScroll;
+    private static android.widget.LinearLayout parentCol;
+    /** The compact entry of the playlist whose categories are open (Left from the categories lands here). */
+    private static android.widget.TextView parentCurrent;
+    /** The category that had the highlight when Left moved into the compact column (Right returns to it). */
+    private static android.view.View lastCategory;
+
+    /** Called by browse("live"): the (hidden) column that holds the compacted first tier. */
+    static android.view.View buildParentColumn(MainActivity a) {
+        parentCol = new android.widget.LinearLayout(a);
+        parentCol.setOrientation(android.widget.LinearLayout.VERTICAL);
+        parentScroll = new android.widget.ScrollView(a);
+        parentScroll.setTag(FocusWrap.MENU); // Up/Down stay in it, wrapping at the ends
+        parentScroll.setFillViewport(true);
+        parentScroll.setVerticalScrollBarEnabled(false);
+        parentScroll.addView(parentCol);
+        parentScroll.setVisibility(android.view.View.GONE);
+        parentCurrent = null;
+        lastCategory = null;
+        return parentScroll;
+    }
+
+    private static void hideParent() {
+        if (parentScroll != null) parentScroll.setVisibility(android.view.View.GONE);
+        if (parentCol != null) parentCol.removeAllViews();
+        parentCurrent = null;
+        lastCategory = null;
+    }
+
+    /**
+     * Second tier is showing: keep the first tier on the far left as a narrow column (short labels, the open
+     * playlist marked), so Left goes back to it and OK on any entry opens that one.
+     */
+    static void showParent(MainActivity a) {
+        if (parentScroll == null || parentCol == null) return;
+        parentCol.removeAllViews();
+        parentCurrent = null;
+        lastCategory = null;
+        compact(a, "←", a.liveOnly() ? "TV Guide" : "Home", false, a::home);
+        compact(a, "★", "Favorites", false, () -> backTo(a, "fav"));
+        compact(a, "⌕", "Search", false, a::searchLive);
+        compact(a, "▦", "TV guide", false, () -> a.openGuide(null));
+        for (JSONObject t : Antenna.tuners(a)) {
+            String id = Antenna.PREFIX + t.optString("id");
+            compact(a, "📡", Antenna.nameOf(t), false, () -> backTo(a, id));
+        }
+        JSONArray mine = VirtualCategories.all(a);
+        for (int i = 0; i < mine.length(); i++) {
+            JSONObject c = mine.optJSONObject(i);
+            if (c == null) continue;
+            String vid = c.optString("id");
+            compact(a, "◆", c.optString("name"), false, () -> backTo(a, vid));
+        }
+        JSONArray pls = a.library.all();
+        String active = a.library.activeId();
+        for (int i = 0; i < pls.length(); i++) {
+            JSONObject p = pls.optJSONObject(i);
+            if (p == null || Library.isHdhr(p)) continue;
+            boolean on = p.optString("id").equals(active);
+            android.widget.TextView v = compact(a, on ? "▤" : "▢", Library.nameOf(p), on, () -> {
+                if (on) toCategories(a); else openPlaylist(a, p);
+            });
+            if (on) parentCurrent = v;
+        }
+        parentScroll.setVisibility(android.view.View.VISIBLE);
+        if (parentCurrent != null) {
+            android.widget.TextView cur = parentCurrent;
+            parentScroll.post(() -> parentScroll.requestChildRectangleOnScreen(parentCol,
+                    new android.graphics.Rect(0, cur.getTop(), cur.getWidth(), cur.getBottom()), true));
+        }
+    }
+
+    /** One short entry in the compact first-tier column. */
+    private static android.widget.TextView compact(MainActivity a, String icon, String name, boolean current, Runnable ok) {
+        android.widget.TextView v = a.button(icon + "  " + name, parentCol, ok);
+        v.setTextSize(16);
+        v.setSingleLine(true);
+        v.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        v.setPadding(a.dp(10), a.dp(9), a.dp(6), a.dp(9));
+        android.widget.LinearLayout.LayoutParams lp = (android.widget.LinearLayout.LayoutParams) v.getLayoutParams();
+        lp.setMargins(a.dp(4), a.dp(3), a.dp(4), a.dp(3));
+        v.setLayoutParams(lp);
+        if (current) {
+            v.setTextColor(Theme.ACCENT);
+            v.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        } else v.setTextColor(Theme.MUTED);
+        android.view.View.OnFocusChangeListener old = v.getOnFocusChangeListener();
+        v.setOnFocusChangeListener((w, f) -> {
+            if (old != null) old.onFocusChange(w, f);
+            if (!current) v.setTextColor(f ? 0xffffffff : Theme.MUTED);
+        });
+        return v;
+    }
+
+    /** OK on Favorites, an Antenna tuner or one of your categories in the compact column: back to the first tier on it. */
+    private static void backTo(MainActivity a, String id) {
+        a.resumeCategory = id;
+        focusOnOpen = id;
+        top(a);
+    }
+
+    /** Right from the compact column (or OK on the open playlist): back into the categories. */
+    private static void toCategories(MainActivity a) {
+        if (lastCategory != null && lastCategory.getParent() == a.side && lastCategory.isShown()) lastCategory.requestFocus();
+        else if (a.side.getChildCount() > 1) a.side.getChildAt(1).requestFocus();
+    }
+
+    /**
+     * Left/Right between the compact first tier and the categories. Called from TvRemote before other keys.
+     * Returns true when the key was used.
+     */
+    static boolean sideways(MainActivity a, android.view.KeyEvent e) {
+        int key = e.getKeyCode();
+        if (key != android.view.KeyEvent.KEYCODE_DPAD_LEFT && key != android.view.KeyEvent.KEYCODE_DPAD_RIGHT) return false;
+        if (!"live".equals(a.mode) || !tier.equals(CATEGORIES) || parentScroll == null || !parentScroll.isShown()) return false;
+        android.view.View f = a.getCurrentFocus();
+        if (f == null) return false;
+        boolean left = key == android.view.KeyEvent.KEYCODE_DPAD_LEFT;
+        if (left && f.getParent() == a.side) {
+            if (e.getAction() == android.view.KeyEvent.ACTION_DOWN) {
+                lastCategory = f;
+                if (parentCurrent != null) parentCurrent.requestFocus();
+                else if (parentCol.getChildCount() > 0) parentCol.getChildAt(0).requestFocus();
+            }
+            return true;
+        }
+        if (!left && f.getParent() == parentCol) {
+            if (e.getAction() == android.view.KeyEvent.ACTION_DOWN) toCategories(a);
+            return true;
+        }
+        return false;
     }
 
     /** Back in Live TV: from the categories tier go up to the first tier. False when already at the top. */
