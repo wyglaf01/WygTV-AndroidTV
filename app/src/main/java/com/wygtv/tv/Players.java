@@ -44,7 +44,8 @@ final class Players {
     /** Settings: which video decoders to try first. */
     static final String PREF_DECODER = "video_decoder";
     static final String[] DECODER_KEYS = {"auto", "hardware", "software"};
-    static final String[] DECODER_LABELS = {"Automatic (device default)", "Hardware first", "Software first"};
+    static final String[] DECODER_LABELS = {"Automatic (device default)", "Hardware first", "Software first (recommended)"};
+    static final String DECODER_DEFAULT = "software";
 
     /** Seconds loaded before playback starts for a buffer choice; 0 keeps Media3's own 2.5 s start. */
     static int bufferSeconds(String key) {
@@ -72,11 +73,11 @@ final class Players {
 
     /** The full-screen player, with the buffer and decoder chosen in Settings. */
     static ExoPlayer create(Context c, SharedPreferences prefs) {
-        return create(c, bufferSeconds(prefs.getString(PREF_BUFFER, BUFFER_DEFAULT)), prefs.getString(PREF_DECODER, "auto"));
+        return create(c, bufferSeconds(prefs.getString(PREF_BUFFER, BUFFER_DEFAULT)), prefs.getString(PREF_DECODER, DECODER_DEFAULT));
     }
 
     private static ExoPlayer create(Context c, int bufferSeconds) {
-        return create(c, bufferSeconds, c.getSharedPreferences("wygtv", Context.MODE_PRIVATE).getString(PREF_DECODER, "auto"));
+        return create(c, bufferSeconds, c.getSharedPreferences("wygtv", Context.MODE_PRIVATE).getString(PREF_DECODER, DECODER_DEFAULT));
     }
 
     private static ExoPlayer create(Context c, int bufferSeconds, String decoder) {

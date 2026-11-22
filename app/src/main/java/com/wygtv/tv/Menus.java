@@ -477,7 +477,7 @@ final class Menus {
                     settings(a, bufferRow);
                 }));
         final int decoderRow = list.getChildCount();
-        final String decoderKey = a.prefs.getString(Players.PREF_DECODER, "auto");
+        final String decoderKey = a.prefs.getString(Players.PREF_DECODER, Players.DECODER_DEFAULT);
         row(a, list, "Video decoder", Players.DECODER_LABELS[Math.max(0, indexOf(Players.DECODER_KEYS, decoderKey))] + "  •  try Software first if a channel freezes, shows green blocks or won't play", () ->
                 choose(a, "Video decoder", Players.DECODER_LABELS, Math.max(0, indexOf(Players.DECODER_KEYS, decoderKey)), i -> {
                     a.prefs.edit().putString(Players.PREF_DECODER, Players.DECODER_KEYS[i]).apply();
