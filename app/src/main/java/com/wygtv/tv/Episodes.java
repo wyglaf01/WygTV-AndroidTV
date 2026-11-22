@@ -15,7 +15,8 @@ import java.util.List;
 /**
  * A series' seasons and episodes with watch progress: a Continue / Next episode button, "3/10 watched" on each
  * season, and ✓ (watched) or ◐ (started, with time left) on each episode. Unfinished episodes resume where they
- * stopped. Hold OK (or Menu) on an episode to mark it watched or unwatched.
+ * stopped. Hold OK (or Menu) on an episode or a season to mark it watched or unwatched; a button marks the whole
+ * series. Play next in the player starts the episode after the one playing (Settings can make it skip watched ones).
  */
 final class Episodes {
     private Episodes() { }
@@ -37,7 +38,7 @@ final class Episodes {
             JSONObject episodes = o.optJSONObject("episodes");
             List<String> seasons = Watch.seasons(episodes);
             if (seasons.isEmpty()) { cont.setText("No episodes yet"); return; }
-            JSONObject state = Watch.load(a, sid);
+            JSONObject state = Watch.refresh(a, sid, episodes);
             String[] next = Watch.next(episodes, state);
             if (next != null) {
                 int idx = Integer.parseInt(next[1]);
@@ -51,11 +52,26 @@ final class Episodes {
                 cont.setText("✓  All watched");
                 cont.setOnClickListener(v -> Toast.makeText(a, "You've watched every episode. Pick a season to watch again.", Toast.LENGTH_SHORT).show());
             }
+            boolean all = state.optBoolean("complete");
+            a.button(all ? "↺  Mark series not watched" : "✓  Mark series watched", left, () -> {
+                Watch.markAll(a, sid, episodes, null, !all);
+                Toast.makeText(a, all ? "Series marked as not watched" : "Every episode marked as watched", Toast.LENGTH_SHORT).show();
+                show(a, sid, title);
+            });
             TextView[] seasonRows = new TextView[seasons.size()];
             for (int i = 0; i < seasons.size(); i++) {
                 String s = seasons.get(i);
                 seasonRows[i] = a.button("", left, () -> showSeason(a, right, sid, title, s, episodes, true));
                 seasonRows[i].setText(seasonLabel(s, episodes.optJSONArray(s), state));
+                seasonRows[i].setOnLongClickListener(v -> {
+                    JSONArray eps = episodes.optJSONArray(s);
+                    boolean nowDone = Watch.doneIn(eps, Watch.load(a, sid)) < (eps == null ? 0 : eps.length());
+                    Watch.markAll(a, sid, episodes, s, nowDone);
+                    Toast.makeText(a, "Season " + s + (nowDone ? " marked as watched" : " marked as not watched"), Toast.LENGTH_SHORT).show();
+                    a.resumeStreamId = null;
+                    show(a, sid, title);
+                    return true;
+                });
             }
             // Open on the season of the episode just played, else the one with the next episode.
             String resume = a.resumeStreamId, open = next != null ? next[0] : seasons.get(0);
@@ -103,13 +119,14 @@ final class Episodes {
             row.setOnLongClickListener(v -> {
                 boolean nowDone = !Watch.done(Watch.load(a, sid), eid);
                 Watch.setDone(a, sid, eid, season, number(e, idx), nowDone);
+                Watch.refresh(a, sid, episodes);
                 ((TextView) v).setText(episodeLabel(Watch.load(a, sid), season, e, idx));
                 Toast.makeText(a, nowDone ? "Marked as watched" : "Marked as not watched", Toast.LENGTH_SHORT).show();
                 return true;
             });
             if (first == null) first = row;
         }
-        TextView hint = a.label("Hold OK on an episode to mark it watched or not watched.", 13);
+        TextView hint = a.label("Hold OK on an episode, or on a season on the left, to mark it watched or not watched.", 13);
         hint.setTextColor(Theme.HINT);
         hint.setGravity(Gravity.START);
         hint.setPadding(a.dp(8), a.dp(8), a.dp(8), a.dp(8));
@@ -134,7 +151,7 @@ final class Episodes {
     /** The episode after the one playing, as {season, index}, or null (not an episode, or the last one). */
     static String[] next(MainActivity a) {
         if (a.watching == null || a.seriesEpisodes == null) return null;
-        return Watch.after(a.seriesEpisodes, a.watching[1]);
+        return Watch.after(a.seriesEpisodes, a.watching[1], Watch.skipWatched(a) ? Watch.load(a, a.watching[0]) : null);
     }
 
     /** "S1 E5  Title" for the episode after the one playing, or null. */
