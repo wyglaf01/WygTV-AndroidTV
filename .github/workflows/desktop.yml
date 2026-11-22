@@ -91,24 +91,24 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Make test videos with the bundled FFmpeg
+      - name: Make test videos and start a pretend IPTV service
         working-directory: WygDesktop
         run: |
-          mkdir -p "$RUNNER_TEMP/ff" && (cd "$RUNNER_TEMP/ff" && npm init -y >/dev/null && npm install -q ffmpeg-static@5.2.0)
-          FF=$(cd "$RUNNER_TEMP/ff" && node -p "require('ffmpeg-static')")
+          sudo apt-get update -q
+          sudo apt-get install -y -q ffmpeg
           mkdir -p "$RUNNER_TEMP/media/hls"
-          $FF -loglevel error -y -f lavfi -i testsrc2=size=1280x720:rate=25 -f lavfi -i sine=frequency=440 -t 40 -c:v libx264 -preset ultrafast -g 50 -c:a aac -f mpegts "$RUNNER_TEMP/media/h264.ts"
-          $FF -loglevel error -y -f lavfi -i smptebars=size=720x480:rate=30 -f lavfi -i sine=frequency=300 -t 40 -c:v mpeg2video -b:v 4M -c:a ac3 -f mpegts "$RUNNER_TEMP/media/mpeg2.ts"
-          $FF -loglevel error -y -i "$RUNNER_TEMP/media/h264.ts" -c copy -f hls -hls_time 4 -hls_list_size 0 "$RUNNER_TEMP/media/hls/index.m3u8"
+          ffmpeg -loglevel error -y -f lavfi -i testsrc2=size=1280x720:rate=25 -f lavfi -i sine=frequency=440 -t 40 -c:v libx264 -preset ultrafast -g 50 -c:a aac -f mpegts "$RUNNER_TEMP/media/h264.ts"
+          ffmpeg -loglevel error -y -f lavfi -i smptebars=size=720x480:rate=30 -f lavfi -i sine=frequency=300 -t 40 -c:v mpeg2video -b:v 4M -c:a ac3 -f mpegts "$RUNNER_TEMP/media/mpeg2.ts"
+          ffmpeg -loglevel error -y -i "$RUNNER_TEMP/media/h264.ts" -c copy -f hls -hls_time 4 -hls_list_size 0 "$RUNNER_TEMP/media/hls/index.m3u8"
           nohup node test/mock-server.js 8765 "$RUNNER_TEMP/media" > "$RUNNER_TEMP/mock.log" 2>&1 &
           sleep 2
           curl -sf "http://127.0.0.1:8765/player_api.php?username=demo&password=demo"
 
       - name: Install the .deb (apt resolves its dependencies)
         run: |
-          sudo apt-get update -q
           # No system FFmpeg, so the app must use the one it ships with.
           sudo apt-get remove -y -q ffmpeg || true
+          ! command -v ffmpeg
           sudo apt-get install -y -q --no-install-recommends xvfb ./pkg/WygDesktop-linux.deb
           dpkg -s wygdesktop | grep -E '^(Version|Depends)'
           ls -l /opt/WygDesktop/chrome-sandbox
