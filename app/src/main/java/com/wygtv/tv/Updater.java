@@ -57,7 +57,7 @@ final class Updater {
                 int code = latest.optInt("versionCode", -1), mine = installedCode(a);
                 String name = latest.optString("versionName", String.valueOf(code));
                 if (!isNewer(code, mine)) { if (manual) Toast.makeText(a, "WygTV " + installedName(a) + " is the latest version.", Toast.LENGTH_LONG).show(); return; }
-                new AlertDialog.Builder(a).setTitle("WygTV update available")
+                new Dialogs.Builder(a).setTitle("WygTV update available")
                         .setMessage("Version " + name + " is ready (you have " + installedName(a) + ").\n\nIt installs over this one, and your playlists, favourites and settings are kept.")
                         .setPositiveButton("Update now", (d, w) -> download(a, name))
                         .setNegativeButton("Later", null).show();
@@ -66,7 +66,7 @@ final class Updater {
     }
 
     private static void download(MainActivity a, String name) {
-        AlertDialog progress = new AlertDialog.Builder(a).setTitle("Downloading WygTV " + name).setMessage("Starting…").setCancelable(false).show();
+        AlertDialog progress = new Dialogs.Builder(a).setTitle("Downloading WygTV " + name).setMessage("Starting…").setCancelable(false).show();
         new Thread(() -> {
             File apk = ApkProvider.file(a);
             String error = null;
@@ -101,7 +101,7 @@ final class Updater {
     /** Hands the downloaded APK to the system installer, asking for "install unknown apps" first when needed. */
     static void install(MainActivity a) {
         if (Build.VERSION.SDK_INT >= 26 && !a.getPackageManager().canRequestPackageInstalls()) {
-            new AlertDialog.Builder(a).setTitle("Allow WygTV to install updates")
+            new Dialogs.Builder(a).setTitle("Allow WygTV to install updates")
                     .setMessage("Turn on \"Allow from this source\" (or \"Install unknown apps\") for WygTV on the next screen, then press Back and choose Update again.")
                     .setPositiveButton("Open setting", (d, w) -> {
                         try { a.startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + a.getPackageName()))); }

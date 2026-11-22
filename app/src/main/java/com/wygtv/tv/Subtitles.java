@@ -1,6 +1,5 @@
 package com.wygtv.tv;
 
-import android.app.AlertDialog;
 import android.content.SharedPreferences;
 import android.widget.Toast;
 import androidx.annotation.OptIn;
@@ -107,11 +106,11 @@ final class Subtitles {
         }
         if (groups.isEmpty()) {
             String[] items = {"Off", "On (show them when the channel sends any)"};
-            new AlertDialog.Builder(a).setTitle("Subtitles  •  none in this stream right now")
+            new Dialogs.Builder(a).setTitle("Subtitles  •  none in this stream right now")
                     .setSingleChoiceItems(items, wanted ? 1 : 0, (d, w) -> { d.dismiss(); set(w == 1); }).show();
             return;
         }
-        new AlertDialog.Builder(a).setTitle("Subtitles").setSingleChoiceItems(labels.toArray(new String[0]), checked, (d, w) -> {
+        new Dialogs.Builder(a).setTitle("Subtitles").setSingleChoiceItems(labels.toArray(new String[0]), checked, (d, w) -> {
             d.dismiss();
             if (w == 0) { set(false); return; }
             Tracks.Group g = groups.get(w - 1);
