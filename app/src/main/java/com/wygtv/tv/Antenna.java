@@ -55,7 +55,8 @@ final class Antenna {
     static void addMenuEntries(MainActivity a) {
         for (JSONObject t : tuners(a)) {
             String id = PREFIX + t.optString("id");
-            LiveMenu.pick(a, label(a, t), id);
+            // Highlighting it previews its channels; OK opens its full guide with only the side menu (collapsed) on the left.
+            LiveMenu.pick(a, label(a, t), id).setOnClickListener(w -> a.showGuide(id, null, true));
         }
     }
 

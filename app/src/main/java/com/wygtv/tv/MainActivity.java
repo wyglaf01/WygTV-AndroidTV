@@ -40,7 +40,7 @@ public class MainActivity extends Activity {
  @Override protected void onActivityResult(int code,int result,Intent data){super.onActivityResult(code,result,data);if(code==Backup.REQ_PICK&&result==RESULT_OK&&data!=null)Backup.onPicked(this,data.getData());}
  void updateStatus(){String s=saved("host");if(s.isEmpty()){status.setText("No playlist connected");return;}String exp=Menus.expiryText(saved("expiry"));status.setText("Playlist: "+saved("title")+"  •  "+(library.activeIsHdhr()?"HDHomeRun":library.activeIsM3u()?"M3U":"Xtream Codes")+"  •  "+Menus.hostOf(s)+(exp.isEmpty()?"":"  •  "+exp));}
  /** Which side-menu entry the current screen belongs to. */
- String railKey(){return mode.equals("search")&&liveOnly()?"search":mode.equals("search")||mode.equals("favorites")?"live":mode.equals("episodes")?"series":mode.equals("details")?detailsType:mode.equals("login")?"playlists":mode.equals("hdhr")?"settings":mode;}
+ String railKey(){if(mode.equals("guide")&&Antenna.isAntenna(category))return category;/* a tuner's guide lights its 📡 entry */return mode.equals("search")&&liveOnly()?"search":mode.equals("search")||mode.equals("favorites")?"live":mode.equals("episodes")?"series":mode.equals("details")?detailsType:mode.equals("login")?"playlists":mode.equals("hdhr")?"settings":mode;}
  /** Settings → App mode: "Live TV only" hides Movies, Series and the Home screen; the TV guide is the main screen. */
  boolean liveOnly(){return prefs.getBoolean("live_only",false);}
  void home(){Antenna.restoreMain(this);
@@ -57,7 +57,7 @@ public class MainActivity extends Activity {
   TextView live=homeTile("▣","Live TV",tiles,()->browse("live"));if(library.activeIsM3u())homeTile("▦","TV Guide",tiles,()->openGuide(null));else{homeTile("▶","Movies",tiles,()->browse("vod"));homeTile("▤","Series",tiles,()->browse("series"));}
   /* Second row: Search (everything, every playlist) and each HDHomeRun tuner as "Antenna TV" when one is set up. Favorites live inside Live TV. */
   LinearLayout shortcuts=new LinearLayout(this);shortcuts.setGravity(Gravity.CENTER);center.addView(shortcuts,new LinearLayout.LayoutParams(-1,dp(105)));
-  homeTile("⌕","Search",shortcuts,()->MasterSearch.show(this));for(JSONObject t:Antenna.tuners(this)){String aid=Antenna.PREFIX+t.optString("id");homeTile("📡",Antenna.nameOf(t),shortcuts,()->LiveMenu.openAt(this,aid,true));}
+  homeTile("⌕","Search",shortcuts,()->MasterSearch.show(this));for(JSONObject t:Antenna.tuners(this)){String aid=Antenna.PREFIX+t.optString("id");homeTile("📡",Antenna.nameOf(t),shortcuts,()->showGuide(aid,null,true));/* tuner guide full screen, only the side menu (collapsed) on the left */}
   for(int i=0;i<shortcuts.getChildCount();i++)((TextView)shortcuts.getChildAt(i)).setTextSize(20);
   LinearLayout footer=new LinearLayout(this);footer.setGravity(Gravity.CENTER_VERTICAL);layout.addView(footer,new LinearLayout.LayoutParams(-1,dp(56)));
   TextView manage=button("☰  Playlists",footer,()->playlists());manage.setTextSize(16);manage.setGravity(Gravity.CENTER);manage.setLayoutParams(new LinearLayout.LayoutParams(dp(170),dp(48)));TextView gear=button("⚙  Settings",footer,()->settings());gear.setTextSize(16);gear.setGravity(Gravity.CENTER);gear.setLayoutParams(new LinearLayout.LayoutParams(dp(170),dp(48)));
