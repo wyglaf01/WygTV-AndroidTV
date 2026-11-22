@@ -48,7 +48,7 @@ final class TvRemote {
 
     // Overlays.
     private LinearLayout banner;
-    private TextView bannerNumber, bannerTitle, bannerSource, bannerNow, bannerNext, numberBox;
+    private TextView bannerLogo, bannerTitle, bannerSource, bannerNow, bannerNext, numberBox;
     private String typed = "";
     private final Runnable hideBanner = () -> { if (banner != null) banner.setVisibility(View.GONE); };
     private final Runnable commitNumber = this::commitNumber;
@@ -125,11 +125,12 @@ final class TvRemote {
         banner.setVisibility(View.GONE);
         LinearLayout top = new LinearLayout(a);
         top.setGravity(Gravity.CENTER_VERTICAL);
-        bannerNumber = text("", 30, Theme.ACCENT, true);
-        top.addView(bannerNumber, new LinearLayout.LayoutParams(-2, -2));
+        // The channel's logo from the playlist (or a letter badge), not its number.
+        bannerLogo = text("", 30, Theme.ACCENT, true);
+        top.addView(bannerLogo, new LinearLayout.LayoutParams(-2, -2));
         bannerTitle = text("", 28, Theme.TEXT, true);
         bannerTitle.setSingleLine(true);
-        bannerTitle.setPadding(a.dp(18), 0, 0, 0);
+        bannerTitle.setPadding(a.dp(4), 0, 0, 0);
         top.addView(bannerTitle, new LinearLayout.LayoutParams(0, -2, 1));
         banner.addView(top);
         bannerSource = text("", 15, Theme.ACCENT, false);
@@ -143,7 +144,7 @@ final class TvRemote {
         bannerNext.setSingleLine(true);
         banner.addView(bannerNext);
         TextView hints = text(isLive()
-                ? "▲▼ / CH± change channel    0-9 channel number    OK info    GUIDE TV guide    MENU options / subtitles    BACK exit"
+                ? "▲▼ / CH± change channel    0-9 channel number    OK favorites / groups    INFO channel info    GUIDE TV guide    MENU options / subtitles    BACK exit"
                 : "series".equals(type) && Episodes.next(a) != null ? "◀▶ seek    ▶❚❚ play / pause    MENU next episode / options / subtitles    BACK exit"
                 : "◀▶ seek    ▶❚❚ play / pause    MENU options / subtitles    BACK exit", 14, Theme.MUTED, false);
         hints.setPadding(0, a.dp(8), 0, 0);
@@ -192,7 +193,8 @@ final class TvRemote {
 
     private void showBanner() {
         if (banner == null) return;
-        bannerNumber.setText(channelNumber(current()));
+        JSONObject ch = channel();
+        ChannelIcons.attach(bannerLogo, ch.optString("stream_icon"), title, 48);
         bannerTitle.setText(title);
         String source = Library.sourceLabel(a.library.find(a.library.activeId()));
         bannerSource.setText(source.isEmpty() ? "" : "Source  " + source);
@@ -264,10 +266,7 @@ final class TvRemote {
                 if (upNextShowing()) { if (down && e.getRepeatCount() == 0) Episodes.playNext(a); return true; }
                 if (!typed.isEmpty()) { if (down) { ui.removeCallbacks(commitNumber); commitNumber(); } return true; }
                 if (!isLive()) return false; // movies and episodes: OK shows the playback controls
-                if (down && e.getRepeatCount() == 0) {
-                    if (banner.getVisibility() == View.VISIBLE) { banner.setVisibility(View.GONE); view.showController(); }
-                    else showBanner();
-                }
+                if (down && e.getRepeatCount() == 0) channelOptions();
                 return true;
             case KeyEvent.KEYCODE_INFO:
                 if (down) { if (banner.getVisibility() == View.VISIBLE) hideBanner.run(); else showBanner(); }
@@ -432,10 +431,24 @@ final class TvRemote {
 
     private static int parse(String s) { try { return Integer.parseInt(s); } catch (NumberFormatException e) { return -1; } }
 
-    private String channelNumber(JSONObject ch) {
-        String n = ch == null ? "" : ch.optString("num");
-        if (!n.isEmpty()) return n;
-        return zapIndex >= 0 ? String.valueOf(zapIndex + 1) : "";
+    /** The channel playing, with its logo and playlist when known (from the list you zap through, else all channels). */
+    private JSONObject channel() {
+        JSONObject ch = current();
+        if (ch != null && id.equals(ch.optString("stream_id"))) return ch;
+        if (allLiveReady()) { int i = indexOf(allLive, id); if (i >= 0) return allLive.optJSONObject(i); }
+        return channelStub(id, title, ext);
+    }
+
+    /**
+     * OK on a live channel: the same pop-up as holding OK in a guide (Favorites, Hidden, Add to channel group,
+     * New channel group), with the channel banner shown under it for the logo, source and what's on.
+     */
+    private void channelOptions() {
+        showBanner();
+        ui.removeCallbacks(hideBanner);
+        android.app.AlertDialog d = GuideOptions.show(a, channel(), null, null);
+        if (d == null) { ui.postDelayed(hideBanner, BANNER_MS); return; }
+        d.setOnDismissListener(x -> { ui.removeCallbacks(hideBanner); ui.postDelayed(hideBanner, BANNER_MS); });
     }
 
     private static String[] numbers(JSONArray list) {
@@ -526,14 +539,22 @@ final class TvRemote {
     /** A quick channel picker over the video, so you can jump without leaving the player. */
     private void channelList() {
         if (zapList == null || zapList.length() == 0) { toast("No channel list to show."); return; }
-        String[] names = new String[zapList.length()];
-        for (int i = 0; i < names.length; i++) {
-            JSONObject o = zapList.optJSONObject(i);
-            String num = o == null ? "" : o.optString("num");
-            names[i] = (num.isEmpty() ? String.valueOf(i + 1) : num) + "   " + (o == null ? "" : o.optString("name"));
-        }
         final JSONArray list = zapList;
-        AlertDialog d = new Dialogs.Builder(a).setTitle("Channels").setSingleChoiceItems(names, Math.max(0, zapIndex), (dialog, which) -> {
+        final int playing = zapIndex;
+        // Each row: the channel's logo from the playlist and its name (▶ marks the one playing).
+        android.widget.ArrayAdapter<String> rows = new android.widget.ArrayAdapter<String>(a, android.R.layout.select_dialog_item) {
+            @Override public int getCount() { return list.length(); }
+            @Override public String getItem(int i) { JSONObject o = list.optJSONObject(i); return o == null ? "" : o.optString("name"); }
+            @Override public View getView(int i, View convert, android.view.ViewGroup parent) {
+                TextView t = (TextView) super.getView(i, convert, parent);
+                JSONObject o = list.optJSONObject(i);
+                String name = o == null ? "" : o.optString("name");
+                t.setText(i == playing ? "▶  " + name : name);
+                ChannelIcons.attach(t, o == null ? "" : o.optString("stream_icon"), name, 28);
+                return t;
+            }
+        };
+        AlertDialog d = new Dialogs.Builder(a).setTitle("Channels").setAdapter(rows, (dialog, which) -> {
             dialog.dismiss();
             if (which != zapIndex || list != zapList) switchTo(list, which);
         }).create();
