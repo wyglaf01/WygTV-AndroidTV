@@ -11,7 +11,9 @@ const { spawn } = require('child_process');
 const net = require('./net');
 
 const BASE = 'https://github.com/wyglaf01/WygTV-AndroidTV/releases/download/wygdesktop-latest/';
-const FILES = { win32: 'WygDesktop-Setup.exe', appimage: 'WygDesktop-linux.AppImage', deb: 'WygDesktop-linux.deb' };
+const FILES = { win32: 'WygDesktop-Setup.exe', appimage: 'WygDesktop-linux.AppImage', deb: 'WygDesktop-linux.deb',
+  // WygTV-Mac: one disk image for Apple Silicon (M1 and newer) and one for Intel Macs.
+  mac: process.arch === 'arm64' ? 'WygTV-Mac-AppleSilicon.dmg' : 'WygTV-Mac-Intel.dmg' };
 
 function newer(a, b) {
   const pa = String(a).split('.').map(Number), pb = String(b).split('.').map(Number);
@@ -21,7 +23,7 @@ function newer(a, b) {
 
 async function check(current) {
   const info = await net.json(BASE + 'desktop-version.json?t=' + Date.now(), { timeout: 15000 });
-  const kind = process.platform === 'win32' ? 'win32' : process.env.APPIMAGE ? 'appimage' : 'deb';
+  const kind = process.platform === 'win32' ? 'win32' : process.platform === 'darwin' ? 'mac' : process.env.APPIMAGE ? 'appimage' : 'deb';
   return { current, latest: info.version, available: newer(info.version, current), kind, url: BASE + FILES[kind], notes: info.notes || '' };
 }
 
@@ -39,7 +41,7 @@ async function download(url, file, progress) {
 }
 
 async function install(info, progress) {
-  if (info.kind === 'deb') { await shell.openExternal(info.url); return 'opened'; }
+  if (info.kind === 'deb' || info.kind === 'mac') { await shell.openExternal(info.url); return 'opened'; }
   if (info.kind === 'win32') {
     const file = path.join(os.tmpdir(), 'WygDesktop-Setup.exe');
     await download(info.url, file, progress);

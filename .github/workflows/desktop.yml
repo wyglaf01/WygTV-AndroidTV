@@ -1,4 +1,4 @@
-name: Build WygDesktop (Windows and Ubuntu)
+name: Build WygDesktop (Windows and Ubuntu) and WygTV-Mac (macOS)
 
 on:
   workflow_dispatch:
@@ -25,6 +25,17 @@ jobs:
             files: |
               WygDesktop/dist/WygDesktop-linux.AppImage
               WygDesktop/dist/WygDesktop-linux.deb
+          # WygTV-Mac: each Mac kind is built (and tried) on its own kind of Mac, so FFmpeg matches it.
+          - os: macos-latest
+            target: mac
+            arch: arm64
+            label: AppleSilicon
+            files: WygDesktop/dist/WygTV-Mac-AppleSilicon.dmg
+          - os: macos-15-intel
+            target: mac
+            arch: x64
+            label: Intel
+            files: WygDesktop/dist/WygTV-Mac-Intel.dmg
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
@@ -68,12 +79,40 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run dist:${{ matrix.target }}
+        run: npm run dist:${{ matrix.target }} -- ${{ matrix.target == 'mac' && format('--{0} -c.mac.artifactName=WygTV-Mac-{1}.dmg', matrix.arch, matrix.label) || '' }}
+
+      # Opens the .dmg, copies WygTV-Mac.app out like a person would, and has it play a direct H.264 channel
+      # and an MPEG-2/AC-3 channel through its FFmpeg from a pretend IPTV service (see src/main/smoke.js).
+      - name: Try WygTV-Mac
+        if: matrix.target == 'mac'
+        timeout-minutes: 15
+        run: |
+          FF="$(node -p "require('ffmpeg-static')")"
+          if ! "$FF" -hide_banner -encoders 2>/dev/null | grep -q libx264; then brew install ffmpeg >/dev/null; FF=ffmpeg; fi
+          mkdir -p "$RUNNER_TEMP/media/hls"
+          "$FF" -loglevel error -y -f lavfi -i testsrc2=size=1280x720:rate=25 -f lavfi -i sine=frequency=440 -t 40 -c:v libx264 -preset ultrafast -g 50 -c:a aac -f mpegts "$RUNNER_TEMP/media/h264.ts"
+          "$FF" -loglevel error -y -f lavfi -i smptebars=size=720x480:rate=30 -f lavfi -i sine=frequency=300 -t 40 -c:v mpeg2video -b:v 4M -c:a ac3 -f mpegts "$RUNNER_TEMP/media/mpeg2.ts"
+          "$FF" -loglevel error -y -i "$RUNNER_TEMP/media/h264.ts" -c copy -f hls -hls_time 4 -hls_list_size 0 "$RUNNER_TEMP/media/hls/index.m3u8"
+          nohup node test/mock-server.js 8765 "$RUNNER_TEMP/media" > "$RUNNER_TEMP/mock.log" 2>&1 &
+          sleep 2
+          curl -sf "http://127.0.0.1:8765/player_api.php?username=demo&password=demo" >/dev/null
+          hdiutil attach -nobrowse -readonly -mountpoint "$RUNNER_TEMP/dmg" dist/WygTV-Mac-${{ matrix.label }}.dmg
+          ls "$RUNNER_TEMP/dmg"
+          cp -R "$RUNNER_TEMP/dmg/WygTV-Mac.app" "$RUNNER_TEMP/"
+          hdiutil detach "$RUNNER_TEMP/dmg"
+          APP="$RUNNER_TEMP/WygTV-Mac.app"
+          codesign --verify --deep --strict "$APP" && codesign -dv "$APP" 2>&1 | grep -E 'Identifier|Signature'
+          lipo -archs "$APP/Contents/MacOS/WygTV-Mac"
+          "$APP/Contents/MacOS/WygTV-Mac" --smoke=http://127.0.0.1:8765 2>&1 | tee "$RUNNER_TEMP/smoke.log" | grep -E 'WYG-SMOKE|rror' ; test "${PIPESTATUS[0]}" = 0
+
+      - name: Mac logs
+        if: failure() && matrix.target == 'mac'
+        run: tail -n 80 "$RUNNER_TEMP/smoke.log" "$RUNNER_TEMP/mock.log" || true
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: wygdesktop-${{ matrix.target }}
+          name: wygdesktop-${{ matrix.target }}${{ matrix.arch && format('-{0}', matrix.arch) || '' }}
           path: ${{ matrix.files }}
           if-no-files-found: error
 
@@ -160,7 +199,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ "$GITHUB_REF_NAME" = "app" ]; then TAG=wygdesktop-latest; TITLE="WygDesktop (latest build)"; else TAG=wygdesktop-test; TITLE="WygDesktop (test build from $GITHUB_REF_NAME)"; fi
+          if [ "$GITHUB_REF_NAME" = "app" ]; then TAG=wygdesktop-latest; TITLE="WygDesktop and WygTV-Mac (latest build)"; else TAG=wygdesktop-test; TITLE="WygDesktop and WygTV-Mac (test build from $GITHUB_REF_NAME)"; fi
           echo "{\"version\": \"1.0.${GITHUB_RUN_NUMBER}\", \"notes\": \"${GITHUB_REF_NAME} ${GITHUB_SHA::7}\"}" > dist/desktop-version.json
           git tag -f "$TAG"
           git push -f origin "refs/tags/$TAG"
@@ -170,11 +209,16 @@ jobs:
           Windows installer: $URL/WygDesktop-Setup.exe
           Windows portable (no install): $URL/WygDesktop-Portable.exe
           Ubuntu .deb: $URL/WygDesktop-linux.deb
-          Ubuntu AppImage: $URL/WygDesktop-linux.AppImage"
+          Ubuntu AppImage: $URL/WygDesktop-linux.AppImage
+          WygTV-Mac for Apple Silicon Macs (M1 and newer): $URL/WygTV-Mac-AppleSilicon.dmg
+          WygTV-Mac for Intel Macs: $URL/WygTV-Mac-Intel.dmg
+
+          WygTV-Mac isn't signed by Apple yet. The first time: open the .dmg, drag WygTV-Mac into Applications, open it,
+          click Done, then System Settings → Privacy & Security → Open Anyway (or right-click → Open on older macOS)."
           # Kept as a pre-release so it never replaces WygTV's APK as the repository's "latest" release.
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release edit "$TAG" --title "$TITLE" --notes "$NOTES" --prerelease --latest=false
           else
             gh release create "$TAG" --title "$TITLE" --notes "$NOTES" --prerelease --latest=false
           fi
-          gh release upload "$TAG" dist/WygDesktop-Setup.exe dist/WygDesktop-Portable.exe dist/WygDesktop-linux.deb dist/WygDesktop-linux.AppImage dist/desktop-version.json --clobber
+          gh release upload "$TAG" dist/WygDesktop-Setup.exe dist/WygDesktop-Portable.exe dist/WygDesktop-linux.deb dist/WygDesktop-linux.AppImage dist/WygTV-Mac-AppleSilicon.dmg dist/WygTV-Mac-Intel.dmg dist/desktop-version.json --clobber

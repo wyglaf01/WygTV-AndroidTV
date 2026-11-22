@@ -89,7 +89,7 @@
   };
 
   W.backupText = () => JSON.stringify({
-    app: 'WygDesktop', version: 1, saved: new Date().toISOString(), settings: W.settings, favs: W.favs, recent: W.recent,
+    app: 'WygDesktop', brand: W.brand, version: 1, saved: new Date().toISOString(), settings: W.settings, favs: W.favs, recent: W.recent,
     mylist: W.myList, progress: W.progress, hidden: W.hidden,
   }, null, 2);
 
@@ -171,7 +171,7 @@
             if (i >= 0) { W.settings.guideRows = opts[i]; W.saveSettings(); W.refresh(); }
           } }, h('div', { class: 'set-label' }, 'Upcoming shows under the preview'), h('div', { class: 'set-sub' }, (W.settings.guideRows || 4) + ' rows')),
           btn({ class: 'set-row', onclick: () => { W.settings.startup = W.settings.startup === 'last' ? 'home' : 'last'; W.saveSettings(); W.refresh(); } },
-            h('div', { class: 'set-label' }, 'When WygDesktop starts'), h('div', { class: 'set-sub' }, W.settings.startup === 'last' ? 'Play the last channel' : 'Show the home screen')),
+            h('div', { class: 'set-label' }, 'When ' + W.brand + ' starts'), h('div', { class: 'set-sub' }, W.settings.startup === 'last' ? 'Play the last channel' : 'Show the home screen')),
         ];
       },
     },
@@ -189,11 +189,11 @@
           btn({ class: 'set-row', onclick: async () => {
             const p = await W.api.ext.pick();
             if (p) { W.settings.extPlayer = p; W.saveSettings(); W.refresh(); }
-          } }, h('div', { class: 'set-label' }, 'External player (VLC or mpv)'), h('div', { class: 'set-sub' }, W.settings.extPlayer || 'Not set: VLC is found automatically when installed')),
+          } }, h('div', { class: 'set-label' }, 'External player (VLC or mpv)'), h('div', { class: 'set-sub' }, W.settings.extPlayer || (W.isMac ? 'Not set: VLC (in Applications) is used when installed' : 'Not set: VLC is found automatically when installed'))),
           btn({ class: 'set-row', onclick: async () => {
-            const r = await W.form('User agent', [{ key: 'ua', label: 'Sent to your provider (leave empty for the default)', value: W.settings.userAgent, placeholder: 'WygDesktop/1.0' }]);
-            if (r) { W.settings.userAgent = r.ua.trim(); W.saveSettings(); W.api.net.setUserAgent(W.settings.userAgent || 'WygDesktop/1.0'); W.refresh(); }
-          } }, h('div', { class: 'set-label' }, 'User agent'), h('div', { class: 'set-sub' }, W.settings.userAgent || 'WygDesktop/1.0 (default)')),
+            const r = await W.form('User agent', [{ key: 'ua', label: 'Sent to your provider (leave empty for the default)', value: W.settings.userAgent, placeholder: W.brand + '/1.0' }]);
+            if (r) { W.settings.userAgent = r.ua.trim(); W.saveSettings(); W.api.net.setUserAgent(W.settings.userAgent || W.brand + '/1.0'); W.refresh(); }
+          } }, h('div', { class: 'set-label' }, 'User agent'), h('div', { class: 'set-sub' }, W.settings.userAgent || W.brand + '/1.0 (default)')),
           h('div', { class: 'set-text' }, 'Player keys: Up/Down or Page Up/Down change channel, numbers jump to a channel, Left/Right skip in movies, Space or P pauses, I shows info, F toggles full screen, Esc goes back.'),
         ];
       },
@@ -235,9 +235,9 @@
       label: 'ℹ About & updates',
       render() {
         const ver = h('div', { class: 'set-sub' }, '…');
-        W.api.app.info().then((i) => { ver.textContent = 'Version ' + i.version + ' · ' + (i.platform === 'win32' ? 'Windows' : i.platform === 'linux' ? 'Linux' : i.platform); });
+        W.api.app.info().then((i) => { ver.textContent = 'Version ' + i.version + ' · ' + (i.platform === 'win32' ? 'Windows' : i.platform === 'linux' ? 'Linux' : i.platform === 'darwin' ? 'macOS' : i.platform); });
         return [
-          h('div', { class: 'about' }, h('img', { src: 'assets/icon.png', alt: '' }), h('div', null, h('div', { class: 'brand' }, 'WygDesktop'), ver, h('div', { class: 'set-sub' }, 'The desktop copy of WygTV.'))),
+          h('div', { class: 'about' }, h('img', { src: 'assets/icon.png', alt: '' }), h('div', null, h('div', { class: 'brand' }, W.brand), ver, h('div', { class: 'set-sub' }, 'The desktop copy of WygTV.'))),
           h('div', { class: 'set-buttons' },
             btn({ class: 'button primary', onclick: () => W.checkUpdates(true) }, '⟳ Check for updates'),
             btn({ class: 'button', onclick: () => W.api.win.quit() }, '⏻ Quit')),
@@ -262,8 +262,8 @@
   W.checkUpdates = async (manual) => {
     try {
       const r = await W.api.update.check();
-      if (!r.available) { if (manual) W.alert('Up to date', 'You have the newest WygDesktop (' + r.current + ').'); return; }
-      const go = await W.confirm('Update available', `WygDesktop ${r.latest} is ready (you have ${r.current}). Install it now?`, r.kind === 'deb' ? 'Download' : 'Install', 'Later');
+      if (!r.available) { if (manual) W.alert('Up to date', 'You have the newest ' + W.brand + ' (' + r.current + ').'); return; }
+      const go = await W.confirm('Update available', r.kind === 'mac' ? `${W.brand} ${r.latest} is ready (you have ${r.current}). Download it now? Open the downloaded file and drag ${W.brand} into Applications to replace this one.` : `${W.brand} ${r.latest} is ready (you have ${r.current}). Install it now?`, r.kind === 'deb' || r.kind === 'mac' ? 'Download' : 'Install', 'Later');
       if (!go) return;
       const b = W.busy('Downloading the update…');
       W.api.onUpdateProgress((p) => b.set('Downloading the update… ' + p + '%'));

@@ -1,6 +1,6 @@
 # WygDesktop
 
-The desktop copy of WygTV for **Windows** and **Ubuntu**, in the same royal blue and bronze look.
+The desktop copy of WygTV for **Windows** and **Ubuntu**, in the same royal blue and bronze look. The same code also builds **WygTV-Mac** for macOS.
 
 ## Download
 
@@ -12,6 +12,8 @@ Every change merged into the `app` branch is built by GitHub Actions and publish
 | Windows, no install | https://github.com/wyglaf01/WygTV-AndroidTV/releases/download/wygdesktop-latest/WygDesktop-Portable.exe |
 | Ubuntu (.deb) | https://github.com/wyglaf01/WygTV-AndroidTV/releases/download/wygdesktop-latest/WygDesktop-linux.deb |
 | Ubuntu (AppImage) | https://github.com/wyglaf01/WygTV-AndroidTV/releases/download/wygdesktop-latest/WygDesktop-linux.AppImage |
+| WygTV-Mac, Apple Silicon | https://github.com/wyglaf01/WygTV-AndroidTV/releases/download/wygdesktop-latest/WygTV-Mac-AppleSilicon.dmg |
+| WygTV-Mac, Intel | https://github.com/wyglaf01/WygTV-AndroidTV/releases/download/wygdesktop-latest/WygTV-Mac-Intel.dmg |
 
 Builds from other branches go to the `wygdesktop-test` release instead. Settings → About & updates → Check for updates installs newer builds.
 
@@ -20,6 +22,10 @@ On Ubuntu (22.04 and 24.04 are checked on every build):
 - **.deb** (recommended): `sudo apt install ./WygDesktop-linux.deb`, then open WygDesktop from the app menu or run `wygdesktop`.
 - **AppImage**: AppImages need FUSE 2, which Ubuntu no longer installs by default: `sudo apt install libfuse2t64` on 24.04 (`libfuse2` on 22.04). Then `chmod +x WygDesktop-linux.AppImage` and run it.
 - FFmpeg (for antenna channels and AC-3/DTS sound): the .deb installs Ubuntu's `ffmpeg` package; the AppImage carries its own.
+
+On a Mac (macOS 11 or newer; each build is tried on an Apple Silicon and an Intel Mac): open the .dmg and drag WygTV-Mac into Applications.
+It is ad-hoc signed but not signed or notarized by Apple, so the first launch is blocked: click Done, then System Settings → Privacy & Security → **Open Anyway**
+(right-click → Open on macOS 14 and older). If macOS says it "is damaged": `xattr -cr /Applications/WygTV-Mac.app`.
 
 ## Features
 
@@ -44,7 +50,7 @@ cd WygDesktop
 npm install
 npm start          # run the app
 npm test           # unit tests
-npm run dist:win   # or dist:linux
+npm run dist:win   # or dist:linux, or dist:mac on a Mac
 ```
 
 `node test/mock-server.js 8765 <media folder>` runs a pretend Xtream provider (server `http://127.0.0.1:8765`, user `demo`, password `demo`) for trying the app without a real service.
