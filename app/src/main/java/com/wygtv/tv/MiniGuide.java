@@ -157,6 +157,7 @@ final class MiniGuide {
     }
 
     private static String starred(MainActivity a, JSONObject item) {
+        if ("fav".equals(a.category)) return ""; // Showing Favorites: every row is one.
         String pid = item.optString("playlist");
         boolean fav = (pid.isEmpty() || pid.equals(a.library.activeId())) && a.isFavorite("live", item.optString("stream_id"));
         return fav ? "★ " : "";
