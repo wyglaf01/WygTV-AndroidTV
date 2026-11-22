@@ -86,7 +86,7 @@ final class VodMenu {
             JSONObject c = a.categories.optJSONObject(i);
             if (c != null && hidden.contains(c.optString("category_id"))) hiddenCount++;
         }
-        a.button(hiddenCount == 0 ? "◐ Hide / show categories" : "◐ Hide / show categories (" + hiddenCount + " hidden)", a.side, a::manageCategories);
+        a.button(hiddenCount == 0 ? "◐ Hide / show categories" : "◐ Hide / show categories (" + hiddenCount + " hidden)", a.side, () -> { String m = a.mode; Manage.categories(a, null, m, () -> a.browse(m)); });
         if (focusMe != null) focusMe.requestFocus();
     }
 

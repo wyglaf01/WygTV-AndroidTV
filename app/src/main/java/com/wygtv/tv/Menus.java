@@ -136,11 +136,12 @@ final class Menus {
 
     private static void playlistActions(MainActivity a, JSONObject p) {
         boolean on = a.library.isOn(p);
-        String[] items = {on ? "Turn off (skip it in menus, guides, Search and updates)" : "Turn on (show it everywhere again)", "Edit", "Refresh now", "Delete"};
+        String[] items = {on ? "Turn off (skip it in menus, guides, Search and updates)" : "Turn on (show it everywhere again)", "Edit", "Refresh now", "Manage categories (hide or show)", "Delete"};
         new Dialogs.Builder(a).setTitle(p.optString("title", "Playlist") + (on ? "" : "   (off)")).setItems(items, (d, which) -> {
             if (which == 0) setOn(a, p, !on);
             else if (which == 1) { if (Library.isHdhr(p)) hdhrForm(a, p); else if (Library.M3U.equals(p.optString("type"))) m3uForm(a, p); else xtreamForm(a, p, null); }
             else if (which == 2) refresh(a, p);
+            else if (which == 3) Manage.categories(a, p, () -> playlists(a));
             else new Dialogs.Builder(a).setTitle("Delete “" + p.optString("title", "Playlist") + "”?")
                         .setMessage("Its favorites stay saved, so they come back if you add the same playlist again.")
                         .setPositiveButton("Delete", (d2, w2) -> {
@@ -471,7 +472,7 @@ final class Menus {
                     : (tuners.size() == 1 ? describe(tuners.get(0)) : tuners.size() + " tuners") + "  •  press OK to add, edit, refresh or remove",
                     () -> { if (tuners.isEmpty()) hdhrForm(a, null); else tunerList(a); });
             final int catsRow = list.getChildCount();
-            row(a, list, "Manage categories", Manage.categorySummary(a) + "  •  press OK to tick the categories to show, one at a time or all at once",
+            row(a, list, "Manage categories", Manage.categorySummary(a) + "  •  press OK to tick the categories to show, playlist by playlist",
                     () -> Manage.categories(a, () -> settings(a, catsRow)));
             final int chansRow = list.getChildCount();
             row(a, list, "Hide and show channels", Manage.channelSummary(a) + "  •  press OK to tick the channels to show, category by category",
