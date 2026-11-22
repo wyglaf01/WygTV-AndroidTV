@@ -655,7 +655,7 @@ final class TvGuide {
         previewId = id;
         previewError.setVisibility(View.GONE);
         if (preview == null) {
-            preview = new ExoPlayer.Builder(a).build();
+            preview = Players.create(a);
             previewView.setPlayer(preview);
             preview.addListener(new Player.Listener() {
                 @Override public void onPlayerError(PlaybackException error) { previewError.setVisibility(View.VISIBLE); }
