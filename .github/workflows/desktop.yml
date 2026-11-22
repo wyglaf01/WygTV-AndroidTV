@@ -1,0 +1,108 @@
+name: Build WygDesktop (Windows and Ubuntu)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [app, "claude/**"]
+    paths: ["WygDesktop/**", ".github/workflows/desktop.yml"]
+  pull_request:
+    branches: [app]
+    paths: ["WygDesktop/**", ".github/workflows/desktop.yml"]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: win
+            files: |
+              WygDesktop/dist/WygDesktop-Setup.exe
+              WygDesktop/dist/WygDesktop-Portable.exe
+          - os: ubuntu-latest
+            target: linux
+            files: |
+              WygDesktop/dist/WygDesktop-linux.AppImage
+              WygDesktop/dist/WygDesktop-linux.deb
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: WygDesktop
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: WygDesktop/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Unit tests
+        if: matrix.target == 'linux'
+        run: npm test
+
+      - name: Set the version (1.0.<build number>)
+        run: npm version "1.0.${{ github.run_number }}" --no-git-tag-version --allow-same-version
+
+      - name: Build
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run dist:${{ matrix.target }}
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: wygdesktop-${{ matrix.target }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error
+
+  # Fixed download links:
+  #   app branch     → release wygdesktop-latest (also used by the in-app "Check for updates")
+  #   other branches → release wygdesktop-test (for trying a pull request before merging)
+  publish:
+    needs: build
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Download builds
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Update the WygDesktop release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "$GITHUB_REF_NAME" = "app" ]; then TAG=wygdesktop-latest; TITLE="WygDesktop (latest build)"; else TAG=wygdesktop-test; TITLE="WygDesktop (test build from $GITHUB_REF_NAME)"; fi
+          echo "{\"version\": \"1.0.${GITHUB_RUN_NUMBER}\", \"notes\": \"${GITHUB_REF_NAME} ${GITHUB_SHA::7}\"}" > dist/desktop-version.json
+          git tag -f "$TAG"
+          git push -f origin "refs/tags/$TAG"
+          URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/$TAG"
+          NOTES="WygDesktop 1.0.${GITHUB_RUN_NUMBER} from ${GITHUB_REF_NAME} (${GITHUB_SHA::7}), $(date -u '+%Y-%m-%d %H:%M UTC').
+
+          Windows installer: $URL/WygDesktop-Setup.exe
+          Windows portable (no install): $URL/WygDesktop-Portable.exe
+          Ubuntu .deb: $URL/WygDesktop-linux.deb
+          Ubuntu AppImage: $URL/WygDesktop-linux.AppImage"
+          # Kept as a pre-release so it never replaces WygTV's APK as the repository's "latest" release.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "$TITLE" --notes "$NOTES" --prerelease --latest=false
+          else
+            gh release create "$TAG" --title "$TITLE" --notes "$NOTES" --prerelease --latest=false
+          fi
+          gh release upload "$TAG" dist/WygDesktop-Setup.exe dist/WygDesktop-Portable.exe dist/WygDesktop-linux.deb dist/WygDesktop-linux.AppImage dist/desktop-version.json --clobber

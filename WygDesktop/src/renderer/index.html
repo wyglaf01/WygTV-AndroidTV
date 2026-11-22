@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; img-src * data: blob: file:; media-src * blob: data:; connect-src * blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self' file: 'unsafe-inline'; worker-src blob: 'self' file:; font-src 'self' data:">
+  <title>WygDesktop</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <div id="backdrop"></div>
+    <div id="screen"></div>
+    <div id="layers"></div>
+    <div id="toasts"></div>
+  </div>
+  <script src="../../node_modules/hls.js/dist/hls.min.js"></script>
+  <script src="../../node_modules/mpegts.js/dist/mpegts.js"></script>
+  <script src="js/core.js"></script>
+  <script src="js/nav.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/meta.js"></script>
+  <script src="js/player.js"></script>
+  <script src="js/screens-live.js"></script>
+  <script src="js/screens-vod.js"></script>
+  <script src="js/screens-settings.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
