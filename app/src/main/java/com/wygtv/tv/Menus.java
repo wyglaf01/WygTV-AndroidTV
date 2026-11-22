@@ -632,7 +632,7 @@ final class Menus {
             case GROUP_PLAYLISTS: return "Manage playlists";
             case GROUP_PLAYER: return "Manage player";
             case GROUP_APPEARANCE: return "Appearance";
-            default: return "Backup & update";
+            default: return "Manage app";
         }
     }
 
