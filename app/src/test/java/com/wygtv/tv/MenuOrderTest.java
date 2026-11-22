@@ -14,9 +14,9 @@ public class MenuOrderTest {
         assertEquals(Arrays.asList(MenuOrder.DEFAULT), MenuOrder.parse(null));
     }
 
-    @Test public void savedOrderKeptAndMissingItemsAddedAtDefaultPlace() {
+    @Test public void savedOrderKeptOldFavDroppedAndMissingItemsAddedAtDefaultPlace() {
         List<String> o = MenuOrder.parse("settings,home,bogus,guide,fav,live,home,vod,series,msearch,playlists");
-        assertEquals(Arrays.asList("settings", "home", "guide", "fav", "live", "vod", "series", "antenna", "msearch", "playlists"), o);
+        assertEquals(Arrays.asList("settings", "home", "guide", "live", "vod", "series", "antenna", "msearch", "playlists"), o);
     }
 
     @Test public void moveUpAndDownStopsAtEnds() {
@@ -30,7 +30,7 @@ public class MenuOrderTest {
     }
 
     @Test public void gapSitsAbovePlaylistsAndSettingsAtTheEnd() {
-        assertEquals(8, MenuOrder.gapBefore(Arrays.asList(MenuOrder.DEFAULT)));
+        assertEquals(7, MenuOrder.gapBefore(Arrays.asList(MenuOrder.DEFAULT)));
         assertEquals(2, MenuOrder.gapBefore(Arrays.asList("settings", "home", "playlists")));
         assertEquals(3, MenuOrder.gapBefore(Arrays.asList("settings", "playlists", "home")));
     }
