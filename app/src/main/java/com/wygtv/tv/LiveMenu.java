@@ -176,7 +176,7 @@ final class LiveMenu {
         compact(a, "▦", "TV guide", false, () -> a.openGuide(null));
         for (JSONObject t : Antenna.tuners(a)) {
             String id = Antenna.PREFIX + t.optString("id");
-            compact(a, "📡", Antenna.nameOf(t), false, () -> backTo(a, id));
+            compact(a, "📡", Antenna.nameOf(t), false, () -> a.showGuide(id, null, true));
         }
         JSONArray mine = VirtualCategories.all(a);
         for (int i = 0; i < mine.length(); i++) {
