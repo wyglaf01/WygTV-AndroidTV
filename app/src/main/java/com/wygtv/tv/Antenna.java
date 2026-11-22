@@ -125,7 +125,7 @@ final class Antenna {
         JSONObject tuner = a.library.find(item.optString("playlist"));
         String pre = tuner == null ? "" : Library.prefixOf(tuner);
         boolean fav = !pre.isEmpty() && a.isFavoriteIn(pre, "live", sid);
-        new Dialogs.Builder(a).setTitle(title).setItems(new String[]{"Play", fav ? "Remove Favorite" : "Add Favorite", "Program guide", "Add to category…", "Close"}, (d, w) -> {
+        new Dialogs.Builder(a).setTitle(title).setItems(new String[]{"Play", fav ? "Remove Favorite" : "Add Favorite", "Program guide", "Add to channel group…", "Close"}, (d, w) -> {
             if (w == 0) play(a, item);
             else if (w == 1 && !pre.isEmpty()) {
                 boolean added = a.toggleFavoriteIn(pre, "live", sid, title, "ts");
