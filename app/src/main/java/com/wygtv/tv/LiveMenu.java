@@ -72,7 +72,7 @@ final class LiveMenu {
                 return true;
             });
         }
-        JSONArray pls = a.library.all();
+        JSONArray pls = a.library.inUse();
         String active = a.library.activeId();
         for (int i = 0; i < pls.length(); i++) {
             JSONObject p = pls.optJSONObject(i);
@@ -185,7 +185,7 @@ final class LiveMenu {
             String vid = c.optString("id");
             compact(a, "◆", c.optString("name"), false, () -> backTo(a, vid));
         }
-        JSONArray pls = a.library.all();
+        JSONArray pls = a.library.inUse();
         String active = a.library.activeId();
         for (int i = 0; i < pls.length(); i++) {
             JSONObject p = pls.optJSONObject(i);
@@ -284,7 +284,7 @@ final class LiveMenu {
         }
         Map<String, ?> stored = a.prefs.getAll();
         JSONArray out = new JSONArray();
-        JSONArray pls = a.library.all();
+        JSONArray pls = a.library.inUse();
         String active = a.library.activeId();
         for (int pass = 0; pass < 2; pass++) for (int i = 0; i < pls.length(); i++) {
             JSONObject p = pls.optJSONObject(i);

@@ -105,7 +105,7 @@ final class TvGuide {
     void show() {
         a.mode = "guide";
         String single = "";
-        if (!mixed && a.library.all().length() > 1) {
+        if (!mixed && a.library.inUse().length() > 1) {
             JSONObject first = channels.optJSONObject(0);
             JSONObject other = first == null ? null : otherPlaylist(0);
             single = "  •  " + Library.nameOf(other != null ? other : a.library.find(a.library.activeId()));

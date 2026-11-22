@@ -33,7 +33,7 @@ final class VodMenu {
         String active = a.library.activeId();
         if (open == null) { open = new HashSet<>(); open.add(active); }
         a.side.removeViews(a.sideFixed, Math.max(0, a.side.getChildCount() - a.sideFixed));
-        JSONArray pls = a.library.all();
+        JSONArray pls = a.library.inUse();
         TextView focusMe = null;
         for (int i = 0; i < pls.length(); i++) {
             JSONObject p = pls.optJSONObject(i);
