@@ -232,7 +232,7 @@ public class MainActivity extends Activity {
  void closePlayer(){if(recovery!=null){recovery.stop();recovery=null;}if(player!=null){saveWatch();watching=null;remote.onPlayerExit();player.release();player=null;subs=null;}}
  @Override public void onBackPressed(){if(remote.onBack())return;if(player!=null){closePlayer();if(playerReturn!=null)playerReturn.run();else home();return;}if(mode.equals("home")||mode.equals("setup")){super.onBackPressed();return;}if(mode.equals("login")){leaveForm();return;}if(mode.equals("hdhr")){if(library.isEmpty())setup();else settings();return;}if(mode.equals("details")&&detailsBack!=null){detailsBack.run();return;}if(mode.equals("episodes")){Episodes.back(this);return;}if(mode.equals("guide")&&liveOnly()){super.onBackPressed();return;}if(mode.equals("search")||mode.equals("guide")||mode.equals("favorites")){browse("live");return;}if(mode.equals("live")&&LiveMenu.back(this))return;home();}
  @Override protected void onStop(){if(player!=null){saveWatch();player.pause();}if(tvGuide!=null)tvGuide.pausePreview();LivePreview.release();super.onStop();}
- @Override protected void onStart(){super.onStart();if(tvGuide!=null&&mode.equals("guide"))tvGuide.resumePreview();if(mode.equals("live")&&player==null)LivePreview.resume(this);}
+ @Override protected void onStart(){super.onStart();Updater.onReturn(this);if(tvGuide!=null&&mode.equals("guide"))tvGuide.resumePreview();if(mode.equals("live")&&player==null)LivePreview.resume(this);}
  @Override protected void onDestroy(){if(recovery!=null){recovery.stop();recovery=null;}if(player!=null){player.release();player=null;}super.onDestroy();}
 }
 

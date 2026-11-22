@@ -12,4 +12,9 @@ public class UpdaterTest {
         assertFalse(Updater.isNewer(41, 41));
         assertFalse(Updater.isNewer(-1, 41));
     }
+
+    @Test public void signatureClashSaysToReinstallOnce() {
+        assertTrue(Updater.failureText(android.content.pm.PackageInstaller.STATUS_FAILURE_CONFLICT, null).contains("uninstall WygTV once"));
+        assertEquals("The update didn't install: bad file", Updater.failureText(android.content.pm.PackageInstaller.STATUS_FAILURE, "bad file"));
+    }
 }
