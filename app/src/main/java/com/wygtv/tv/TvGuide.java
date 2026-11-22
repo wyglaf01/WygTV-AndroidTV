@@ -67,7 +67,7 @@ final class TvGuide {
     private java.text.DateFormat timeFmt;
 
     private PlayerView previewView;
-    private TextView clock, infoChannel, infoTitle, infoTime, infoLeft, infoDesc, infoNext, previewLabel, previewError;
+    private TextView clock, infoChannel, infoSource, infoTitle, infoTime, infoLeft, infoDesc, infoNext, previewLabel, previewError;
     private ProgressBar progress;
     private LinearLayout timeHeader, rows;
     private View nowLine;
@@ -196,6 +196,10 @@ final class TvGuide {
         infoChannel = text("", 12, Theme.MUTED, false);
         infoChannel.setLetterSpacing(.12f);
         info.addView(infoChannel);
+        infoSource = text("", 12, Theme.ACCENT, false);
+        infoSource.setSingleLine(true);
+        infoSource.setEllipsize(TextUtils.TruncateAt.END);
+        info.addView(infoSource);
         infoTitle = text("", 22, Theme.TEXT, true);
         infoTitle.setMaxLines(2);
         infoTitle.setEllipsize(TextUtils.TruncateAt.END);
@@ -516,6 +520,10 @@ final class TvGuide {
         String name = ch.optString("name", "Channel"), num = ch.optString("num", "");
         infoChannel.setText(((num.isEmpty() || num.equals("0")) ? "" : num + " · ") + name.toUpperCase(java.util.Locale.getDefault()));
         previewLabel.setText(name + " · live preview");
+        String pid = ch.optString("playlist");
+        String source = Library.sourceLabel(a.library.find(pid.isEmpty() ? a.library.activeId() : pid));
+        infoSource.setText(source.isEmpty() ? "" : "Source  " + source);
+        infoSource.setVisibility(source.isEmpty() ? View.GONE : View.VISIBLE);
         List<EpgGrid.Program> progs = epg.get(key(row));
         EpgGrid.Program p = c.program;
         long n = now();
