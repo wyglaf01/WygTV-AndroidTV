@@ -15,8 +15,8 @@ public class MenuOrderTest {
     }
 
     @Test public void savedOrderKeptAndMissingItemsAddedAtDefaultPlace() {
-        List<String> o = MenuOrder.parse("live,home,bogus,live,guide");
-        assertEquals(Arrays.asList("live", "home", "guide", "fav", "vod", "series", "antenna", "msearch", "playlists", "settings"), o);
+        List<String> o = MenuOrder.parse("settings,home,bogus,guide,fav,live,home,vod,series,msearch,playlists");
+        assertEquals(Arrays.asList("settings", "home", "guide", "fav", "live", "vod", "series", "antenna", "msearch", "playlists"), o);
     }
 
     @Test public void moveUpAndDownStopsAtEnds() {
