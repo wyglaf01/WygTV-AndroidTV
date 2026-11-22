@@ -54,6 +54,38 @@ final class Antenna {
         }
     }
 
+    /** Adds each tuner ("📡 Antenna TV") to the TV guide's "Showing" choices. */
+    static void addGuideChoices(MainActivity a, List<String> ids, List<String> names) {
+        for (JSONObject t : tuners(a)) { ids.add(PREFIX + t.optString("id")); names.add(label(a, t)); }
+    }
+
+    /** Opens the full TV guide on a tuner's channels. Falls back to all channels when the tuner is gone or can't be reached. */
+    static void openGuide(MainActivity a, String src, String focusId, boolean picked) {
+        JSONObject tuner = a.library.find(src.substring(PREFIX.length()));
+        if (tuner == null) { a.showGuide("all", focusId, false); return; }
+        final int ticket = ++a.listGeneration;
+        if (a.status != null) a.status.setText("Loading antenna channels…");
+        new Thread(() -> {
+            JSONArray list;
+            try { list = a.library.liveChannelsOf(tuner); } catch (Exception e) { list = null; }
+            final JSONArray got = list;
+            a.runOnUiThread(() -> {
+                if (a.isFinishing() || a.isDestroyed() || ticket != a.listGeneration) return;
+                if (got == null || got.length() == 0) {
+                    Toast.makeText(a, got == null ? "Couldn't reach the HDHomeRun at " + Menus.hostOf(tuner.optString("url")) + ". Showing all channels."
+                            : nameOf(tuner) + " has no channels. Showing all channels.", Toast.LENGTH_LONG).show();
+                    a.showGuide("all", focusId, false);
+                    return;
+                }
+                a.items = got;
+                a.category = src;
+                a.categories = new JSONArray();
+                try { a.categories.put(new JSONObject().put("category_id", src).put("category_name", label(a, tuner))); } catch (org.json.JSONException ignored) { }
+                TvGuide.open(a, focusId);
+            });
+        }).start();
+    }
+
     /** Shows the tuner's channels in the mini guide. */
     static void show(MainActivity a, String categoryId) {
         JSONObject tuner = a.library.find(categoryId.substring(PREFIX.length()));
