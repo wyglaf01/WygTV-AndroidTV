@@ -46,7 +46,7 @@ public class MainActivity extends Activity {
   FrameLayout scene=new FrameLayout(this);View frame=NavRail.wrap(this,scene,"home");frame.setBackground(new SteampunkBackdrop(getResources(),R.drawable.steampunk_home,true));setContentView(frame);
   LinearLayout layout=new LinearLayout(this);layout.setOrientation(LinearLayout.VERTICAL);layout.setPadding(dp(36),dp(20),dp(36),dp(18));scene.addView(layout,new FrameLayout.LayoutParams(-1,-1));
   LinearLayout header=new LinearLayout(this);header.setGravity(Gravity.CENTER_VERTICAL);layout.addView(header,new LinearLayout.LayoutParams(-1,dp(52)));
-  TextView brand=label("WygTV",32);brand.setTypeface(null,Typeface.BOLD);brand.setTextColor(Theme.ACCENT);header.addView(brand,new LinearLayout.LayoutParams(0,-1,1));
+  TextView brand=label("WygIPTV",32);brand.setTypeface(null,Typeface.BOLD);brand.setTextColor(Theme.ACCENT);header.addView(brand,new LinearLayout.LayoutParams(0,-1,1));
   LinearLayout center=new LinearLayout(this);center.setOrientation(LinearLayout.VERTICAL);center.setGravity(Gravity.CENTER);layout.addView(center,new LinearLayout.LayoutParams(-1,0,1));
   TextView welcome=label("YOUR NEXT SAGA AWAITS",15);welcome.setTextColor(Theme.ACCENT);welcome.setLetterSpacing(.18f);welcome.setGravity(Gravity.CENTER);center.addView(welcome,new LinearLayout.LayoutParams(-1,dp(35)));
   TextView heading=label("Choose your adventure",30);heading.setTypeface(null,Typeface.BOLD);heading.setGravity(Gravity.CENTER);center.addView(heading,new LinearLayout.LayoutParams(-1,dp(60)));

@@ -1,11 +1,9 @@
-name: Build WygTV Android TV APK
+name: Build WygIPTV (WygTV 1.0.146 fork) APK
 
 on:
   workflow_dispatch:
   push:
-    branches: [app, main, "codex/**"]
-  pull_request:
-    branches: [app, main]
+    branches: [claude/project-thread-0cc74l]
 
 jobs:
   build:
@@ -57,20 +55,20 @@ jobs:
           OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
         run: gradle --no-daemon :app:lintDebug :app:testDebugUnitTest :app:assembleDebug
 
-      - name: Name the APK wygtv.apk
+      - name: Name the APK wygiptv.apk
         run: |
           mkdir -p dist
-          cp app/build/outputs/apk/debug/*.apk dist/wygtv.apk
+          cp app/build/outputs/apk/debug/*.apk dist/wygiptv.apk
           # WygTV's in-app updater reads this to know whether a newer build exists.
-          echo "{\"versionCode\": ${GITHUB_RUN_NUMBER}, \"versionName\": \"1.0.${GITHUB_RUN_NUMBER}\"}" > dist/version.json
+          echo "{\"versionCode\": ${GITHUB_RUN_NUMBER}, \"versionName\": \"1.0.146-${GITHUB_RUN_NUMBER}\"}" > dist/version.json
           cat dist/version.json
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: wygtv
+          name: wygiptv
           path: |
-            dist/wygtv.apk
+            dist/wygiptv.apk
             dist/version.json
           if-no-files-found: error
 
@@ -79,16 +77,15 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: WygTV-check-reports
+          name: WygIPTV-check-reports
           path: app/build/reports/
           if-no-files-found: ignore
 
-  # Publishes wygtv.apk to a public GitHub Release so it has a fixed direct link
-  # (for Downloader codes):
-  # https://github.com/wyglaf01/WygTV-AndroidTV/releases/latest/download/wygtv.apk
+  # Publishes wygiptv.apk to its own pre-release (never "latest", so WygTV's link is untouched):
+  # https://github.com/wyglaf01/WygTV-AndroidTV/releases/download/wygiptv-latest/wygiptv.apk
   publish:
     needs: build
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/app')
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -99,22 +96,22 @@ jobs:
       - name: Download APK
         uses: actions/download-artifact@v4
         with:
-          name: wygtv
+          name: wygiptv
           path: dist
 
-      - name: Update the WygTV release
+      - name: Update the WygIPTV release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: wygtv-latest
+          TAG: wygiptv-latest
         run: |
           git tag -f "$TAG"
           git push -f origin "refs/tags/$TAG"
-          NOTES="Latest WygTV build from ${GITHUB_REF_NAME} (${GITHUB_SHA::7}), $(date -u '+%Y-%m-%d %H:%M UTC').
+          NOTES="WygIPTV: a separate app made from WygTV 1.0.146. Latest build from ${GITHUB_REF_NAME} (${GITHUB_SHA::7}), $(date -u '+%Y-%m-%d %H:%M UTC').
 
-          Direct download: https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/wygtv.apk"
+          Direct download: https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/wygiptv.apk"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" --title "WygTV (latest build)" --notes "$NOTES" --latest
+            gh release edit "$TAG" --title "WygIPTV (latest build)" --notes "$NOTES" --prerelease --latest=false
           else
-            gh release create "$TAG" --title "WygTV (latest build)" --notes "$NOTES" --latest
+            gh release create "$TAG" --title "WygIPTV (latest build)" --notes "$NOTES" --prerelease --latest=false
           fi
-          gh release upload "$TAG" dist/wygtv.apk dist/version.json --clobber
+          gh release upload "$TAG" dist/wygiptv.apk dist/version.json --clobber

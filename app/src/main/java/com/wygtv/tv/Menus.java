@@ -528,15 +528,15 @@ final class Menus {
         });
         row(a, list, "Back up playlists", "save playlists, favorites, your categories, My List, hidden items and all settings to a dated WygTV backup file", () -> Backup.backup(a));
         row(a, list, "Restore from a backup", "reload everything from a WygTV backup file", () -> Backup.restore(a));
-        row(a, list, "Check for updates", "WygTV " + Updater.installedName(a) + "  •  press OK to look for a newer version and install it over this one", () -> Updater.check(a, true));
+        row(a, list, "Check for updates", "WygIPTV " + Updater.installedName(a) + "  •  press OK to look for a newer version and install it over this one", () -> Updater.check(a, true));
         final int autoRow = list.getChildCount();
         boolean auto = a.prefs.getBoolean(Updater.PREF_AUTO, true);
-        row(a, list, "Look for updates at start-up", auto ? "On  •  offers new versions when WygTV opens" : "Off", () -> {
+        row(a, list, "Look for updates at start-up", auto ? "On  •  offers new versions when WygIPTV opens" : "Off", () -> {
             a.prefs.edit().putBoolean(Updater.PREF_AUTO, !a.prefs.getBoolean(Updater.PREF_AUTO, true)).apply();
             settings(a, autoRow);
         });
         String version = Updater.installedName(a);
-        final String about = "WygTV " + version + " for Android TV";
+        final String about = "WygIPTV " + version + " for Android TV";
         row(a, list, "About", about, () -> Toast.makeText(a, about, Toast.LENGTH_SHORT).show());
         int i = Math.max(0, Math.min(focusIndex, list.getChildCount() - 1));
         list.getChildAt(i).requestFocus();
