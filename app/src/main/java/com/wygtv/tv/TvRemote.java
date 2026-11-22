@@ -235,6 +235,8 @@ final class TvRemote {
         if (FocusWrap.menuKey(a.getCurrentFocus(), e)) return true;
         // Live TV: Left from a playlist's categories goes to the compacted first tier beside it, Right comes back.
         if (LiveMenu.sideways(a, e)) return true;
+        // Settings pages (and other pages opened from a list): Left goes to the collapsed menu tree beside them.
+        if (TreeMenu.sideways(a, e)) return true;
         if (e.getAction() != KeyEvent.ACTION_DOWN) return false;
         return listKey(e, key);
     }
