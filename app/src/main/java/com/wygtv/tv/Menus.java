@@ -457,8 +457,8 @@ final class Menus {
         boolean liveOnly = a.liveOnly();
         if (g.isEmpty()) {
             row(a, list, "▤  " + groupTitle(GROUP_PLAYLISTS), "playlists, HDHomeRun, manage categories, hide and show channels, channel groups, TV guide source, extra TV guides", () -> settingsGroup(a, GROUP_PLAYLISTS));
-            row(a, list, "▶  " + groupTitle(GROUP_PLAYER), "live stream format, buffer, video decoder, subtitles", () -> settingsGroup(a, GROUP_PLAYER));
-            row(a, list, "◐  " + groupTitle(GROUP_APPEARANCE), "theme, glass effect, app mode, start-up screen, side menu order, Exit button, guide rows, live preview, watched series, play next, movie and series info, IMDb ratings", () -> settingsGroup(a, GROUP_APPEARANCE));
+            row(a, list, "▶  " + groupTitle(GROUP_PLAYER), "live stream format, buffer, video decoder, subtitles, watched series, play next", () -> settingsGroup(a, GROUP_PLAYER));
+            row(a, list, "◐  " + groupTitle(GROUP_APPEARANCE), "theme, glass effect, app mode, start-up screen, side menu order, Exit button, guide rows, live preview, movie and series info, IMDb ratings", () -> settingsGroup(a, GROUP_APPEARANCE));
             row(a, list, "⟳  " + groupTitle(GROUP_BACKUP), "back up, restore, check for updates  •  WygTV " + Updater.installedName(a), () -> settingsGroup(a, GROUP_BACKUP));
         } else if (g.equals(GROUP_PLAYLISTS)) {
             row(a, list, "Manage playlists", Manage.playlistSummary(a) + "  •  press OK to add, edit, refresh, delete or turn playlists on and off", () -> a.playlists());
@@ -541,6 +541,18 @@ final class Menus {
                 a.prefs.edit().putBoolean(Subtitles.PREF_VOD, !Subtitles.defaultOn(a.prefs, false)).apply();
                 settings(a, subsVodRow);
             });
+            if (!liveOnly) {
+                final int watchedRow = list.getChildCount();
+                row(a, list, "Watched series", (Watch.hideWatched(a) ? "Hide" : "Show with ✓") + "  •  series with every episode watched. Mark episodes, seasons or a whole series in its episode list", () -> {
+                    a.prefs.edit().putBoolean(Watch.PREF_HIDE_WATCHED, !Watch.hideWatched(a)).apply();
+                    settings(a, watchedRow);
+                });
+                final int skipRow = list.getChildCount();
+                row(a, list, "Play next episode", (Watch.skipWatched(a) ? "Skip watched episodes" : "Always the very next episode") + "  •  press OK to switch", () -> {
+                    a.prefs.edit().putBoolean(Watch.PREF_SKIP_WATCHED, !Watch.skipWatched(a)).apply();
+                    settings(a, skipRow);
+                });
+            }
         } else if (g.equals(GROUP_APPEARANCE)) {
             final int themeRow = list.getChildCount();
             row(a, list, "Theme", Theme.LABELS[Theme.indexOf(a.prefs.getString("theme", Theme.DEFAULT))], () ->
@@ -585,23 +597,11 @@ final class Menus {
                         settings(a, guideRowsRow);
                     }));
             final int previewRow = list.getChildCount();
-            row(a, list, "Live preview switches", PreviewDelay.label(a.prefs) + "  •  when the preview above the guide changes to the channel you highlight", () ->
+            row(a, list, "Live preview switches", PreviewDelay.label(a.prefs) + "  •  Live preview guide change delay", () ->
                     choose(a, "Change the live preview", PreviewDelay.LABELS, Menus.indexOf(PreviewDelay.KEYS, PreviewDelay.key(a.prefs)), i -> {
                         a.prefs.edit().putString(PreviewDelay.PREF, PreviewDelay.KEYS[i]).apply();
                         settings(a, previewRow);
                     }));
-            if (!liveOnly) {
-                final int watchedRow = list.getChildCount();
-                row(a, list, "Watched series", (Watch.hideWatched(a) ? "Hide" : "Show with ✓") + "  •  series with every episode watched. Mark episodes, seasons or a whole series in its episode list", () -> {
-                    a.prefs.edit().putBoolean(Watch.PREF_HIDE_WATCHED, !Watch.hideWatched(a)).apply();
-                    settings(a, watchedRow);
-                });
-                final int skipRow = list.getChildCount();
-                row(a, list, "Play next episode", (Watch.skipWatched(a) ? "Skip watched episodes" : "Always the very next episode") + "  •  press OK to switch", () -> {
-                    a.prefs.edit().putBoolean(Watch.PREF_SKIP_WATCHED, !Watch.skipWatched(a)).apply();
-                    settings(a, skipRow);
-                });
-            }
             final int tmdbRow = list.getChildCount();
             keyRow(a, list, "Movie & series info (TMDb)", Tmdb.PREF_KEY, Tmdb.builtInKey(), "TMDb", "posters, plots, cast and ratings", tmdbRow);
             final int omdbRow = list.getChildCount();
@@ -632,7 +632,7 @@ final class Menus {
             case GROUP_PLAYLISTS: return "Manage playlists";
             case GROUP_PLAYER: return "Manage player";
             case GROUP_APPEARANCE: return "Appearance";
-            default: return "Backup & update";
+            default: return "Manage app";
         }
     }
 
