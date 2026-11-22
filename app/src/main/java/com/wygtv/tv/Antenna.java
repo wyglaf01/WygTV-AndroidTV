@@ -10,7 +10,7 @@ import java.util.List;
 
 /**
  * HDHomeRun tuners as a category. A tuner is added in Settings and saved like a playlist (see {@link Hdhr}),
- * but it shows in Live TV as its own category, "📡 Local Ant" (or the name you give the tuner), next to Favorites and your categories, instead
+ * but it shows in Live TV as its own category, "📡 Local Antenna" (or the name you give the tuner), next to Favorites and your categories, instead
  * of in the playlist list. Its channels play the same way a favorite from another playlist does: the tuner
  * becomes the active source while it plays, and Home, Movies and Series switch back to your main playlist.
  */
@@ -33,20 +33,20 @@ final class Antenna {
     }
 
     /** Name a new HDHomeRun tuner gets automatically. */
-    static final String DEFAULT_NAME = "Local Ant";
+    static final String DEFAULT_NAME = "Local Antenna";
 
-    /** The tuner's name, with "Local Ant" for tuners that were left with no name or the device's own name. */
+    /** The tuner's name, with "Local Antenna" for tuners that were left with no name or the device's own name. */
     static String nameOf(JSONObject tuner) {
         String t = tuner == null ? "" : tuner.optString("title").trim();
         return t.isEmpty() || t.startsWith("HDHomeRun") ? DEFAULT_NAME : t;
     }
 
-    /** "📡 Local Ant", or whatever name the tuner was given. */
+    /** "📡 Local Antenna", or whatever name the tuner was given. */
     static String label(MainActivity a, JSONObject tuner) {
         return "📡 " + nameOf(tuner);
     }
 
-    /** Adds the Local Ant entries to the first tier of the Live TV menu. */
+    /** Adds the Local Antenna entries to the first tier of the Live TV menu. */
     static void addMenuEntries(MainActivity a) {
         for (JSONObject t : tuners(a)) {
             String id = PREFIX + t.optString("id");
