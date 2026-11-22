@@ -11,6 +11,7 @@
    <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LEANBACK_LAUNCHER"/></intent-filter>
    <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
   </activity>
+  <receiver android:name=".UpdateResultReceiver" android:exported="false"/>
   <provider android:name=".ApkProvider" android:authorities="com.wygtv.tv.update" android:exported="false" android:grantUriPermissions="true"/>
  </application>
 </manifest>
