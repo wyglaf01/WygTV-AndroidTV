@@ -72,7 +72,7 @@ final class MiniGuide {
         for (int i = from; i < limit; i++) {
             JSONObject item = items.optJSONObject(i);
             if (item == null) continue;
-            View row = addRow(a, list, item, ok, more);
+            View row = addRow(a, list, item, it -> { if (!LivePreview.previewOnOk(a, it)) ok.run(it); }, more);
             rows.add(row);
             data.add(item);
         }
@@ -157,6 +157,7 @@ final class MiniGuide {
     }
 
     private static String starred(MainActivity a, JSONObject item) {
+        if ("fav".equals(a.category)) return ""; // Showing Favorites: every row is one.
         String pid = item.optString("playlist");
         boolean fav = (pid.isEmpty() || pid.equals(a.library.activeId())) && a.isFavorite("live", item.optString("stream_id"));
         return fav ? "★ " : "";

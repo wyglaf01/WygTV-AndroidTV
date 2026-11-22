@@ -35,10 +35,11 @@ final class Antenna {
     /** Name a new HDHomeRun tuner gets automatically. */
     static final String DEFAULT_NAME = "Antenna TV";
 
-    /** The tuner's name, with "Antenna TV" for tuners that were left with no name or the device's own name. */
+    /** The tuner's name with its first letter capitalized, or "Antenna TV" for tuners that were left with no name or the device's own name. */
     static String nameOf(JSONObject tuner) {
         String t = tuner == null ? "" : tuner.optString("title").trim();
-        return t.isEmpty() || t.startsWith("HDHomeRun") ? DEFAULT_NAME : t;
+        if (t.isEmpty() || t.startsWith("HDHomeRun")) return DEFAULT_NAME;
+        return t.substring(0, 1).toUpperCase(java.util.Locale.getDefault()) + t.substring(1); // "local" shows as "Local"
     }
 
     /** "📡 Antenna TV", or whatever name the tuner was given. */

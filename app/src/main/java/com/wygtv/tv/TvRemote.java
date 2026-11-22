@@ -48,7 +48,7 @@ final class TvRemote {
 
     // Overlays.
     private LinearLayout banner;
-    private TextView bannerNumber, bannerTitle, bannerNow, bannerNext, numberBox;
+    private TextView bannerNumber, bannerTitle, bannerSource, bannerNow, bannerNext, numberBox;
     private String typed = "";
     private final Runnable hideBanner = () -> { if (banner != null) banner.setVisibility(View.GONE); };
     private final Runnable commitNumber = this::commitNumber;
@@ -121,6 +121,10 @@ final class TvRemote {
         bannerTitle.setPadding(a.dp(18), 0, 0, 0);
         top.addView(bannerTitle, new LinearLayout.LayoutParams(0, -2, 1));
         banner.addView(top);
+        bannerSource = text("", 15, Theme.ACCENT, false);
+        bannerSource.setSingleLine(true);
+        bannerSource.setPadding(0, a.dp(2), 0, a.dp(4));
+        banner.addView(bannerSource);
         bannerNow = text("", 19, Theme.TEXT, false);
         bannerNow.setSingleLine(true);
         banner.addView(bannerNow);
@@ -141,6 +145,9 @@ final class TvRemote {
         if (banner == null) return;
         bannerNumber.setText(channelNumber(current()));
         bannerTitle.setText(title);
+        String source = Library.sourceLabel(a.library.find(a.library.activeId()));
+        bannerSource.setText(source.isEmpty() ? "" : "Source  " + source);
+        bannerSource.setVisibility(source.isEmpty() ? View.GONE : View.VISIBLE);
         banner.setVisibility(View.VISIBLE);
         ui.removeCallbacks(hideBanner);
         ui.postDelayed(hideBanner, BANNER_MS);
