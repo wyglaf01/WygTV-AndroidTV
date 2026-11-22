@@ -34,7 +34,7 @@ import java.util.concurrent.Executors;
 final class Details {
     private static final ExecutorService POOL = Executors.newFixedThreadPool(3);
     private static final Handler UI = new Handler(Looper.getMainLooper());
-    private static final LruCache<String, Bitmap> IMAGES = new LruCache<String, Bitmap>(24 * 1024 * 1024) {
+    private static final LruCache<String, Bitmap> IMAGES = new LruCache<String, Bitmap>(32 * 1024 * 1024) {
         @Override protected int sizeOf(String k, Bitmap b) { return b.getByteCount(); }
     };
 
@@ -91,8 +91,9 @@ final class Details {
         LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(-2, -2);
         blp.setMargins(0, a.dp(10), 0, a.dp(8));
         col.addView(buttons, blp);
-        TextView play = action(a, buttons, series ? "☰  Episodes" : "▶  Play", () -> {
-            if (series) { a.episodes(id, name); return; }
+        String progress = series ? Watch.summary(Watch.load(a, id)) : "";
+        TextView play = action(a, buttons, series ? (progress.isEmpty() ? "☰  Episodes" : "▶  Episodes  •  " + progress) : "▶  Play", () -> {
+            if (series) { a.episodesBack = reopen; Episodes.show(a, id, name); return; }
             a.playerReturn = reopen;
             a.zapList = list;
             a.play("vod", id, ext, name);
@@ -145,15 +146,14 @@ final class Details {
         a.apiQuiet((series ? "get_series_info&series_id=" : "get_vod_info&vod_id=") + a.enc(id), answer -> {
             if (generation != a.screenGeneration) return;
             if (answer != null) { provider[0] = Tmdb.fromProvider(item, answer); shown[0] = provider[0]; render[0].run(); }
-            if (Tmdb.key(a).isEmpty()) return;
+            if (!Tmdb.enabled(a)) return;
             JSONObject p = provider[0];
-            String[] clean = Tmdb.cleanTitle(name);
             POOL.execute(() -> {
-                JSONObject t = Tmdb.lookup(a, type, p.optString("tmdb_id"), clean[0], p.optString("year", clean[1]));
+                JSONObject t = Tmdb.enrich(a, type, p, name);
                 UI.post(() -> {
                     if (generation != a.screenGeneration || a.isFinishing()) return;
                     if (t == null) { source.setText(sourceLine(a, shown[0]) + "  •  no TMDb match"); return; }
-                    shown[0] = Tmdb.merge(p, t);
+                    shown[0] = t;
                     render[0].run();
                 });
             });
@@ -167,16 +167,19 @@ final class Details {
         int min = m.optInt("runtime", 0);
         if (min > 0) parts.add((series ? "~" : "") + (min >= 60 ? min / 60 + "h " + (min % 60 > 0 ? min % 60 + "m" : "") : min + "m").trim());
         if (!m.optString("cert").isEmpty()) parts.add(m.optString("cert"));
-        if (!m.optString("rating").isEmpty()) parts.add("★ " + m.optString("rating") + ("TMDb".equals(m.optString("rating_source")) ? " TMDb" : ""));
+        if (!m.optString("imdb_rating").isEmpty()) parts.add("★ " + m.optString("imdb_rating") + " IMDb");
+        else if (!m.optString("rating").isEmpty()) parts.add("★ " + m.optString("rating") + ("TMDb".equals(m.optString("rating_source")) ? " TMDb" : ""));
+        if (!m.optString("rt").isEmpty()) parts.add("Rotten Tomatoes " + m.optString("rt"));
+        if (!m.optString("metascore").isEmpty()) parts.add("Metacritic " + m.optString("metascore"));
         int seasons = m.optInt("seasons", 0);
         if (series && seasons > 0) parts.add(seasons + (seasons == 1 ? " season" : " seasons"));
-        if (!m.optString("imdb").isEmpty()) parts.add("IMDb " + m.optString("imdb"));
         return android.text.TextUtils.join("   •   ", parts);
     }
 
     private static String sourceLine(MainActivity a, JSONObject m) {
-        if ("TMDb".equals(m.optString("source"))) return "Details from TMDb (The Movie Database) and your provider.";
-        if (Tmdb.key(a).isEmpty()) return "Details from your provider.  Add a free TMDb API key in Settings → Movie & series info for posters, plots, cast and ratings.";
+        boolean tmdb = "TMDb".equals(m.optString("source")), omdb = m.has("omdb");
+        if (tmdb || omdb) return "Details from " + (tmdb ? "TMDb" : "") + (tmdb && omdb ? ", " : "") + (omdb ? "OMDb (IMDb ratings)" : "") + " and your provider.";
+        if (!Tmdb.enabled(a)) return "Details from your provider.  Add a free TMDb or OMDb API key in Settings for posters, plots, cast and IMDb ratings.";
         return "Details from your provider.";
     }
 
@@ -212,21 +215,29 @@ final class Details {
     // ------------------------------------------------------------------ images
 
     /** Loads a poster / backdrop into the view, scaled down to about maxWidth pixels; later calls on the view win. */
-    private static void image(ImageView v, String url, int maxWidth, int generation, MainActivity a) {
+    static void image(ImageView v, String url, int maxWidth, int generation, MainActivity a) {
         if (url == null || url.isEmpty()) return;
         if (url.equals(v.getTag())) return;
         v.setTag(url);
         Bitmap cached = IMAGES.get(url);
         if (cached != null) { v.setImageBitmap(cached); return; }
         POOL.execute(() -> {
-            Bitmap b = download(url, maxWidth);
+            Bitmap b = download(a.getCacheDir(), url, maxWidth);
             if (b == null) return;
             IMAGES.put(url, b);
             UI.post(() -> { if (url.equals(v.getTag()) && generation == a.screenGeneration) v.setImageBitmap(b); });
         });
     }
 
-    private static Bitmap download(String url, int maxWidth) {
+    /** Downloads (or reads from the disk cache) an image, shrunk to about maxWidth pixels. */
+    private static Bitmap download(java.io.File cacheDir, String url, int maxWidth) {
+        java.io.File disk = new java.io.File(cacheDir, "posters/" + M3u.idFor(url + "|" + maxWidth) + ".jpg");
+        if (disk.exists()) {
+            BitmapFactory.Options o = new BitmapFactory.Options();
+            o.inPreferredConfig = Bitmap.Config.RGB_565;
+            Bitmap b = BitmapFactory.decodeFile(disk.getAbsolutePath(), o);
+            if (b != null) return b;
+        }
         try {
             HttpURLConnection conn = Library.open(url, 15000);
             byte[] bytes;
@@ -244,7 +255,14 @@ final class Details {
             while (o.outWidth / (sample * 2) >= maxWidth) sample *= 2;
             o = new BitmapFactory.Options();
             o.inSampleSize = sample;
-            return BitmapFactory.decodeByteArray(bytes, 0, bytes.length, o);
+            o.inPreferredConfig = Bitmap.Config.RGB_565;
+            Bitmap b = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, o);
+            if (b == null) return null;
+            if (b.getWidth() > maxWidth * 3 / 2) b = Bitmap.createScaledBitmap(b, maxWidth, Math.max(1, b.getHeight() * maxWidth / b.getWidth()), true);
+            java.io.File dir = disk.getParentFile();
+            if (dir != null) dir.mkdirs();
+            try (java.io.OutputStream out = new java.io.FileOutputStream(disk)) { b.compress(Bitmap.CompressFormat.JPEG, 88, out); } catch (Exception ignored) { }
+            return b;
         } catch (Throwable e) {
             return null;
         }

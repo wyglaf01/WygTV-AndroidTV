@@ -330,10 +330,9 @@ final class Menus {
             Toast.makeText(a, "The guide will reload the next time it's shown.", Toast.LENGTH_SHORT).show();
         });
         final int tmdbRow = list.getChildCount();
-        String mine = a.saved(Tmdb.PREF_KEY).trim();
-        row(a, list, "Movie & series info (TMDb)", !mine.isEmpty() ? "On  •  your TMDb key …" + mine.substring(Math.max(0, mine.length() - 4)) + "  •  press OK to change or remove it"
-                : !Tmdb.builtInKey().isEmpty() ? "On  •  built-in key  •  press OK to use your own"
-                : "Off  •  press OK to add a free TMDb API key for posters, plots, cast and ratings", () -> tmdbKey(a, tmdbRow));
+        keyRow(a, list, "Movie & series info (TMDb)", Tmdb.PREF_KEY, Tmdb.builtInKey(), "TMDb", "posters, plots, cast and ratings", tmdbRow);
+        final int omdbRow = list.getChildCount();
+        keyRow(a, list, "IMDb ratings (OMDb)", Omdb.PREF_KEY, Omdb.builtInKey(), "OMDb", "IMDb, Rotten Tomatoes and Metacritic ratings, plus plots and cast", omdbRow);
         final int hiddenRow = list.getChildCount();
         int hidden = a.hiddenCount();
         row(a, list, "Hidden categories and channels", hidden == 0 ? "nothing hidden" : hidden + " hidden  •  press OK to show them all again", () -> {
@@ -364,34 +363,44 @@ final class Menus {
         list.getChildAt(i).requestFocus();
     }
 
-    /** Settings → Movie & series info: type, test and save a TMDb API key (v3 key or v4 read access token). */
-    private static void tmdbKey(MainActivity a, int focusRow) {
+    private static void keyRow(MainActivity a, LinearLayout list, String name, String pref, String builtIn, String service, String what, int row) {
+        String mine = a.saved(pref).trim();
+        row(a, list, name, !mine.isEmpty() ? "On  •  your " + service + " key …" + mine.substring(Math.max(0, mine.length() - 4)) + "  •  press OK to change or remove it"
+                : !builtIn.isEmpty() ? "On  •  built-in key  •  press OK to use your own"
+                : "Off  •  press OK to add a free " + service + " API key for " + what, () -> apiKey(a, row, pref, service));
+    }
+
+    /** Settings → TMDb / OMDb: type, test and save an API key. */
+    private static void apiKey(MainActivity a, int focusRow, String pref, String service) {
+        boolean tmdb = service.equals("TMDb");
         LinearLayout box = new LinearLayout(a);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(a.dp(20), a.dp(8), a.dp(20), 0);
-        TextView help = a.label("Get a free key at themoviedb.org → Settings → API, then type the \"API Key\" here. Movie and series pages then show TMDb posters, plots, cast, ratings and age ratings.", 15);
+        TextView help = a.label(tmdb
+                ? "Get a free key at themoviedb.org → Settings → API, then type the \"API Key\" here. Movie and series pages then show TMDb posters, plots, cast, ratings and age ratings."
+                : "Get a free key at omdbapi.com → API Key (the free plan allows 1,000 lookups a day; WygTV saves each answer for two weeks). Movie and series pages then show IMDb, Rotten Tomatoes and Metacritic ratings.", 15);
         help.setTextColor(Theme.MUTED);
         box.addView(help, new LinearLayout.LayoutParams(-1, -2));
-        android.widget.EditText field = new android.widget.EditText(a);
+        EditText field = new EditText(a);
         field.setSingleLine(true);
-        field.setHint("TMDb API key");
-        field.setText(a.saved(Tmdb.PREF_KEY));
+        field.setHint(service + " API key");
+        field.setText(a.saved(pref));
         field.setTextColor(Theme.TEXT);
         field.setHintTextColor(Theme.HINT);
         box.addView(field, new LinearLayout.LayoutParams(-1, -2));
-        new Dialogs.Builder(a).setTitle("TMDb API key").setView(box)
+        new Dialogs.Builder(a).setTitle(service + " API key").setView(box)
                 .setPositiveButton("Save", (d, w) -> {
                     String key = field.getText().toString().replaceAll("\\s+", "");
-                    a.prefs.edit().putString(Tmdb.PREF_KEY, key).apply();
+                    a.prefs.edit().putString(pref, key).apply();
                     settings(a, focusRow);
                     if (key.isEmpty()) return;
-                    Toast.makeText(a, "Checking the key with TMDb…", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(a, "Checking the key with " + service + "…", Toast.LENGTH_SHORT).show();
                     new Thread(() -> {
-                        boolean ok = Tmdb.works(key);
-                        a.runOnUiThread(() -> Toast.makeText(a, ok ? "TMDb key works. Open any movie or series to see its details." : "TMDb didn't accept that key (or there's no connection). Check it and try again.", Toast.LENGTH_LONG).show());
+                        boolean ok = tmdb ? Tmdb.works(key) : Omdb.works(key);
+                        a.runOnUiThread(() -> Toast.makeText(a, ok ? service + " key works. Open any movie or series to see its details." : service + " didn't accept that key (or there's no connection). Check it and try again.", Toast.LENGTH_LONG).show());
                     }).start();
                 })
-                .setNeutralButton("Remove", (d, w) -> { a.prefs.edit().remove(Tmdb.PREF_KEY).apply(); settings(a, focusRow); })
+                .setNeutralButton("Remove", (d, w) -> { a.prefs.edit().remove(pref).apply(); settings(a, focusRow); })
                 .setNegativeButton("Cancel", null).show();
         field.requestFocus();
     }
