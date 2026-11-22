@@ -459,6 +459,20 @@ final class Menus {
                         settings(a, formatRow);
                     }));
         }
+        final int bufferRow = list.getChildCount();
+        final String bufferKey = a.prefs.getString(Players.PREF_BUFFER, Players.BUFFER_DEFAULT);
+        row(a, list, "Buffer", Players.BUFFER_LABELS[Math.max(0, indexOf(Players.BUFFER_KEYS, bufferKey))] + "  •  more buffer rides out a shaky connection but takes longer to start a channel", () ->
+                choose(a, "Buffer before playing", Players.BUFFER_LABELS, Math.max(0, indexOf(Players.BUFFER_KEYS, bufferKey)), i -> {
+                    a.prefs.edit().putString(Players.PREF_BUFFER, Players.BUFFER_KEYS[i]).apply();
+                    settings(a, bufferRow);
+                }));
+        final int decoderRow = list.getChildCount();
+        final String decoderKey = a.prefs.getString(Players.PREF_DECODER, "auto");
+        row(a, list, "Video decoder", Players.DECODER_LABELS[Math.max(0, indexOf(Players.DECODER_KEYS, decoderKey))] + "  •  try Software first if a channel freezes, shows green blocks or won't play", () ->
+                choose(a, "Video decoder", Players.DECODER_LABELS, Math.max(0, indexOf(Players.DECODER_KEYS, decoderKey)), i -> {
+                    a.prefs.edit().putString(Players.PREF_DECODER, Players.DECODER_KEYS[i]).apply();
+                    settings(a, decoderRow);
+                }));
         final int subsLiveRow = list.getChildCount();
         row(a, list, "Subtitles for Live TV", onOff(Subtitles.defaultOn(a.prefs, true)) + "  •  closed captions start on for every channel that sends them. Press OK to switch", () -> {
             a.prefs.edit().putBoolean(Subtitles.PREF_LIVE, !Subtitles.defaultOn(a.prefs, true)).apply();

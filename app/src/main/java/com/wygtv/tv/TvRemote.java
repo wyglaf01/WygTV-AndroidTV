@@ -318,6 +318,7 @@ final class TvRemote {
         ext = ch.optString("container_extension", "ts");
         if (ext.isEmpty()) ext = "ts";
         if (a.subs != null) a.subs.newStream();
+        if (a.recovery != null) a.recovery.newStream();
         a.player.setMediaItem(MediaItem.fromUri(a.streamUrl("live", id, ext)));
         a.player.prepare();
         a.player.play();
