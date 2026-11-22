@@ -3,10 +3,12 @@ package com.wygtv.tv;
 import android.content.Context;
 import android.widget.Toast;
 
+import androidx.annotation.OptIn;
 import androidx.media3.common.C;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.common.Tracks;
+import androidx.media3.common.util.UnstableApi;
 import androidx.media3.datasource.HttpDataSource;
 import androidx.media3.exoplayer.DefaultRenderersFactory;
 import androidx.media3.exoplayer.ExoPlayer;
@@ -16,7 +18,9 @@ import androidx.media3.exoplayer.ExoPlayer;
  * AC-3 audio; many tablets and some TV boxes have no AC-3 decoder, so the FFmpeg audio extension
  * (AC-3, E-AC-3 and more) is added. The device's own decoders still win when it has them, so HDMI
  * passthrough to a soundbar keeps working.
+ * The renderer settings are Media3 "unstable" API, which is opted into here.
  */
+@OptIn(markerClass = UnstableApi.class)
 final class Players {
     private Players() { }
 

@@ -160,6 +160,7 @@ final class Library {
         M3u.Playlist p = M3u.parse(text);
         try (OutputStream out = new FileOutputStream(m3uFile(url))) { out.write(text.getBytes(StandardCharsets.UTF_8)); }
         synchronized (this) { if (url.equals(m3uKey)) { m3u = p; } }
+        synchronized (otherM3u) { if (otherM3u.containsKey(url)) otherM3u.put(url, p); }
         return p;
     }
 

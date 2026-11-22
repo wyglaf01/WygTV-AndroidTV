@@ -38,6 +38,7 @@ final class LiveMenu {
         a.button("★ Favorites", a.side, () -> a.loadItems("fav"));
         a.sideFixed = 1;
         a.button("⌕ Search", a.side, a::searchLive);
+        Antenna.addMenuEntries(a);
         JSONArray mine = VirtualCategories.all(a);
         for (int i = 0; i < mine.length(); i++) {
             JSONObject c = mine.optJSONObject(i);
@@ -50,14 +51,14 @@ final class LiveMenu {
         String active = a.library.activeId();
         for (int i = 0; i < pls.length(); i++) {
             JSONObject p = pls.optJSONObject(i);
-            if (p == null) continue;
+            if (p == null || Library.isHdhr(p)) continue; // tuners show as Antenna TV above
             boolean on = p.optString("id").equals(active);
             a.button((on ? "▤ " : "▢ ") + Library.nameOf(p) + "  ›", a.side, () -> openPlaylist(a, p));
         }
         a.button("⚙ Manage playlists", a.side, a::playlists);
         String resume = a.resumeCategory;
         a.resumeCategory = null;
-        a.loadItems(resume != null && VirtualCategories.isVirtual(resume) ? resume : "fav");
+        a.loadItems(resume != null && (VirtualCategories.isVirtual(resume) || Antenna.isAntenna(resume)) ? resume : "fav");
     }
 
     /** Second tier: the playlist's provider categories (switching to it first if needed). */

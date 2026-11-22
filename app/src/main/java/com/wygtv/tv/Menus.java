@@ -81,7 +81,7 @@ final class Menus {
         View focus = null;
         for (int i = 0; i < all.length(); i++) {
             JSONObject p = all.optJSONObject(i);
-            if (p == null) continue;
+            if (p == null || Library.isHdhr(p)) continue; // tuners are managed in Settings > HDHomeRun antenna TV
             boolean on = p.optString("id").equals(active);
             TextView row = a.button((on ? "●  " : "○  ") + p.optString("title", "Playlist") + (on ? "   (watching)" : "") + "\n      " + describe(p), list, () -> playlistActions(a, p));
             row.setTextSize(19);
@@ -90,7 +90,6 @@ final class Menus {
         }
         TextView addX = a.button("+  Add an Xtream Codes login", list, () -> xtreamForm(a, null, null));
         a.button("+  Add an M3U playlist link", list, () -> m3uForm(a, null));
-        a.button("+  Add an HDHomeRun antenna tuner", list, () -> hdhrForm(a, null));
         (focus == null ? addX : focus).requestFocus();
     }
 
@@ -176,6 +175,7 @@ final class Menus {
                 if (a.isFinishing() || a.isDestroyed()) return;
                 Toast.makeText(a, text, Toast.LENGTH_LONG).show();
                 if (gen == a.screenGeneration && a.mode.equals("playlists")) playlists(a);
+                else if (gen == a.screenGeneration && a.mode.equals("settings")) settings(a);
             });
         }).start();
     }
@@ -286,7 +286,7 @@ final class Menus {
      * on a home network); "Find tuners" searches the network, and any IP address can be typed instead.
      */
     static void hdhrForm(MainActivity a, JSONObject existing) {
-        a.mode = "login";
+        a.mode = "hdhr";
         a.shell(existing == null ? "ADD HDHOMERUN TUNER" : "EDIT TUNER");
         LinearLayout form = column(a);
         form.setPadding(a.dp(80), a.dp(4), a.dp(80), 0);
@@ -300,8 +300,33 @@ final class Menus {
                 + "(shown in your router, or at my.hdhomerun.com).");
         TextView connect = a.button("Save & load channels", form, () -> connectTuner(a, existing, title.getText().toString().trim(), host.getText().toString(), epg.getText().toString().trim()));
         a.button("⌕  Find tuners on my network", form, () -> findTuners(a, existing, title, host, epg));
-        a.button("Cancel", form, () -> a.leaveForm());
+        a.button("Cancel", form, () -> { if (a.library.isEmpty()) setup(a); else settings(a); });
         (existing == null ? connect : host).requestFocus();
+    }
+
+    /** Settings > HDHomeRun antenna TV once a tuner is added: pick a tuner, or add another. */
+    private static void tunerList(MainActivity a) {
+        java.util.List<JSONObject> tuners = Antenna.tuners(a);
+        String[] names = new String[tuners.size() + 1];
+        for (int i = 0; i < tuners.size(); i++) names[i] = Library.nameOf(tuners.get(i)) + "  •  " + describe(tuners.get(i));
+        names[tuners.size()] = "+  Add another tuner";
+        new Dialogs.Builder(a).setTitle("HDHomeRun antenna TV").setItems(names, (d, w) -> {
+            if (w == tuners.size()) hdhrForm(a, null); else tunerActions(a, tuners.get(w));
+        }).setNegativeButton("Close", null).show();
+    }
+
+    private static void tunerActions(MainActivity a, JSONObject t) {
+        new Dialogs.Builder(a).setTitle(Library.nameOf(t)).setItems(new String[]{"Edit name or address", "Refresh channels (after a channel scan)", "Remove"}, (d, w) -> {
+            if (w == 0) hdhrForm(a, t);
+            else if (w == 1) refresh(a, t);
+            else new Dialogs.Builder(a).setTitle("Remove “" + Library.nameOf(t) + "”?")
+                        .setMessage("Antenna TV disappears from Live TV. Its favorites stay saved, so they come back if you add the same tuner again.")
+                        .setPositiveButton("Remove", (d2, w2) -> {
+                            a.library.remove(t.optString("id"));
+                            a.forgetPlaylistData();
+                            if (a.library.isEmpty()) setup(a); else settings(a);
+                        }).setNegativeButton("Cancel", null).show();
+        }).show();
     }
 
     /** "http://192.168.1.50:80" → "192.168.1.50", "http://x:5004" → "x:5004". */
@@ -376,10 +401,11 @@ final class Menus {
                             .put("url", device.lineupUrl).put("epg", epg).put("count", loaded.channels.size())
                             .put("hdhr", true).put("device_id", device.id).put("model", device.model).put("tuners", device.tuners);
                 } catch (JSONException ignored) { }
+                boolean first = a.library.isEmpty();
                 a.library.put(p);
-                a.switchPlaylist(p);
-                Toast.makeText(a, loaded.channels.size() + " channels from " + p.optString("title"), Toast.LENGTH_LONG).show();
-                a.home();
+                if (first || p.optString("id").equals(a.library.activeId())) a.switchPlaylist(p);
+                Toast.makeText(a, loaded.channels.size() + " channels from " + p.optString("title") + ". Find them in Live TV under Antenna TV.", Toast.LENGTH_LONG).show();
+                if (first) a.home(); else settings(a);
             });
         }).start();
     }
@@ -395,7 +421,12 @@ final class Menus {
         boolean m3u = a.library.activeIsM3u();
         JSONObject active = a.library.find(a.library.activeId());
 
-        row(a, list, "Playlist", active == null ? "none" : active.optString("title") + "  (" + (m3u ? "M3U" : "Xtream Codes") + ")", () -> a.playlists());
+        row(a, list, "Playlist", active == null ? "none" : active.optString("title") + "  (" + (a.library.activeIsHdhr() ? "HDHomeRun" : m3u ? "M3U" : "Xtream Codes") + ")", () -> a.playlists());
+        java.util.List<JSONObject> tuners = Antenna.tuners(a);
+        row(a, list, "HDHomeRun antenna TV", tuners.isEmpty()
+                ? "not added  •  press OK to add your tuner. Its channels show in Live TV as the Antenna TV category"
+                : (tuners.size() == 1 ? describe(tuners.get(0)) : tuners.size() + " tuners") + "  •  press OK to add, edit, refresh or remove",
+                () -> { if (tuners.isEmpty()) hdhrForm(a, null); else tunerList(a); });
         final int modeRow = list.getChildCount();
         boolean liveOnly = a.liveOnly();
         row(a, list, "App mode", liveOnly ? "Live TV only  •  opens on the TV guide; press OK for the full app" : "Full  •  press OK for Live TV only (opens on the TV guide, hides Movies and Series)", () -> {
