@@ -63,6 +63,7 @@ final class Menus {
         center.addView(tiles, new LinearLayout.LayoutParams(-1, a.dp(170)));
         TextView xtream = a.homeTile("⚙", "Xtream Codes\nserver + username", tiles, () -> xtreamForm(a, null, null));
         a.homeTile("☰", "M3U link\nplaylist URL", tiles, () -> m3uForm(a, null));
+        a.homeTile("📡", "HDHomeRun\nantenna TV tuner", tiles, () -> hdhrForm(a, null));
         a.homeTile("↺", "Restore\nfrom a backup", tiles, () -> Backup.restore(a));
         for (int i = 0; i < tiles.getChildCount(); i++) ((TextView) tiles.getChildAt(i)).setTextSize(21);
         xtream.requestFocus();
@@ -89,12 +90,20 @@ final class Menus {
         }
         TextView addX = a.button("+  Add an Xtream Codes login", list, () -> xtreamForm(a, null, null));
         a.button("+  Add an M3U playlist link", list, () -> m3uForm(a, null));
+        a.button("+  Add an HDHomeRun antenna tuner", list, () -> hdhrForm(a, null));
         (focus == null ? addX : focus).requestFocus();
     }
 
     static String describe(JSONObject p) {
         StringBuilder s = new StringBuilder();
-        if (Library.M3U.equals(p.optString("type"))) {
+        if (Library.isHdhr(p)) {
+            s.append("HDHomeRun tuner");
+            int n = p.optInt("count", -1);
+            if (n >= 0) s.append("  •  ").append(n).append(n == 1 ? " channel" : " channels");
+            s.append("  •  ").append(hostOf(p.optString("url")));
+            int t = p.optInt("tuners", 0);
+            if (t > 0) s.append("  •  ").append(t).append(t == 1 ? " tuner" : " tuners");
+        } else if (Library.M3U.equals(p.optString("type"))) {
             s.append("M3U playlist");
             int n = p.optInt("count", -1);
             if (n >= 0) s.append("  •  ").append(n).append(n == 1 ? " channel" : " channels");
@@ -128,7 +137,7 @@ final class Menus {
         String[] items = {on ? "Go to Home" : "Watch this playlist", "Edit", "Refresh now", "Delete"};
         new Dialogs.Builder(a).setTitle(p.optString("title", "Playlist")).setItems(items, (d, which) -> {
             if (which == 0) { a.switchPlaylist(p); a.home(); }
-            else if (which == 1) { if (Library.M3U.equals(p.optString("type"))) m3uForm(a, p); else xtreamForm(a, p, null); }
+            else if (which == 1) { if (Library.isHdhr(p)) hdhrForm(a, p); else if (Library.M3U.equals(p.optString("type"))) m3uForm(a, p); else xtreamForm(a, p, null); }
             else if (which == 2) refresh(a, p);
             else new Dialogs.Builder(a).setTitle("Delete “" + p.optString("title", "Playlist") + "”?")
                         .setMessage("Its favorites stay saved, so they come back if you add the same playlist again.")
@@ -270,6 +279,111 @@ final class Menus {
         }).start();
     }
 
+    // ------------------------------------------------------------------ HDHomeRun tuners
+
+    /**
+     * Add or edit an HDHomeRun tuner. The address starts as hdhomerun.local (the name every tuner answers to
+     * on a home network); "Find tuners" searches the network, and any IP address can be typed instead.
+     */
+    static void hdhrForm(MainActivity a, JSONObject existing) {
+        a.mode = "login";
+        a.shell(existing == null ? "ADD HDHOMERUN TUNER" : "EDIT TUNER");
+        LinearLayout form = column(a);
+        form.setPadding(a.dp(80), a.dp(4), a.dp(80), 0);
+        EditText title = a.field(form, "Name (e.g. Antenna TV)", existing == null ? "" : existing.optString("title"));
+        String addr = existing == null ? Hdhr.DEFAULT_HOST : hostAndPort(Hdhr.baseOfLineup(existing.optString("url")));
+        EditText host = a.field(form, "Tuner address: hdhomerun.local or its IP, e.g. 192.168.1.50", addr);
+        host.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        EditText epg = a.field(form, "TV guide (XMLTV) link, optional: leave empty to use the HDHomeRun guide", existing == null ? "" : existing.optString("epg"));
+        note(a, form, "Channels come from the tuner's lineup (the same list as http://hdhomerun.local/lineup.html), grouped by channel number. "
+                + "The TV guide comes from SiliconDust's free HDHomeRun guide. If hdhomerun.local isn't found, press Find tuners or type the tuner's IP address "
+                + "(shown in your router, or at my.hdhomerun.com).");
+        TextView connect = a.button("Save & load channels", form, () -> connectTuner(a, existing, title.getText().toString().trim(), host.getText().toString(), epg.getText().toString().trim()));
+        a.button("⌕  Find tuners on my network", form, () -> findTuners(a, existing, title, host, epg));
+        a.button("Cancel", form, () -> a.leaveForm());
+        (existing == null ? connect : host).requestFocus();
+    }
+
+    /** "http://192.168.1.50:80" → "192.168.1.50", "http://x:5004" → "x:5004". */
+    static String hostAndPort(String base) {
+        try {
+            URI u = new URI(base);
+            if (u.getHost() == null) return base;
+            return u.getPort() < 0 || u.getPort() == 80 ? u.getHost() : u.getHost() + ":" + u.getPort();
+        } catch (Exception e) {
+            return base;
+        }
+    }
+
+    private static void findTuners(MainActivity a, JSONObject existing, EditText title, EditText host, EditText epg) {
+        a.status.setText("Looking for HDHomeRun tuners…");
+        Toast.makeText(a, "Looking for HDHomeRun tuners…", Toast.LENGTH_SHORT).show();
+        final int gen = a.screenGeneration;
+        new Thread(() -> {
+            java.util.List<Hdhr.Device> found = Hdhr.discoverAll();
+            a.runOnUiThread(() -> {
+                if (a.isFinishing() || a.isDestroyed() || gen != a.screenGeneration) return;
+                a.status.setText("");
+                if (found.isEmpty()) {
+                    alert(a, "No HDHomeRun tuner answered. Check that it's powered on and on the same network as this device, then type its IP address instead.");
+                    return;
+                }
+                String[] names = new String[found.size()];
+                for (int i = 0; i < names.length; i++) names[i] = found.get(i).summary();
+                new Dialogs.Builder(a).setTitle(found.size() == 1 ? "Found 1 tuner" : "Found " + found.size() + " tuners").setItems(names, (d, w) -> {
+                    Hdhr.Device dev = found.get(w);
+                    host.setText(hostAndPort(dev.base));
+                    if (title.getText().toString().trim().isEmpty() && !dev.name.isEmpty()) title.setText(dev.name);
+                    connectTuner(a, existing, title.getText().toString().trim(), hostAndPort(dev.base), epg.getText().toString().trim());
+                }).setNegativeButton("Cancel", null).show();
+            });
+        }).start();
+    }
+
+    /** Reads the tuner's discover.json and lineup, then saves it as a playlist and opens Home. */
+    private static void connectTuner(MainActivity a, JSONObject existing, String name, String address, String epg) {
+        String base = Hdhr.baseFromInput(address);
+        if (base.isEmpty()) { alert(a, "Enter the tuner's address, like hdhomerun.local or 192.168.1.50."); return; }
+        a.status.setText("Connecting to the tuner…");
+        Toast.makeText(a, "Connecting to " + hostAndPort(base) + "…", Toast.LENGTH_SHORT).show();
+        final int gen = a.screenGeneration;
+        new Thread(() -> {
+            Hdhr.Device dev = null;
+            M3u.Playlist m = null;
+            String problem = null;
+            try { dev = Hdhr.describe(base); } catch (Exception e) {
+                problem = "No HDHomeRun tuner answered at " + hostAndPort(base) + ". Check the address, or press Find tuners."
+                        + (base.contains(".local") ? " Some devices can't look up hdhomerun.local: use the tuner's IP address instead." : "");
+            }
+            if (dev != null) {
+                try { m = a.library.downloadM3u(dev.lineupUrl); } catch (Exception e) { problem = "The tuner answered but its channel list couldn't be read."; }
+                if (m != null && m.channels.isEmpty()) problem = "The tuner has no channels yet. Run a channel scan in the HDHomeRun app or at " + hostAndPort(dev.base) + ", then try again.";
+            }
+            final Hdhr.Device device = dev;
+            final M3u.Playlist loaded = m;
+            final String error = problem;
+            a.runOnUiThread(() -> {
+                if (a.isFinishing() || a.isDestroyed() || gen != a.screenGeneration) return;
+                a.status.setText("");
+                if (error != null) { alert(a, error); return; }
+                JSONObject p = existing != null ? existing : Library.newPlaylist(Library.M3U);
+                if (existing != null && !existing.optString("url").equals(device.lineupUrl)) {
+                    // A new address gives new channel links: drop the old cached copy.
+                    a.library.m3uFile(existing.optString("url")).delete();
+                }
+                try {
+                    p.put("title", name.isEmpty() ? (device.name.isEmpty() ? "HDHomeRun" : device.name) : name)
+                            .put("url", device.lineupUrl).put("epg", epg).put("count", loaded.channels.size())
+                            .put("hdhr", true).put("device_id", device.id).put("model", device.model).put("tuners", device.tuners);
+                } catch (JSONException ignored) { }
+                a.library.put(p);
+                a.switchPlaylist(p);
+                Toast.makeText(a, loaded.channels.size() + " channels from " + p.optString("title"), Toast.LENGTH_LONG).show();
+                a.home();
+            });
+        }).start();
+    }
+
     // ------------------------------------------------------------------ settings
 
     static void settings(MainActivity a) { settings(a, 0); }
@@ -323,7 +437,7 @@ final class Menus {
         final int guideRow = list.getChildCount();
         String custom = a.saved("epg_url");
         String guideState = a.library.guideStatus();
-        String source = !custom.isEmpty() ? hostOf(custom) + " (your link)" : m3u ? (a.library.guideUrl().isEmpty() ? "none in this playlist" : hostOf(a.library.guideUrl()) + " (from the playlist)") : "the provider's guide";
+        String source = !custom.isEmpty() ? hostOf(custom) + " (your link)" : a.library.activeIsHdhr() ? "HDHomeRun guide (from the tuner)" : m3u ? (a.library.guideUrl().isEmpty() ? "none in this playlist" : hostOf(a.library.guideUrl()) + " (from the playlist)") : "the provider's guide";
         row(a, list, "TV guide source", source + (guideState.isEmpty() ? "" : "  •  " + guideState), () -> guideSource(a, active, guideRow));
         if (!custom.isEmpty() || m3u) row(a, list, "Reload TV guide", "download the guide again now", () -> {
             new Thread(a.library::dropGuide).start();

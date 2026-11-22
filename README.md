@@ -19,3 +19,13 @@ The start screen now draws a sunset desert with mesas, a ranch silhouette, fence
 
 ## Steampunk Main Home theme
 The main landing page uses a locally bundled steampunk backdrop (`res/drawable-nodpi/steampunk_home.jpg`), brass-rimmed smoked-glass Live TV / Movies / Series buttons, and a matching Settings button and playlist-account panel. Existing menu behavior, split Live TV guide, and Xtream expiration lookup are unchanged.
+
+## HDHomeRun antenna TV
+WygTV can watch free over-the-air channels from a SiliconDust HDHomeRun network tuner, on Android TV (remote / D-pad) and on tablets (touch).
+
+- **Add it:** first-time setup → *HDHomeRun*, or Playlists → *Add an HDHomeRun antenna tuner*. The address starts as `hdhomerun.local`; *Find tuners on my network* searches by UDP broadcast (port 65001) and SiliconDust's cloud lookup, and any IP address can be typed instead.
+- **Channels** come from the tuner's lineup (`/lineup.json`, the same list as `/lineup.html`), grouped by channel number (4.1, 4.2 and 4.3 sit under "Channel 4 · WNBC"). Copy-protected cable channels are left out. Playlists → Refresh re-reads the lineup after a channel scan.
+- **TV guide** comes from SiliconDust's free HDHomeRun guide (`api.hdhomerun.com/api/guide.php`, authorised with the tuner's own DeviceAuth), about 12 hours ahead, refreshed every 30 minutes. An XMLTV link can be set instead.
+- **Playback** uses Media3 with the Jellyfin FFmpeg audio extension, so Dolby AC-3 / E-AC-3 sound plays even on devices without a Dolby decoder (the device's own decoder and HDMI passthrough are still preferred). MPEG-2 video needs a hardware decoder: most Android TV boxes have one, many tablets don't (those get sound only and a message saying why).
+- Each playing channel uses one of the tuner's tuners; the TV guide's preview window uses one too. When every tuner is busy the app says so.
+- The tuner is saved by its IP address, so give it a fixed address (DHCP reservation) in your router.

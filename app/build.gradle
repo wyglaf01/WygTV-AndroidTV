@@ -23,5 +23,7 @@ android { namespace 'com.wygtv.tv'; compileSdk 35
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
-dependencies { testImplementation 'junit:junit:4.13.2'; testImplementation 'org.json:json:20231013'; implementation 'androidx.media3:media3-exoplayer:1.5.1'; implementation 'androidx.media3:media3-ui:1.5.1' }
+dependencies { testImplementation 'junit:junit:4.13.2'; testImplementation 'org.json:json:20231013'; implementation 'androidx.media3:media3-exoplayer:1.5.1'; implementation 'androidx.media3:media3-ui:1.5.1'
+    // FFmpeg audio decoders (AC-3 / E-AC-3 for over-the-air TV from HDHomeRun tuners), built for Media3 1.5 by Jellyfin.
+    implementation 'org.jellyfin.media3:media3-ffmpeg-decoder:1.5.0+1' }
 

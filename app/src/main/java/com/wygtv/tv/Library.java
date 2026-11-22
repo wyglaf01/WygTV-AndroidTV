@@ -144,13 +144,18 @@ final class Library {
 
     boolean activeIsM3u() { return M3U.equals(prefs.getString("type", "")); }
 
+    /** An HDHomeRun antenna tuner: saved as an M3U playlist whose link is the tuner's lineup.json. */
+    boolean activeIsHdhr() { return activeIsM3u() && Hdhr.isLineupUrl(prefs.getString("m3u_url", "")); }
+
+    static boolean isHdhr(JSONObject p) { return p != null && M3U.equals(p.optString("type")) && Hdhr.isLineupUrl(p.optString("url")); }
+
     // ------------------------------------------------------------------ M3U
 
     File m3uFile(String url) { return new File(a.getFilesDir(), "playlist_" + M3u.idFor(url) + ".m3u"); }
 
     /** Downloads and parses an M3U link (for the add/refresh form). Saves a copy so start-up is offline-fast. */
     M3u.Playlist downloadM3u(String url) throws Exception {
-        String text = download(url, 60000);
+        String text = Hdhr.playlistText(url);
         if (!M3u.looksLikePlaylist(text)) throw new IllegalStateException("not a playlist");
         M3u.Playlist p = M3u.parse(text);
         try (OutputStream out = new FileOutputStream(m3uFile(url))) { out.write(text.getBytes(StandardCharsets.UTF_8)); }
@@ -170,7 +175,7 @@ final class Library {
         File f = m3uFile(url);
         String text = f.exists() ? readFile(f) : null;
         if (text == null || !M3u.looksLikePlaylist(text)) {
-            text = download(url, 60000);
+            text = Hdhr.playlistText(url);
             if (!M3u.looksLikePlaylist(text)) throw new IllegalStateException("not a playlist");
             try (OutputStream out = new FileOutputStream(f)) { out.write(text.getBytes(StandardCharsets.UTF_8)); }
         }
@@ -259,7 +264,7 @@ final class Library {
         File f = m3uFile(url);
         String text = f.exists() ? readFile(f) : null;
         if (text == null || !M3u.looksLikePlaylist(text)) {
-            text = download(url, 60000);
+            text = Hdhr.playlistText(url);
             if (!M3u.looksLikePlaylist(text)) throw new IllegalStateException("not a playlist");
             try (OutputStream out = new FileOutputStream(f)) { out.write(text.getBytes(StandardCharsets.UTF_8)); }
         }
@@ -292,6 +297,15 @@ final class Library {
     /** The provider's short guide for a channel of another Xtream playlist (M3U playlists that aren't active have none here). Call off the UI thread. */
     JSONObject epgFor(JSONObject p, String action) throws Exception {
         return shortEpgWithExtras(action, p, () -> {
+            if (isHdhr(p)) {
+                String sid = "";
+                int limit = 4;
+                for (String part : action.split("&")) {
+                    if (part.startsWith("stream_id=")) sid = URLDecoder.decode(part.substring(10), "UTF-8");
+                    else if (part.startsWith("limit=")) try { limit = Integer.parseInt(part.substring(6)); } catch (NumberFormatException ignored) { }
+                }
+                return new JSONObject().put("epg_listings", hdhrEpg(p.optString("url"), sid, limit, p));
+            }
             if (M3U.equals(p.optString("type"))) return new JSONObject().put("epg_listings", new JSONArray());
             String body = download(p.optString("host") + "/player_api.php?username=" + XtreamProtocol.encode(p.optString("user"))
                     + "&password=" + XtreamProtocol.encode(p.optString("pass")) + "&action=" + action, 20000);
@@ -329,7 +343,7 @@ final class Library {
         return guideError;
     }
 
-    void dropGuide() { synchronized (guideLock) { guide = null; guideKey = ""; guideError = ""; } new File(a.getCacheDir(), guideCacheName(guideUrl())).delete(); }
+    void dropGuide() { synchronized (hdhrGuideLock) { hdhrGuides.clear(); } synchronized (guideLock) { guide = null; guideKey = ""; guideError = ""; } new File(a.getCacheDir(), guideCacheName(guideUrl())).delete(); }
 
     private static String guideCacheName(String url) { return "guide_" + M3u.idFor(url) + ".xml"; }
 
@@ -371,6 +385,7 @@ final class Library {
      */
     JSONArray shortEpg(String streamId, int limit) {
         Xmltv.Guide g = guideBlocking();
+        if (g == null && activeIsHdhr()) return hdhrEpg(prefs.getString("m3u_url", ""), streamId, limit, null);
         if (g == null) return activeIsM3u() ? new JSONArray() : null;
         String tvgId, name;
         if (activeIsM3u()) {
@@ -384,8 +399,48 @@ final class Library {
             tvgId = ids[0]; name = ids[1];
         }
         List<Xmltv.Program> progs = g.find(tvgId, name);
+        if (progs.isEmpty() && activeIsHdhr()) return hdhrEpg(prefs.getString("m3u_url", ""), streamId, limit, null);
         if (progs.isEmpty()) return activeIsM3u() ? new JSONArray() : null;
         return listings(Xmltv.upcoming(progs, System.currentTimeMillis(), Math.max(1, limit)));
+    }
+
+    // ------------------------------------------------------------------ HDHomeRun guide
+
+    /** Guide by tuner address: {loaded at (Long), channel number → programmes (Map) or null after a failure}. */
+    private final Map<String, Object[]> hdhrGuides = new HashMap<>();
+    private final Object hdhrGuideLock = new Object();
+
+    /**
+     * A tuner channel's upcoming programmes from SiliconDust's guide (the one the HDHomeRun app shows),
+     * matched by channel number. {@code other} is a saved tuner that isn't active, or null. Call off the UI thread.
+     */
+    JSONArray hdhrEpg(String lineupUrl, String streamId, int limit, JSONObject other) {
+        M3u.Channel c;
+        try { c = (other == null ? m3uBlocking() : m3uOf(other)).byId.get(streamId); } catch (Exception e) { return new JSONArray(); }
+        if (c == null) return new JSONArray();
+        Map<String, List<Xmltv.Program>> g = hdhrGuide(Hdhr.baseOfLineup(lineupUrl));
+        List<Xmltv.Program> progs = g == null ? null : g.get(c.number.isEmpty() ? c.tvgId : c.number);
+        if (progs == null || progs.isEmpty()) return new JSONArray();
+        return listings(Xmltv.upcoming(progs, System.currentTimeMillis(), Math.max(1, limit)));
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, List<Xmltv.Program>> hdhrGuide(String base) {
+        if (base.isEmpty()) return null;
+        synchronized (hdhrGuideLock) {
+            long now = System.currentTimeMillis();
+            Object[] have = hdhrGuides.get(base);
+            if (have != null) {
+                long age = now - (Long) have[0];
+                if (have[1] != null && age < 30 * 60_000L) return (Map<String, List<Xmltv.Program>>) have[1];
+                if (have[1] == null && age < 5 * 60_000L) return null;
+            }
+            Map<String, List<Xmltv.Program>> got;
+            try { got = Hdhr.loadGuide(base, 12); } catch (Exception e) { got = null; }
+            if (got == null && have != null && have[1] != null) got = (Map<String, List<Xmltv.Program>>) have[1];
+            hdhrGuides.put(base, new Object[]{now, got});
+            return got;
+        }
     }
 
     /** XMLTV programmes in the provider's get_short_epg format (base64 title and description). */
