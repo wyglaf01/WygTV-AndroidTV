@@ -140,7 +140,8 @@ final class MiniGuide {
         row.setOnClickListener(v -> ok.run(item));
         row.setOnLongClickListener(v -> { more.run(item); return true; });
         // The channel's logo, its name and (small, underneath) its category.
-        String top = starred(a, item) + title, sub = categoryOf(a, item);
+        boolean hiddenCh = GuideOptions.isHidden(a, item);
+        String top = starred(a, item) + title, sub = hiddenCh ? "Hidden" : categoryOf(a, item);
         TextView name = a.label(top, 15);
         name.setMaxLines(2);
         if (!sub.isEmpty()) {
@@ -154,6 +155,7 @@ final class MiniGuide {
         name.setEllipsize(TextUtils.TruncateAt.END);
         name.setTypeface(null, Typeface.BOLD);
         ChannelIcons.attach(name, item.optString("stream_icon"), title, 28);
+        if (hiddenCh) name.setAlpha(.45f);
         row.addView(name, new LinearLayout.LayoutParams(a.dp(CHANNEL_DP - 6), -1));
         LinearLayout cells = new LinearLayout(a);
         row.addView(cells, new LinearLayout.LayoutParams(0, -1, 1));
