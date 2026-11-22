@@ -65,22 +65,28 @@ final class Manage {
     // ---------- Categories ----------
 
     /** Opens the full-screen category page on the first playlist. */
-    static void categories(MainActivity a, Runnable after) { categories(a, null, after); }
+    static void categories(MainActivity a, Runnable after) { categories(a, null, null, after); }
+
+    static void categories(MainActivity a, JSONObject startAt, Runnable after) { categories(a, startAt, null, after); }
 
     /**
      * Opens the full-screen category page. The left column lists every playlist (HDHomeRun tuners aside) with its
      * Live TV / Movies / Series under it (just Live TV for M3U playlists and in Live-TV-only mode), so each
      * playlist's categories are hidden or shown separately. {@code startAt} picks the playlist to open on.
      */
-    static void categories(MainActivity a, JSONObject startAt, Runnable after) {
+    static void categories(MainActivity a, JSONObject startAt, String onlySection, Runnable after) {
         List<JSONObject> pls = new ArrayList<>();
         JSONArray all = a.library.all();
         for (int i = 0; i < all.length(); i++) {
             JSONObject p = all.optJSONObject(i);
-            if (p != null && !Library.isHdhr(p)) pls.add(p);
+            if (p == null || Library.isHdhr(p)) continue;
+            // Movies / Series only: M3U playlists have none.
+            if (onlySection != null && !onlySection.equals("live") && Library.M3U.equals(p.optString("type"))) continue;
+            pls.add(p);
         }
         if (pls.isEmpty()) { Menus.alert(a, "Add a playlist first."); return; }
-        boolean headings = pls.size() > 1;
+        // One section (from the Movies or Series screen): one entry per playlist, no headings needed.
+        boolean headings = pls.size() > 1 && onlySection == null;
         String startId = startAt != null ? startAt.optString("id") : a.library.activeId();
         List<Group> groups = new ArrayList<>();
         int start = -1;
@@ -91,15 +97,19 @@ final class Manage {
             int n = a.liveOnly() || m3u ? 1 : SECTIONS.length;
             for (int i = 0; i < n; i++) {
                 String section = SECTIONS[i], name = SECTION_NAMES[i];
+                if (onlySection != null && !onlySection.equals(section)) continue;
                 if (start < 0 && p.optString("id").equals(startId)) start = groups.size();
                 Group g = new Group((headings ? "      " : "") + name + " categories", Library.prefixOf(p) + "hidden_categories_" + section, true,
                         got -> fetchCategories(a, p, section, got, (headings ? title + ": " : "This playlist has no ") + (headings ? "no " : "") + name + " categories."));
                 g.name = headings ? name + " (" + title + ")" : name + " categories";
+                if (onlySection != null && pls.size() > 1) { g = new Group("▤  " + title, g.key, true, g.loader); g.name = title; }
                 groups.add(g);
             }
         }
         if (start < 0) start = headings ? 1 : 0;
-        Page page = new Page(a, "MANAGE CATEGORIES", "categories", groups, start, after);
+        if (groups.isEmpty()) { Menus.alert(a, "No playlist has these categories."); return; }
+        String heading = onlySection == null ? "MANAGE CATEGORIES" : "HIDE AND SHOW " + SECTION_NAMES[java.util.Arrays.asList(SECTIONS).indexOf(onlySection)].toUpperCase(java.util.Locale.ROOT) + " CATEGORIES";
+        Page page = new Page(a, heading, "categories", groups, start, after);
         page.onSaved = () -> { a.otherLive.clear(); MasterSearch.clear(); };
         page.open();
     }
