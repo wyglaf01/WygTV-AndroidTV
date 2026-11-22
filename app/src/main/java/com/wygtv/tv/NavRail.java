@@ -58,6 +58,7 @@ final class NavRail {
         if (a.liveOnly()) {
             // Live TV only (Settings → App mode): the guide is the main screen, plus Live TV and Settings.
             add("▦", "TV Guide", "guide", current, () -> a.openGuide(null));
+            add("★", "Favorites", "fav", current, () -> LiveMenu.openAt(a, "fav", true));
             add("▣", "Live TV", "live", current, () -> a.browse("live"));
             add("⌕", "Search channels", "search", current, () -> a.searchLive());
             rail.addView(new View(a), new LinearLayout.LayoutParams(-1, 0, 1));
@@ -66,11 +67,16 @@ final class NavRail {
             return;
         }
         add("⌂", "Home", "home", current, () -> a.home());
-        add("▣", "Live TV", "live", current, () -> a.browse("live"));
         add("▦", "TV Guide", "guide", current, () -> a.openGuide(null));
+        add("★", "Favorites", "fav", current, () -> LiveMenu.openAt(a, "fav", true));
+        add("▣", "Live TV", "live", current, () -> a.browse("live"));
         if (!m3u) {
             add("▶", "Movies", "vod", current, () -> a.browse("vod"));
             add("▤", "Series", "series", current, () -> a.browse("series"));
+        }
+        for (org.json.JSONObject t : Antenna.tuners(a)) { // each HDHomeRun tuner, when there is one
+            String id = Antenna.PREFIX + t.optString("id");
+            add("📡", Antenna.nameOf(t), id, current, () -> a.showGuide(id, null, true)); // full TV guide of its channels
         }
         add("⌕", "Search", "msearch", current, () -> MasterSearch.show(a));
         rail.addView(new View(a), new LinearLayout.LayoutParams(-1, 0, 1));
@@ -79,15 +85,25 @@ final class NavRail {
         lockEnds();
     }
 
-    /** Up from the top item goes to the bottom one and Down from the bottom goes back to the top, staying in the menu. */
+    /**
+     * Up and Down move only between menu items (Up from the top goes to the bottom, Down from the bottom back to
+     * the top), so scrolling the menu never jumps into the screen behind it. Left stays put.
+     */
     private void lockEnds() {
-        if (!items.isEmpty()) {
-            TextView top = items.get(0), bottom = items.get(items.size() - 1);
-            top.setId(View.generateViewId());
-            bottom.setId(View.generateViewId());
-            top.setNextFocusUpId(bottom.getId());
-            bottom.setNextFocusDownId(top.getId());
+        int n = items.size();
+        for (int i = 0; i < n; i++) items.get(i).setId(View.generateViewId());
+        for (int i = 0; i < n; i++) {
+            TextView v = items.get(i);
+            v.setNextFocusUpId(items.get((i - 1 + n) % n).getId());
+            v.setNextFocusDownId(items.get((i + 1) % n).getId());
+            v.setNextFocusLeftId(v.getId());
         }
+    }
+
+    /** The menu item {@code step} places from {@code v}, wrapping around the ends. */
+    private TextView neighbour(View v, int step) {
+        int n = items.size(), i = items.indexOf(v);
+        return i < 0 || n == 0 ? null : items.get(((i + step) % n + n) % n);
     }
 
     private void add(String icon, String label, String key, String current, Runnable action) {
@@ -104,8 +120,8 @@ final class NavRail {
         v.setClickable(true);
         v.setBackground(itemBg(false, here));
         v.setContentDescription(label);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, a.dp(48));
-        lp.setMargins(0, a.dp(3), 0, a.dp(3));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, a.dp(44));
+        lp.setMargins(0, a.dp(2), 0, a.dp(2));
         rail.addView(v, lp);
         v.setOnClickListener(w -> { if (!here || key.equals("home")) action.run(); else collapseAndReturn(); });
         v.setOnFocusChangeListener((w, focused) -> {
@@ -117,6 +133,15 @@ final class NavRail {
         // Right closes the menu and goes back into the screen.
         v.setOnKeyListener((w, code, e) -> {
             if (e.getAction() == android.view.KeyEvent.ACTION_DOWN && code == android.view.KeyEvent.KEYCODE_DPAD_RIGHT) { collapseAndReturn(); return true; }
+            // Up/Down stay in the menu; Left does nothing.
+            if (code == android.view.KeyEvent.KEYCODE_DPAD_UP || code == android.view.KeyEvent.KEYCODE_DPAD_DOWN) {
+                if (e.getAction() == android.view.KeyEvent.ACTION_DOWN) {
+                    TextView next = neighbour(w, code == android.view.KeyEvent.KEYCODE_DPAD_UP ? -1 : 1);
+                    if (next != null) next.requestFocus();
+                }
+                return true;
+            }
+            if (code == android.view.KeyEvent.KEYCODE_DPAD_LEFT) return true;
             // Back closes the menu first instead of leaving the screen.
             if (code == android.view.KeyEvent.KEYCODE_BACK) { if (e.getAction() == android.view.KeyEvent.ACTION_UP) collapseAndReturn(); return true; }
             return false;

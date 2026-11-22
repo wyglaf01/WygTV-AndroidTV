@@ -41,7 +41,6 @@ import org.json.JSONObject;
  */
 final class TvGuide {
     private static final int PAGE = 40;
-    private static final int PREVIEW_DELAY_MS = 700;
     private static final long HORIZON = 24 * 60 * EpgGrid.MINUTE;
 
     private final MainActivity a;
@@ -62,12 +61,12 @@ final class TvGuide {
     private View shownRoot;
     private ExecutorService pool;
     private ExoPlayer preview;
-    private String previewId;
+    private String previewId, previewName;
     private Runnable pendingPreview, ticker;
     private java.text.DateFormat timeFmt;
 
     private PlayerView previewView;
-    private TextView clock, infoChannel, infoTitle, infoTime, infoLeft, infoDesc, infoNext, previewLabel, previewError;
+    private TextView clock, infoChannel, infoSource, infoTitle, infoTime, infoLeft, infoDesc, infoNext, previewLabel, previewError;
     private ProgressBar progress;
     private LinearLayout timeHeader, rows;
     private View nowLine;
@@ -145,7 +144,7 @@ final class TvGuide {
         bar.addView(clock, new LinearLayout.LayoutParams(-2, -1));
         a.root.addView(bar, 0, new LinearLayout.LayoutParams(-1, a.dp(44)));
         a.status.setLayoutParams(new LinearLayout.LayoutParams(-1, a.dp(24)));
-        a.status.setText("OK  Watch full screen      ◀ ▶  Move through time      ▲ ▼  Change channel      ◀ to ☆  Favorite      ▲ from the top  Pick Favorites or a category, or Search      BACK  " + (a.liveOnly() ? "Exit" : "Live TV"));
+        a.status.setText("OK  Watch full screen      ◀ ▶  Move through time      ▲ ▼  Change channel      " + ("fav".equals(a.category) ? "" : "◀ to ☆  Favorite      ") + "▲ from the top  Pick Favorites or a category, or Search      BACK  " + (a.liveOnly() ? "Exit" : "Live TV"));
 
         int screenW = a.getResources().getDisplayMetrics().widthPixels;
         chanW = a.dp(200);
@@ -196,6 +195,10 @@ final class TvGuide {
         infoChannel = text("", 12, Theme.MUTED, false);
         infoChannel.setLetterSpacing(.12f);
         info.addView(infoChannel);
+        infoSource = text("", 12, Theme.ACCENT, false);
+        infoSource.setSingleLine(true);
+        infoSource.setEllipsize(TextUtils.TruncateAt.END);
+        info.addView(infoSource);
         infoTitle = text("", 22, Theme.TEXT, true);
         infoTitle.setMaxLines(2);
         infoTitle.setEllipsize(TextUtils.TruncateAt.END);
@@ -320,6 +323,9 @@ final class TvGuide {
         LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(a.dp(36), -1);
         sp.setMargins(0, a.dp(2), a.dp(4), a.dp(2));
         row.addView(star, sp);
+        // Showing Favorites: every row is a favorite, so the star is left out.
+        boolean favList = "fav".equals(a.category);
+        if (favList) star.setVisibility(android.view.View.GONE);
         String num = ch.optString("num", "");
         String label = (num.isEmpty() || num.equals("0") || mixed ? "" : num + "   ") + ch.optString("name", "Channel");
         TextView name = text(label, 14, Theme.TEXT, true);
@@ -340,7 +346,7 @@ final class TvGuide {
         name.setPadding(a.dp(12), 0, a.dp(8), 0);
         name.setBackground(rowBg(false));
         ChannelIcons.attach(name, ch.optString("stream_icon"), ch.optString("name", "Channel"), 24);
-        LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(chanW - a.dp(40), -1);
+        LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(favList ? chanW : chanW - a.dp(40), -1);
         np.setMargins(0, a.dp(2), a.dp(8), a.dp(2));
         row.addView(name, np);
         LinearLayout cells = new LinearLayout(a);
@@ -411,7 +417,13 @@ final class TvGuide {
             if (subText != null) subText.setTextColor(focused ? Theme.mix(Theme.INK,Theme.FOCUS,0.4f) : Theme.MUTED);
             if (focused && !rebuilding) onCellFocused(row, c);
         });
-        v.setOnClickListener(view -> playFullScreen(row));
+        v.setOnClickListener(view -> {
+            // "OK only" preview: the first OK previews this channel, OK again opens it full screen.
+            if (PreviewDelay.okOnly(a.prefs) && !(preview != null && key(row).equals(previewId)) && !streamId(row).isEmpty()) {
+                if (pendingPreview != null) ui.removeCallbacks(pendingPreview);
+                startPreview(row);
+            } else playFullScreen(row);
+        });
         v.setOnKeyListener((view, key, e) -> {
             if (e.getAction() != KeyEvent.ACTION_DOWN) return false;
             if (key == KeyEvent.KEYCODE_DPAD_RIGHT && last) {
@@ -506,6 +518,7 @@ final class TvGuide {
         }
         View f = a.getCurrentFocus();
         if (f != null && f.getTag() instanceof EpgGrid.Cell && rowCells.get(focusRow) == f.getParent()) showInfo(focusRow, (EpgGrid.Cell) f.getTag());
+        syncPreviewLabel();
     }
 
     // ---------------------------------------------------------------- info panel
@@ -516,6 +529,10 @@ final class TvGuide {
         String name = ch.optString("name", "Channel"), num = ch.optString("num", "");
         infoChannel.setText(((num.isEmpty() || num.equals("0")) ? "" : num + " · ") + name.toUpperCase(java.util.Locale.getDefault()));
         previewLabel.setText(name + " · live preview");
+        String pid = ch.optString("playlist");
+        String source = Library.sourceLabel(a.library.find(pid.isEmpty() ? a.library.activeId() : pid));
+        infoSource.setText(source.isEmpty() ? "" : "Source  " + source);
+        infoSource.setVisibility(source.isEmpty() ? View.GONE : View.VISIBLE);
         List<EpgGrid.Program> progs = epg.get(key(row));
         EpgGrid.Program p = c.program;
         long n = now();
@@ -633,9 +650,20 @@ final class TvGuide {
 
     private void schedulePreview(int row) {
         if (pendingPreview != null) ui.removeCallbacks(pendingPreview);
+        pendingPreview = null;
+        syncPreviewLabel();
+        int delay = PreviewDelay.ms(a.prefs);
+        if (delay < 0) return; // "OK only": OK on a channel previews it
         final int s = session;
-        pendingPreview = () -> { if (s == session) startPreview(row); };
-        ui.postDelayed(pendingPreview, PREVIEW_DELAY_MS);
+        pendingPreview = () -> { if (s == session && focusRow == row) startPreview(row); };
+        ui.postDelayed(pendingPreview, delay);
+    }
+
+    /** The preview's caption names the channel actually playing (with a delay or "OK only" it can lag the highlight). */
+    private void syncPreviewLabel() {
+        if (previewLabel == null || PreviewDelay.DEFAULT.equals(PreviewDelay.key(a.prefs))) return;
+        if (preview != null && previewName != null) previewLabel.setText(previewName + " · live preview");
+        else previewLabel.setText(PreviewDelay.okOnly(a.prefs) ? "Press OK to preview" : "Rest on a channel to preview it");
     }
 
     private void startPreview(int row) {
@@ -653,6 +681,8 @@ final class TvGuide {
             return;
         }
         previewId = id;
+        JSONObject ch = channels.optJSONObject(row);
+        previewName = ch == null ? "Channel" : ch.optString("name", "Channel");
         previewError.setVisibility(View.GONE);
         if (preview == null) {
             preview = Players.create(a);
@@ -667,6 +697,7 @@ final class TvGuide {
         preview.setMediaItem(MediaItem.fromUri(url));
         preview.prepare();
         preview.play();
+        syncPreviewLabel();
     }
 
     private void releasePreview() {
@@ -677,6 +708,7 @@ final class TvGuide {
             preview = null;
         }
         previewId = null;
+        previewName = null;
     }
 
     private void playFullScreen(int row) {

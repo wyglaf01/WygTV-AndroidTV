@@ -336,6 +336,13 @@ final class Library {
         });
     }
 
+    /** The player pop-up's source line: the playlist's name and what kind of source it is. */
+    static String sourceLabel(JSONObject p) {
+        if (p == null) return "";
+        if (isHdhr(p)) return "📡 " + Antenna.nameOf(p) + "  ·  HDHomeRun antenna";
+        return nameOf(p) + "  ·  " + (M3U.equals(p.optString("type")) ? "M3U playlist" : "Xtream Codes");
+    }
+
     /** A playlist's name for labels: its title, else its server. */
     static String nameOf(JSONObject p) {
         if (p == null) return "removed playlist";
