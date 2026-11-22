@@ -28,7 +28,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Settings → Manage playlists → "Manage categories" and "Hide and show channels".
+ * Settings → Manage playlists → "Turn playlists on or off", "Manage categories" and "Hide and show channels".
  * Both open a full-screen page (mode "manage"): a fixed menu bar at the top (Save, Tick all, Untick all,
  * Exit), groups on the left (Live TV / Movies / Series, or the channel categories) and a tick list on the
  * right where ticked = shown. Changes are kept across groups until Save. Back in a list jumps to the menu
@@ -129,7 +129,52 @@ final class Manage {
         }, "Unable to load channels");
     }
 
+    // ---------- Playlists on / off ----------
+
+    /** Short summary for the Settings row, e.g. "3 playlists, all on" or "2 on, 1 off". */
+    static String playlistSummary(MainActivity a) {
+        int all = a.library.all().length(), on = a.library.inUse().length();
+        if (all == 0) return "no playlists";
+        return on == all ? all + (all == 1 ? " playlist, on" : " playlists, all on") : on + " on, " + (all - on) + " off";
+    }
+
+    /**
+     * Opens the full-screen tick page for every saved playlist and antenna tuner: ticked = on. A playlist
+     * that is switched off is left out of Live TV, Movies, Series, the TV guides, Favorites and Search, and
+     * is never downloaded, until it is ticked again. At least one has to stay on.
+     */
+    static void playlistsOnOff(MainActivity a, Runnable after) {
+        List<Group> groups = new ArrayList<>();
+        groups.add(new Group("Playlists", Library.OFF, true, got -> {
+            JSONArray all = a.library.all();
+            List<String> ids = new ArrayList<>(), names = new ArrayList<>();
+            for (int i = 0; i < all.length(); i++) {
+                JSONObject p = all.optJSONObject(i);
+                if (p == null) continue;
+                ids.add(p.optString("id"));
+                names.add((Library.isHdhr(p) ? "📡 " + Antenna.nameOf(p) : Library.nameOf(p)) + "   ·   " + Menus.describe(p));
+            }
+            got.run(ids, names, "No playlists saved yet.");
+        }));
+        Page page = new Page(a, "TURN PLAYLISTS ON OR OFF", "playlists", groups, 0, () -> { applyPlaylistsOnOff(a); after.run(); });
+        page.onWord = "on";
+        page.offWord = "off";
+        page.check = off -> a.library.all().length() > 0 && off.size() >= a.library.all().length() ? "Keep at least one playlist on." : null;
+        page.open();
+    }
+
+    /** After the on/off list is saved: move off a playlist that was switched off and forget lists built from the old set. */
+    static void applyPlaylistsOnOff(MainActivity a) {
+        JSONObject next = a.library.replacementForActive();
+        MasterSearch.clear();
+        if (next != null) a.switchPlaylist(next);
+        else if (a.activeLive != null && a.liveIndex != null) a.rebuildSearchIndex();
+    }
+
     // ---------- The full-screen tick page ----------
+
+    /** Optional rule checked before saving: returns what is wrong with the unticked set, or null when it can be saved. */
+    interface Check { String problem(Set<String> unticked); }
 
     interface Got { void run(List<String> ids, List<String> names, String emptyMessage); }
     interface Loader { void load(Got got); }
@@ -157,6 +202,9 @@ final class Manage {
         final Map<String, Set<String>> saved = new HashMap<>(), edited = new HashMap<>();
         final Handler ui = new Handler(Looper.getMainLooper());
         int current, loadGeneration; boolean focusListOnLoad = true;
+        /** How the info line and Save message name ticked and unticked rows. */
+        String onWord = "shown", offWord = "hidden";
+        Check check;
         List<String> ids = new ArrayList<>(), names = new ArrayList<>();
         LinearLayout bar; TextView save, info; ListView left, right; BaseAdapter leftAdapter, rightAdapter;
 
@@ -219,7 +267,7 @@ final class Manage {
                 @Override public View getView(int i, View v, ViewGroup parent) {
                     Group g = groups.get(i);
                     int n = g.showCount ? edited.get(g.key).size() : -1;
-                    TextView t = text(v, g.label + (n > 0 ? "   (" + n + " hidden)" : ""));
+                    TextView t = text(v, g.label + (n > 0 ? "   (" + n + " " + offWord + ")" : ""));
                     t.setBackground(i == current ? a.bg(a.PANEL) : null);
                     t.setTextColor(i == current ? Theme.TEXT : Theme.MUTED);
                     return t;
@@ -345,7 +393,7 @@ final class Manage {
             Set<String> h = hidden();
             for (String id : ids) if (!h.contains(id)) on++;
             String name = groups.get(current).label.replaceAll("^[^A-Za-z0-9]+", "");
-            info.setText(name + "   •   " + on + " shown, " + (ids.size() - on) + " hidden   •   ticked are shown, OK ticks or unticks"
+            info.setText(name + "   •   " + on + " " + onWord + ", " + (ids.size() - on) + " " + offWord + "   •   ticked are " + onWord + ", OK ticks or unticks"
                     + (changed() ? "   •   unsaved changes" : "") + "   •   Back = menu bar");
             save.setText(changed() ? "✓ Save changes" : "✓ Save");
         }
@@ -373,6 +421,10 @@ final class Manage {
         }
 
         void save() {
+            if (check != null) for (String k : edited.keySet()) {
+                String problem = check.problem(edited.get(k));
+                if (problem != null) { Toast.makeText(a, problem, Toast.LENGTH_LONG).show(); return; }
+            }
             int hid = 0, back = 0;
             android.content.SharedPreferences.Editor e = a.prefs.edit();
             for (String k : saved.keySet()) {
@@ -383,7 +435,7 @@ final class Manage {
                 e.putStringSet(k, new HashSet<>(now));
             }
             e.apply();
-            String msg = hid == 0 && back == 0 ? "No changes" : (hid > 0 ? hid + " hidden" : "") + (hid > 0 && back > 0 ? ", " : "") + (back > 0 ? back + " shown again" : "");
+            String msg = hid == 0 && back == 0 ? "No changes" : (hid > 0 ? hid + " " + offWord : "") + (hid > 0 && back > 0 ? ", " : "") + (back > 0 ? back + " " + onWord + " again" : "");
             Toast.makeText(a, msg, Toast.LENGTH_SHORT).show();
             close();
         }

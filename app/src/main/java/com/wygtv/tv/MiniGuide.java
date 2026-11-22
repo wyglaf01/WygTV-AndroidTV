@@ -139,8 +139,18 @@ final class MiniGuide {
         row.setTag(item.optString("stream_id"));
         row.setOnClickListener(v -> ok.run(item));
         row.setOnLongClickListener(v -> { more.run(item); return true; });
-        TextView name = a.label(starred(a, item) + title, 15);
+        // The channel's logo, its name and (small, underneath) its category.
+        String top = starred(a, item) + title, sub = categoryOf(a, item);
+        TextView name = a.label(top, 15);
         name.setMaxLines(2);
+        if (!sub.isEmpty()) {
+            android.text.SpannableString two = new android.text.SpannableString(top + "\n" + sub);
+            two.setSpan(new android.text.style.RelativeSizeSpan(.75f), top.length() + 1, two.length(), 0);
+            two.setSpan(new android.text.style.ForegroundColorSpan(Theme.MUTED), top.length() + 1, two.length(), 0);
+            two.setSpan(new android.text.style.StyleSpan(Typeface.NORMAL), top.length() + 1, two.length(), 0);
+            name.setLineSpacing(0, .9f);
+            name.setText(two);
+        }
         name.setEllipsize(TextUtils.TruncateAt.END);
         name.setTypeface(null, Typeface.BOLD);
         ChannelIcons.attach(name, item.optString("stream_icon"), title, 28);
@@ -154,6 +164,17 @@ final class MiniGuide {
         ROWS.put(row, r);
         render(r, false);
         return row;
+    }
+
+    /** The category this channel belongs to in its playlist, or "" when it isn't known here. */
+    private static String categoryOf(MainActivity a, JSONObject item) {
+        String pid = item.optString("playlist"), cid = item.optString("category_id");
+        if (cid.isEmpty() || !(pid.isEmpty() || pid.equals(a.library.activeId()))) return "";
+        for (int k = 0; k < a.categories.length(); k++) {
+            JSONObject c = a.categories.optJSONObject(k);
+            if (c != null && cid.equals(c.optString("category_id"))) return c.optString("category_name");
+        }
+        return "";
     }
 
     private static String starred(MainActivity a, JSONObject item) {

@@ -24,10 +24,14 @@ final class Antenna {
 
     static boolean isAntenna(String categoryId) { return categoryId != null && categoryId.startsWith(PREFIX); }
 
-    /** Saved tuners, in the order they were added. */
-    static List<JSONObject> tuners(MainActivity a) {
+    /** Switched-on tuners, in the order they were added (side menu, Home, guides). */
+    static List<JSONObject> tuners(MainActivity a) { return tuners(a, a.library.inUse()); }
+
+    /** Every saved tuner, switched off or not (Settings > HDHomeRun antenna TV). */
+    static List<JSONObject> allTuners(MainActivity a) { return tuners(a, a.library.all()); }
+
+    private static List<JSONObject> tuners(MainActivity a, JSONArray all) {
         List<JSONObject> out = new ArrayList<>();
-        JSONArray all = a.library.all();
         for (int i = 0; i < all.length(); i++) { JSONObject p = all.optJSONObject(i); if (Library.isHdhr(p)) out.add(p); }
         return out;
     }
@@ -150,8 +154,9 @@ final class Antenna {
     static void restoreMain(MainActivity a) {
         if (!a.library.activeIsHdhr()) return;
         JSONObject main = a.library.find(a.prefs.getString(MAIN_PLAYLIST, ""));
+        if (main != null && !a.library.isOn(main)) main = null;
         if (main == null) {
-            JSONArray all = a.library.all();
+            JSONArray all = a.library.inUse();
             for (int i = 0; i < all.length() && main == null; i++) { JSONObject p = all.optJSONObject(i); if (p != null && !Library.isHdhr(p)) main = p; }
         }
         if (main != null) a.switchPlaylist(main);

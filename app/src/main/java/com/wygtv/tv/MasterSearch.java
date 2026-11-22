@@ -147,7 +147,7 @@ final class MasterSearch {
     // ------------------------------------------------------------------ loading
 
     private static boolean hasXtream(MainActivity a) {
-        JSONArray pls = a.library.all();
+        JSONArray pls = a.library.inUse();
         for (int i = 0; i < pls.length(); i++) {
             JSONObject p = pls.optJSONObject(i);
             if (p != null && !Library.M3U.equals(p.optString("type"))) return true;
@@ -158,7 +158,7 @@ final class MasterSearch {
     /** Starts loading whatever list of a saved playlist this screen needs and doesn't have yet. */
     private static void load(MainActivity a) {
         Screen s = screen;
-        JSONArray pls = a.library.all();
+        JSONArray pls = a.library.inUse();
         for (int i = 0; i < pls.length(); i++) {
             JSONObject p = pls.optJSONObject(i);
             if (p == null) continue;
@@ -206,7 +206,7 @@ final class MasterSearch {
     /** The saved playlists, the active one first. */
     private static List<JSONObject> playlists(MainActivity a) {
         List<JSONObject> out = new ArrayList<>();
-        JSONArray pls = a.library.all();
+        JSONArray pls = a.library.inUse();
         String active = a.library.activeId();
         for (int pass = 0; pass < 2; pass++)
             for (int i = 0; i < pls.length(); i++) {
@@ -270,7 +270,7 @@ final class MasterSearch {
                 else if (e.getKey().endsWith("|vod")) mv += e.getValue().length();
                 else se += e.getValue().length();
             }
-            int pls = a.library.all().length();
+            int pls = a.library.inUse().length();
             text = "Type at least 2 letters to search " + ch + " channels" + (s.types.size() > 1 ? ", " + mv + " movies and " + se + " series" : "")
                     + (pls > 1 ? " in " + pls + " playlists" : "") + ".";
         } else {

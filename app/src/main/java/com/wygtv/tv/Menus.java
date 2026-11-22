@@ -78,19 +78,19 @@ final class Menus {
         a.mode = "playlists";
         a.shell("PLAYLISTS");
         LinearLayout list = column(a);
-        note(a, list, "Press OK on a playlist to watch it, edit it, refresh it or delete it.");
+        note(a, list, "Every playlist that is on is ready to watch at once in Live TV, Movies, Series, the TV guide and Search. Press OK on a playlist to turn it on or off, edit it, refresh it or delete it.");
         JSONArray all = a.library.all();
-        String active = a.library.activeId();
         View focus = null;
         for (int i = 0; i < all.length(); i++) {
             JSONObject p = all.optJSONObject(i);
             if (p == null || Library.isHdhr(p)) continue; // tuners are managed in Settings > HDHomeRun antenna TV
-            boolean on = p.optString("id").equals(active);
-            TextView row = a.button((on ? "●  " : "○  ") + p.optString("title", "Playlist") + (on ? "   (watching)" : "") + "\n      " + describe(p), list, () -> playlistActions(a, p));
+            boolean on = a.library.isOn(p);
+            TextView row = a.button((on ? "☑  " : "☐  ") + p.optString("title", "Playlist") + (on ? "" : "   (off)") + "\n      " + describe(p), list, () -> playlistActions(a, p));
             row.setTextSize(19);
-            if (on) row.setTextColor(Theme.ACCENT);
-            if (focus == null || on) focus = row;
+            if (!on) row.setTextColor(Theme.MUTED);
+            if (focus == null) focus = row;
         }
+        if (all.length() > 1) a.button("☑  Turn playlists on or off…", list, () -> Manage.playlistsOnOff(a, () -> playlists(a)));
         TextView addX = a.button("+  Add an Xtream Codes login", list, () -> xtreamForm(a, null, null));
         a.button("+  Add an M3U playlist link", list, () -> m3uForm(a, null));
         (focus == null ? addX : focus).requestFocus();
@@ -135,10 +135,10 @@ final class Menus {
     }
 
     private static void playlistActions(MainActivity a, JSONObject p) {
-        boolean on = p.optString("id").equals(a.library.activeId());
-        String[] items = {on ? "Go to Home" : "Watch this playlist", "Edit", "Refresh now", "Delete"};
-        new Dialogs.Builder(a).setTitle(p.optString("title", "Playlist")).setItems(items, (d, which) -> {
-            if (which == 0) { a.switchPlaylist(p); a.home(); }
+        boolean on = a.library.isOn(p);
+        String[] items = {on ? "Turn off (skip it in menus, guides, Search and updates)" : "Turn on (show it everywhere again)", "Edit", "Refresh now", "Delete"};
+        new Dialogs.Builder(a).setTitle(p.optString("title", "Playlist") + (on ? "" : "   (off)")).setItems(items, (d, which) -> {
+            if (which == 0) setOn(a, p, !on);
             else if (which == 1) { if (Library.isHdhr(p)) hdhrForm(a, p); else if (Library.M3U.equals(p.optString("type"))) m3uForm(a, p); else xtreamForm(a, p, null); }
             else if (which == 2) refresh(a, p);
             else new Dialogs.Builder(a).setTitle("Delete “" + p.optString("title", "Playlist") + "”?")
@@ -149,6 +149,17 @@ final class Menus {
                             if (a.library.isEmpty()) setup(a); else playlists(a);
                         }).setNegativeButton("Cancel", null).show();
         }).show();
+    }
+
+    /** Turns one playlist on or off (at least one stays on), then redraws the playlists screen. */
+    private static void setOn(MainActivity a, JSONObject p, boolean on) {
+        java.util.Set<String> off = new java.util.HashSet<>(a.library.offIds());
+        if (on) off.remove(p.optString("id")); else off.add(p.optString("id"));
+        if (!on && off.size() >= a.library.all().length()) { Toast.makeText(a, "Keep at least one playlist on.", Toast.LENGTH_LONG).show(); return; }
+        a.prefs.edit().putStringSet(Library.OFF, off).apply();
+        Manage.applyPlaylistsOnOff(a);
+        Toast.makeText(a, p.optString("title", "Playlist") + (on ? " is on." : " is off. It is skipped until you turn it back on."), Toast.LENGTH_LONG).show();
+        playlists(a);
     }
 
     private static void refresh(MainActivity a, JSONObject p) {
@@ -309,9 +320,9 @@ final class Menus {
 
     /** Settings > HDHomeRun antenna TV once a tuner is added: pick a tuner, or add another. */
     private static void tunerList(MainActivity a) {
-        java.util.List<JSONObject> tuners = Antenna.tuners(a);
+        java.util.List<JSONObject> tuners = Antenna.allTuners(a);
         String[] names = new String[tuners.size() + 1];
-        for (int i = 0; i < tuners.size(); i++) names[i] = Antenna.nameOf(tuners.get(i)) + "  •  " + describe(tuners.get(i));
+        for (int i = 0; i < tuners.size(); i++) names[i] = Antenna.nameOf(tuners.get(i)) + (a.library.isOn(tuners.get(i)) ? "" : "  (off)") + "  •  " + describe(tuners.get(i));
         names[tuners.size()] = "+  Add another tuner";
         new Dialogs.Builder(a).setTitle("HDHomeRun antenna TV").setItems(names, (d, w) -> {
             if (w == tuners.size()) hdhrForm(a, null); else tunerActions(a, tuners.get(w));
@@ -450,8 +461,11 @@ final class Menus {
             row(a, list, "◐  " + groupTitle(GROUP_APPEARANCE), "theme, glass effect, app mode, start-up screen, side menu order, Exit button, guide rows, live preview, watched series, play next, movie and series info, IMDb ratings", () -> settingsGroup(a, GROUP_APPEARANCE));
             row(a, list, "⟳  " + groupTitle(GROUP_BACKUP), "back up, restore, check for updates  •  WygTV " + Updater.installedName(a), () -> settingsGroup(a, GROUP_BACKUP));
         } else if (g.equals(GROUP_PLAYLISTS)) {
-            row(a, list, "Manage playlists", (active == null ? "none" : "Watching " + active.optString("title") + "  (" + (a.library.activeIsHdhr() ? "HDHomeRun" : m3u ? "M3U" : "Xtream Codes") + ")") + "  •  press OK to add, edit, refresh or delete playlists", () -> a.playlists());
-            java.util.List<JSONObject> tuners = Antenna.tuners(a);
+            row(a, list, "Manage playlists", Manage.playlistSummary(a) + "  •  press OK to add, edit, refresh, delete or turn playlists on and off", () -> a.playlists());
+            final int onOffRow = list.getChildCount();
+            row(a, list, "Turn playlists on or off", Manage.playlistSummary(a) + "  •  press OK to tick the playlists to use. Unticked ones are skipped in menus, guides, Search and updates",
+                    () -> Manage.playlistsOnOff(a, () -> settings(a, onOffRow)));
+            java.util.List<JSONObject> tuners = Antenna.allTuners(a);
             row(a, list, "HDHomeRun antenna TV", tuners.isEmpty()
                     ? "not added  •  press OK to add your tuner. Its channels show in Live TV as " + Antenna.DEFAULT_NAME
                     : (tuners.size() == 1 ? describe(tuners.get(0)) : tuners.size() + " tuners") + "  •  press OK to add, edit, refresh or remove",
@@ -611,7 +625,7 @@ final class Menus {
     }
 
     /** Back to Settings > Manage playlists, on the HDHomeRun row (after a tuner form or change). */
-    static void backToTuners(MainActivity a) { settingsGroup = GROUP_PLAYLISTS; settings(a, 1); }
+    static void backToTuners(MainActivity a) { settingsGroup = GROUP_PLAYLISTS; settings(a, 2); }
 
     static String groupTitle(String group) {
         switch (group) {
