@@ -149,7 +149,7 @@ final class TvGuide {
         bar.addView(clock, new LinearLayout.LayoutParams(-2, -1));
         a.root.addView(bar, 0, new LinearLayout.LayoutParams(-1, a.dp(44)));
         a.status.setLayoutParams(new LinearLayout.LayoutParams(-1, a.dp(24)));
-        a.status.setText("OK  Watch full screen      ◀ ▶  Move through time      ▲ ▼  Change channel      " + ("fav".equals(a.category) ? "" : "Hold OK  ★ Favorite      ") + "▲ from the top  Pick Favorites or a category, or Search      BACK  " + (a.liveOnly() ? "Exit" : "Live TV"));
+        a.status.setText("OK  Watch full screen      ◀ ▶  Move through time      ▲ ▼  Change channel      " + "Hold OK  Favorite, hide, group      " + "▲ from the top  Pick Favorites or a category, or Search      BACK  " + (a.liveOnly() ? "Exit" : "Live TV"));
 
         int screenW = a.getResources().getDisplayMetrics().widthPixels;
         chanW = a.dp(200);
@@ -406,7 +406,7 @@ final class TvGuide {
                 startPreview(row);
             } else playFullScreen(row);
         });
-        v.setOnLongClickListener(view -> { toggleFavorite(row); return true; });
+        v.setOnLongClickListener(view -> { options(row); return true; });
         if (topRow(row)) v.setNextFocusUpId(sourceId);
         v.setOnKeyListener((view, key, e) -> {
             if (e.getAction() != KeyEvent.ACTION_DOWN) return false;
@@ -580,13 +580,20 @@ final class TvGuide {
         return Library.nameOf(p != null ? p : a.library.find(a.library.activeId()));
     }
 
-    /** Hold OK on a programme: add the channel to ★ Favorites, or take it off. */
-    private void toggleFavorite(int row) {
+    /** Hold OK on a programme: Favorites, Hide / Unhide or Add to channel group for this channel. */
+    private void options(int row) {
         JSONObject ch = channels.optJSONObject(row);
-        if (ch == null) return;
-        String ext = ch.optString("container_extension", "ts");
-        boolean added = a.toggleFavoriteIn(prefixOf(row), "live", streamId(row), ch.optString("name", "Channel"), ext.isEmpty() ? "ts" : ext);
-        android.widget.Toast.makeText(a, added ? "★ Added to Favorites" : "Removed from Favorites", android.widget.Toast.LENGTH_SHORT).show();
+        final int s = session;
+        GuideOptions.show(a, ch, (hidden, fav) -> {
+            if (s != session) return;
+            // A hidden channel (or one taken off Favorites while showing Favorites) leaves the list.
+            if (hidden || (!fav && "fav".equals(a.category))) {
+                if (row < channels.length() && channels.optJSONObject(row) == ch) channels.remove(row);
+                focusRow = Math.max(0, Math.min(row, channels.length() - 1));
+                page = focusRow / PAGE;
+            }
+            buildRows();
+        });
     }
 
     /** The channel's playlist when it isn't the active one, else null. */
