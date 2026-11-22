@@ -1,0 +1,3 @@
+// WygOTA for Ubuntu / desktop Linux. A separate Gradle build (no Android SDK needed) that compiles the
+// HDHomeRun code straight from the Android app, so both apps find tuners and read lineups the same way.
+rootProject.name = 'wygota'

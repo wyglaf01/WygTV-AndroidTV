@@ -303,7 +303,7 @@ final class Menus {
                 + "(shown in your router, or at my.hdhomerun.com).");
         TextView connect = a.button("Save & load channels", form, () -> connectTuner(a, existing, title.getText().toString().trim(), host.getText().toString(), epg.getText().toString().trim()));
         a.button("⌕  Find tuners on my network", form, () -> findTuners(a, existing, title, host, epg));
-        a.button("Cancel", form, () -> { if (a.library.isEmpty()) setup(a); else settings(a); });
+        a.button("Cancel", form, () -> { if (!a.library.isEmpty()) settings(a); else if (Brand.OTA) a.finish(); else setup(a); });
         (existing == null ? connect : host).requestFocus();
     }
 
@@ -424,7 +424,7 @@ final class Menus {
         boolean m3u = a.library.activeIsM3u();
         JSONObject active = a.library.find(a.library.activeId());
 
-        row(a, list, "Manage playlists", (active == null ? "none" : "Watching " + active.optString("title") + "  (" + (a.library.activeIsHdhr() ? "HDHomeRun" : m3u ? "M3U" : "Xtream Codes") + ")") + "  •  press OK to add, edit, refresh or delete playlists", () -> a.playlists());
+        if (!Brand.OTA) row(a, list, "Manage playlists", (active == null ? "none" : "Watching " + active.optString("title") + "  (" + (a.library.activeIsHdhr() ? "HDHomeRun" : m3u ? "M3U" : "Xtream Codes") + ")") + "  •  press OK to add, edit, refresh or delete playlists", () -> a.playlists());
         java.util.List<JSONObject> tuners = Antenna.tuners(a);
         row(a, list, "HDHomeRun antenna TV", tuners.isEmpty()
                 ? "not added  •  press OK to add your tuner. Its channels show in Live TV as " + Antenna.DEFAULT_NAME
@@ -432,7 +432,7 @@ final class Menus {
                 () -> { if (tuners.isEmpty()) hdhrForm(a, null); else tunerList(a); });
         final int modeRow = list.getChildCount();
         boolean liveOnly = a.liveOnly();
-        row(a, list, "App mode", liveOnly ? "Live TV only  •  opens on the TV guide; press OK for the full app" : "Full  •  press OK for Live TV only (opens on the TV guide, hides Movies and Series)", () -> {
+        if (!Brand.OTA) row(a, list, "App mode", liveOnly ? "Live TV only  •  opens on the TV guide; press OK for the full app" : "Full  •  press OK for Live TV only (opens on the TV guide, hides Movies and Series)", () -> {
             a.prefs.edit().putBoolean("live_only", !a.liveOnly()).apply();
             Toast.makeText(a, a.liveOnly() ? "Live TV only. Settings stays in the side menu to switch back." : "Full app is back.", Toast.LENGTH_LONG).show();
             settings(a, modeRow);
@@ -509,9 +509,9 @@ final class Menus {
                 : extraCount + (extraCount == 1 ? " link" : " links") + "  •  " + (a.library.extras.first() ? "used first, the playlist's guide fills the rest" : "fill in channels the playlist's guide leaves empty"),
                 () -> extraGuides(a, extraRow));
         final int tmdbRow = list.getChildCount();
-        keyRow(a, list, "Movie & series info (TMDb)", Tmdb.PREF_KEY, Tmdb.builtInKey(), "TMDb", "posters, plots, cast and ratings", tmdbRow);
+        if (!Brand.OTA) keyRow(a, list, "Movie & series info (TMDb)", Tmdb.PREF_KEY, Tmdb.builtInKey(), "TMDb", "posters, plots, cast and ratings", tmdbRow);
         final int omdbRow = list.getChildCount();
-        keyRow(a, list, "IMDb ratings (OMDb)", Omdb.PREF_KEY, Omdb.builtInKey(), "OMDb", "IMDb, Rotten Tomatoes and Metacritic ratings, plus plots and cast", omdbRow);
+        if (!Brand.OTA) keyRow(a, list, "IMDb ratings (OMDb)", Omdb.PREF_KEY, Omdb.builtInKey(), "OMDb", "IMDb, Rotten Tomatoes and Metacritic ratings, plus plots and cast", omdbRow);
         final int hiddenRow = list.getChildCount();
         int hidden = a.hiddenCount();
         row(a, list, "Hidden categories and channels", hidden == 0 ? "nothing hidden" : hidden + " hidden  •  press OK to show them all again", () -> {
@@ -526,17 +526,17 @@ final class Menus {
             new Dialogs.Builder(a).setTitle("Clear Recently watched?").setPositiveButton("Clear", (d, w) -> { a.library.clearRecent(); settings(a, recentRow); })
                     .setNegativeButton("Cancel", null).show();
         });
-        row(a, list, "Back up playlists", "save playlists, favorites, your categories, My List, hidden items and all settings to a dated WygTV backup file", () -> Backup.backup(a));
-        row(a, list, "Restore from a backup", "reload everything from a WygTV backup file", () -> Backup.restore(a));
-        row(a, list, "Check for updates", "WygTV " + Updater.installedName(a) + "  •  press OK to look for a newer version and install it over this one", () -> Updater.check(a, true));
+        row(a, list, "Back up playlists", "save playlists, favorites, your categories, My List, hidden items and all settings to a dated " + Brand.NAME + " backup file", () -> Backup.backup(a));
+        row(a, list, "Restore from a backup", "reload everything from a " + Brand.NAME + " backup file", () -> Backup.restore(a));
+        row(a, list, "Check for updates", Brand.NAME + " " + Updater.installedName(a) + "  •  press OK to look for a newer version and install it over this one", () -> Updater.check(a, true));
         final int autoRow = list.getChildCount();
         boolean auto = a.prefs.getBoolean(Updater.PREF_AUTO, true);
-        row(a, list, "Look for updates at start-up", auto ? "On  •  offers new versions when WygTV opens" : "Off", () -> {
+        row(a, list, "Look for updates at start-up", auto ? "On  •  offers new versions when " + Brand.NAME + " opens" : "Off", () -> {
             a.prefs.edit().putBoolean(Updater.PREF_AUTO, !a.prefs.getBoolean(Updater.PREF_AUTO, true)).apply();
             settings(a, autoRow);
         });
         String version = Updater.installedName(a);
-        final String about = "WygTV " + version + " for Android TV";
+        final String about = Brand.NAME + " " + version + (Brand.OTA ? " • antenna TV from HDHomeRun" : " for Android TV");
         row(a, list, "About", about, () -> Toast.makeText(a, about, Toast.LENGTH_SHORT).show());
         int i = Math.max(0, Math.min(focusIndex, list.getChildCount() - 1));
         list.getChildAt(i).requestFocus();

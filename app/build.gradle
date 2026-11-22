@@ -1,11 +1,19 @@
 plugins { id 'com.android.application' }
 android { namespace 'com.wygtv.tv'; compileSdk 35
-    defaultConfig { applicationId 'com.wygtv.tv'; minSdk 23; targetSdk 28; versionCode((System.getenv('GITHUB_RUN_NUMBER') ?: '1') as int); versionName "1.0.${System.getenv('GITHUB_RUN_NUMBER') ?: '0'}"
+    defaultConfig { minSdk 23; targetSdk 28; versionCode((System.getenv('GITHUB_RUN_NUMBER') ?: '1') as int); versionName "1.0.${System.getenv('GITHUB_RUN_NUMBER') ?: '0'}"
         // Optional TMDb key for movie/series details, from the GitHub secret TMDB_API_KEY (Settings can override it).
         buildConfigField 'String', 'TMDB_API_KEY', "\"${(System.getenv('TMDB_API_KEY') ?: '').replaceAll('[^A-Za-z0-9._-]', '')}\""
         // Eddie's OMDb key is the default (a GitHub secret OMDB_API_KEY replaces it; Settings overrides both).
         buildConfigField 'String', 'OMDB_API_KEY', "\"${(System.getenv('OMDB_API_KEY') ?: '5b5c4d64').replaceAll('[^A-Za-z0-9._-]', '')}\"" }
     buildFeatures { buildConfig true }
+    // Two apps from one codebase. WygTV: IPTV playlists, movies, series and antenna TV.
+    // WygOTA: only live over-the-air TV from an HDHomeRun tuner (own app id, name and icon,
+    // so both can be installed side by side).
+    flavorDimensions 'app'
+    productFlavors {
+        wygtv { dimension 'app'; applicationId 'com.wygtv.tv'; buildConfigField 'boolean', 'OTA', 'false'; resValue 'string', 'app_name', 'WygTV' }
+        wygota { dimension 'app'; applicationId 'com.wygtv.ota'; buildConfigField 'boolean', 'OTA', 'true'; resValue 'string', 'app_name', 'WygOTA' }
+    }
     // Preserve the existing sideloaded TV runtime behavior; Play target migration needs device testing.
     lint { warning 'ExpiredTargetSdkVersion' }
     // Permanent WygTV signing key, given to CI as GitHub secrets (never committed), so each
