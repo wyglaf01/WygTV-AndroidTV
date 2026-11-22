@@ -231,6 +231,8 @@ final class TvRemote {
     boolean handleKey(KeyEvent e) {
         int key = e.getKeyCode();
         if (a.mode.equals("player") && a.player != null && view != null) return playerKey(e, key);
+        // Up/Down in a menu column (side menu, Live TV / Movies / Series menu) stay in it; only sideways leaves.
+        if (FocusWrap.menuKey(a.getCurrentFocus(), e)) return true;
         if (e.getAction() != KeyEvent.ACTION_DOWN) return false;
         return listKey(e, key);
     }

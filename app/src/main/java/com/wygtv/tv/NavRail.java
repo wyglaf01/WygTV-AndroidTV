@@ -57,37 +57,69 @@ final class NavRail {
         this.a = a;
         rail = new LinearLayout(a);
         rail.setOrientation(LinearLayout.VERTICAL);
+        rail.setTag(FocusWrap.MENU); // Up/Down stay in the menu (FocusWrap.menuKey), wrapping at the ends
         rail.setPadding(a.dp(8), a.dp(16), a.dp(8), a.dp(12));
         rail.setBackground(background(false));
         boolean m3u = a.library.activeIsM3u();
+        // Each movable entry under its Settings → Appearance → Side menu order key; laid out in the saved order.
+        java.util.Map<String, Runnable> entries = new java.util.HashMap<>();
         if (a.liveOnly()) {
             // Live TV only (Settings → App mode): the guide is the main screen, plus Live TV and Settings.
-            add("▦", "TV Guide", "guide", current, () -> a.openGuide(null));
-            add("★", "Favorites", "fav", current, () -> LiveMenu.openAt(a, "fav", true));
-            add("▣", "Live TV", "live", current, () -> a.browse("live"));
-            add("⌕", "Search channels", "search", current, () -> a.searchLive());
-            rail.addView(new View(a), new LinearLayout.LayoutParams(-1, 0, 1));
-            add("⚙", "Settings", "settings", current, () -> a.settings());
-            lockEnds();
-            return;
+            entries.put("guide", () -> add("▦", "TV Guide", "guide", current, () -> a.openGuide(null)));
+            entries.put("fav", () -> add("★", "Favorites", "fav", current, () -> LiveMenu.openAt(a, "fav", true)));
+            entries.put("live", () -> add("▣", "Live TV", "live", current, () -> a.browse("live")));
+            entries.put("msearch", () -> add("⌕", "Search channels", "search", current, () -> a.searchLive()));
+            entries.put("settings", () -> add("⚙", "Settings", "settings", current, () -> a.settings()));
+        } else {
+            entries.put("home", () -> add("⌂", "Home", "home", current, () -> a.home()));
+            entries.put("guide", () -> add("▦", "TV Guide", "guide", current, () -> a.openGuide(null)));
+            entries.put("fav", () -> add("★", "Favorites", "fav", current, () -> LiveMenu.openAt(a, "fav", true)));
+            entries.put("live", () -> add("▣", "Live TV", "live", current, () -> a.browse("live")));
+            if (!m3u) {
+                entries.put("vod", () -> add("▶", "Movies", "vod", current, () -> a.browse("vod")));
+                entries.put("series", () -> add("▤", "Series", "series", current, () -> a.browse("series")));
+            }
+            java.util.List<org.json.JSONObject> tuners = Antenna.tuners(a);
+            if (!tuners.isEmpty()) entries.put("antenna", () -> {
+                for (org.json.JSONObject t : tuners) { // each HDHomeRun tuner
+                    String id = Antenna.PREFIX + t.optString("id");
+                    add("📡", Antenna.nameOf(t), id, current, () -> a.showGuide(id, null, true)); // full TV guide of its channels
+                }
+            });
+            entries.put("msearch", () -> add("⌕", "Search", "msearch", current, () -> MasterSearch.show(a)));
+            entries.put("playlists", () -> add("☰", "Playlists", "playlists", current, () -> a.playlists()));
+            entries.put("settings", () -> add("⚙", "Settings", "settings", current, () -> a.settings()));
         }
-        add("⌂", "Home", "home", current, () -> a.home());
-        add("▦", "TV Guide", "guide", current, () -> a.openGuide(null));
-        add("★", "Favorites", "fav", current, () -> LiveMenu.openAt(a, "fav", true));
-        add("▣", "Live TV", "live", current, () -> a.browse("live"));
-        if (!m3u) {
-            add("▶", "Movies", "vod", current, () -> a.browse("vod"));
-            add("▤", "Series", "series", current, () -> a.browse("series"));
+        java.util.List<String> keys = new ArrayList<>();
+        for (String k : MenuOrder.get(a.prefs)) if (entries.containsKey(k)) keys.add(k);
+        int gap = MenuOrder.gapBefore(keys);
+        for (int i = 0; i < keys.size(); i++) {
+            if (i == gap) rail.addView(new View(a), new LinearLayout.LayoutParams(-1, 0, 1));
+            entries.get(keys.get(i)).run();
         }
-        for (org.json.JSONObject t : Antenna.tuners(a)) { // each HDHomeRun tuner, when there is one
-            String id = Antenna.PREFIX + t.optString("id");
-            add("📡", Antenna.nameOf(t), id, current, () -> a.showGuide(id, null, true)); // full TV guide of its channels
-        }
-        add("⌕", "Search", "msearch", current, () -> MasterSearch.show(a));
-        rail.addView(new View(a), new LinearLayout.LayoutParams(-1, 0, 1));
-        add("☰", "Playlists", "playlists", current, () -> a.playlists());
-        add("⚙", "Settings", "settings", current, () -> a.settings());
+        if (gap >= keys.size()) rail.addView(new View(a), new LinearLayout.LayoutParams(-1, 0, 1));
+        // Small Exit at the very bottom: asks "Quit WygTV?" first.
+        add("⏻", "Exit", "exit", current, () -> a.confirmExit());
+        TextView exit = items.get(items.size() - 1);
+        exit.setTextSize(16);
+        exit.getLayoutParams().height = a.dp(34);
+        exit.setTextColor(Theme.MUTED);
+        fitHeight();
         lockEnds();
+    }
+
+    /** With many entries (several tuners), shrink the rows so every one fits on screen and none hides below the edge. */
+    private void fitHeight() {
+        int screen = a.getResources().getDisplayMetrics().heightPixels;
+        int room = screen - a.dp(16 + 12) - items.size() * a.dp(4);
+        int want = 0;
+        for (TextView v : items) want += v.getLayoutParams().height;
+        if (want <= room) return;
+        float k = Math.max(0.6f, room / (float) want);
+        for (TextView v : items) {
+            v.getLayoutParams().height = Math.round(v.getLayoutParams().height * k);
+            v.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, v.getTextSize() * Math.max(0.75f, k));
+        }
     }
 
     /**
