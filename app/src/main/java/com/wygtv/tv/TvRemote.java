@@ -411,7 +411,7 @@ final class TvRemote {
         ui.removeCallbacks(hideBanner);
         if (!isLive()) {
             boolean fav = a.isFavorite(type, id);
-            new AlertDialog.Builder(a).setTitle(title)
+            new Dialogs.Builder(a).setTitle(title)
                     .setItems(new String[]{fav ? "Remove from Favorites" : "Add to Favorites", "Exit player"}, (d, w) -> {
                         if (w == 0) toast(a.toggleFavorite(type, id, title, ext) ? "Added to Favorites" : "Removed from Favorites");
                         else a.onBackPressed();
@@ -419,7 +419,7 @@ final class TvRemote {
             return;
         }
         boolean fav = a.isFavorite("live", id);
-        new AlertDialog.Builder(a).setTitle(title)
+        new Dialogs.Builder(a).setTitle(title)
                 .setItems(new String[]{fav ? "Remove from Favorites" : "Add to Favorites", "What's on (program guide)", "TV guide", "Channel list", "Exit player"}, (d, w) -> {
                     if (w == 0) toast(a.toggleFavorite("live", id, title, ext) ? "Added to Favorites" : "Removed from Favorites");
                     else if (w == 1) a.guide(id, title);
@@ -439,7 +439,7 @@ final class TvRemote {
             names[i] = (num.isEmpty() ? String.valueOf(i + 1) : num) + "   " + (o == null ? "" : o.optString("name"));
         }
         final JSONArray list = zapList;
-        AlertDialog d = new AlertDialog.Builder(a).setTitle("Channels").setSingleChoiceItems(names, Math.max(0, zapIndex), (dialog, which) -> {
+        AlertDialog d = new Dialogs.Builder(a).setTitle("Channels").setSingleChoiceItems(names, Math.max(0, zapIndex), (dialog, which) -> {
             dialog.dismiss();
             if (which != zapIndex || list != zapList) switchTo(list, which);
         }).create();
