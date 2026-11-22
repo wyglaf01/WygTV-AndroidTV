@@ -75,8 +75,11 @@ final class Menus {
     // ------------------------------------------------------------------ playlists manager
 
     static void playlists(MainActivity a) {
+        boolean fromSettings = playlistsFromSettings;
         a.mode = "playlists";
-        a.shell("PLAYLISTS");
+        a.shell(fromSettings ? "SETTINGS  •  PLAYLISTS" : "PLAYLISTS");
+        // Opened from Settings > Manage playlists: the Settings tree stays collapsed on the left, Manage playlists marked.
+        if (fromSettings) settingsTree(a, GROUP_PLAYLISTS);
         LinearLayout list = column(a);
         note(a, list, "Every playlist that is on is ready to watch at once in Live TV, Movies, Series, the TV guide and Search. Press OK on a playlist to turn it on or off, edit it, refresh it or delete it.");
         JSONArray all = a.library.all();
@@ -459,17 +462,19 @@ final class Menus {
         a.mode = "settings";
         String g = settingsGroup;
         a.shell(g.isEmpty() ? "SETTINGS" : "SETTINGS  •  " + groupTitle(g).toUpperCase(java.util.Locale.ROOT));
+        // Inside a group, the Settings groups stay on the left as a narrow column (the menu tree, collapsed upward).
+        if (!g.isEmpty()) settingsTree(a, g);
         LinearLayout list = column(a);
         boolean m3u = a.library.activeIsM3u();
         JSONObject active = a.library.find(a.library.activeId());
         boolean liveOnly = a.liveOnly();
         if (g.isEmpty()) {
-            row(a, list, "▤  " + groupTitle(GROUP_PLAYLISTS), "playlists, HDHomeRun, manage categories, hide and show channels, channel groups, TV guides (EPG)", () -> settingsGroup(a, GROUP_PLAYLISTS));
-            row(a, list, "▶  " + groupTitle(GROUP_PLAYER), "built-in or external player, live stream format, buffer, video decoder, subtitles, watched series, play next", () -> settingsGroup(a, GROUP_PLAYER));
-            row(a, list, "◐  " + groupTitle(GROUP_APPEARANCE), "theme, glass effect, app mode, start-up screen, side menu order, Exit button, guide rows, channel order, live preview, movie and series info, IMDb ratings", () -> settingsGroup(a, GROUP_APPEARANCE));
-            row(a, list, "⟳  " + groupTitle(GROUP_BACKUP), "back up, restore, check for updates  •  WygTV " + Updater.installedName(a), () -> settingsGroup(a, GROUP_BACKUP));
+            row(a, list, groupIcon(GROUP_PLAYLISTS) + "  " + groupTitle(GROUP_PLAYLISTS), "playlists, HDHomeRun, manage categories, hide and show channels, channel groups, TV guides (EPG)", () -> settingsGroup(a, GROUP_PLAYLISTS));
+            row(a, list, groupIcon(GROUP_PLAYER) + "  " + groupTitle(GROUP_PLAYER), "built-in or external player, live stream format, buffer, video decoder, subtitles, watched series, play next", () -> settingsGroup(a, GROUP_PLAYER));
+            row(a, list, groupIcon(GROUP_APPEARANCE) + "  " + groupTitle(GROUP_APPEARANCE), "theme, glass effect, app mode, start-up screen, side menu order, Exit button, guide rows, channel order, live preview, movie and series info, IMDb ratings", () -> settingsGroup(a, GROUP_APPEARANCE));
+            row(a, list, groupIcon(GROUP_BACKUP) + "  " + groupTitle(GROUP_BACKUP), "back up, restore, check for updates  •  WygTV " + Updater.installedName(a), () -> settingsGroup(a, GROUP_BACKUP));
         } else if (g.equals(GROUP_PLAYLISTS)) {
-            row(a, list, "Manage playlists", Manage.playlistSummary(a) + "  •  press OK to add, edit, refresh, delete or turn playlists on and off", () -> a.playlists());
+            row(a, list, "Manage playlists", Manage.playlistSummary(a) + "  •  press OK to add, edit, refresh, delete or turn playlists on and off", () -> { playlistsFromSettings = true; playlists(a); });
             final int onOffRow = list.getChildCount();
             row(a, list, "Turn playlists on or off", Manage.playlistSummary(a) + "  •  press OK to tick the playlists to use. Unticked ones are skipped in menus, guides, Search and updates",
                     () -> Manage.playlistsOnOff(a, () -> settings(a, onOffRow)));
@@ -670,6 +675,35 @@ final class Menus {
         }
         int i = Math.max(0, Math.min(focusIndex, list.getChildCount() - 1));
         list.getChildAt(i).requestFocus();
+    }
+
+    /** Icon shown for each Settings group, on the top page and in the collapsed tree column. */
+    static String groupIcon(String group) {
+        switch (group) {
+            case GROUP_PLAYLISTS: return "▤";
+            case GROUP_PLAYER: return "▶";
+            case GROUP_APPEARANCE: return "◐";
+            default: return "⟳";
+        }
+    }
+
+    /** The collapsed Settings tree on the left of a group page: All settings, then the four groups, {@code here} marked. */
+    static void settingsTree(MainActivity a, String here) {
+        TreeMenu.begin(a);
+        TreeMenu.heading(a, "SETTINGS");
+        TreeMenu.entry(a, "⚙", "All settings", false, () -> settings(a));
+        for (String g : GROUPS) TreeMenu.entry(a, groupIcon(g), groupTitle(g), g.equals(here), () -> settingsGroup(a, g));
+    }
+
+    /** True while the Playlists page was opened from Settings > Manage playlists (Back returns there). */
+    static boolean playlistsFromSettings;
+
+    /** Back on the Playlists page: to Settings > Manage playlists when it was opened from there. */
+    static boolean playlistsBack(MainActivity a) {
+        if (!playlistsFromSettings) return false;
+        playlistsFromSettings = false;
+        settingsGroup(a, GROUP_PLAYLISTS);
+        return true;
     }
 
     /** Back to Settings > Manage playlists, on the HDHomeRun row (after a tuner form or change). */
@@ -989,7 +1023,8 @@ final class Menus {
 
     private static LinearLayout column(MainActivity a) {
         ScrollView sv = new ScrollView(a);
-        a.body.addView(sv, new LinearLayout.LayoutParams(-1, -1));
+        a.body.addView(sv, new LinearLayout.LayoutParams(0, -1, 1));
+        TreeMenu.page(sv);
         LinearLayout list = new LinearLayout(a);
         list.setOrientation(LinearLayout.VERTICAL);
         list.setPadding(a.dp(40), 0, a.dp(40), 0);

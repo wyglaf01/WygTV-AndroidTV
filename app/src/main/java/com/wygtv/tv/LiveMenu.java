@@ -274,15 +274,16 @@ final class LiveMenu {
     private static boolean collapsed;
 
     /**
-     * Called by browse("live") with the menu column. Once you pick something and focus moves into the guide or the
+     * Called by browse() (Live TV, Movies and Series) with the menu column. Once you pick something and focus moves into the guide or the
      * preview, the menu shrinks to a narrow column on the left (short one-line labels); moving back into it opens
      * it to full width again.
      */
     static void watchFocus(MainActivity a, android.view.View categoryScroll) {
         menuScroll = categoryScroll;
         collapsed = false;
+        String screen = a.mode; // Live TV, Movies or Series
         android.view.ViewTreeObserver.OnGlobalFocusChangeListener track = (oldFocus, newFocus) -> {
-            if (newFocus == null || menuScroll != categoryScroll || !"live".equals(a.mode)) return;
+            if (newFocus == null || menuScroll != categoryScroll || !screen.equals(a.mode)) return;
             if (inside(newFocus, categoryScroll)) setCollapsed(a, false);
             else if (parentScroll == null || !inside(newFocus, parentScroll)) setCollapsed(a, true);
         };
