@@ -149,7 +149,7 @@ final class TvGuide {
         bar.addView(clock, new LinearLayout.LayoutParams(-2, -1));
         a.root.addView(bar, 0, new LinearLayout.LayoutParams(-1, a.dp(44)));
         a.status.setLayoutParams(new LinearLayout.LayoutParams(-1, a.dp(24)));
-        a.status.setText("OK  Watch full screen      ◀ ▶  Move through time      ▲ ▼  Change channel      " + ("fav".equals(a.category) ? "" : "◀ to ☆  Favorite      ") + "▲ from the top  Pick Favorites or a category, or Search      BACK  " + (a.liveOnly() ? "Exit" : "Live TV"));
+        a.status.setText("OK  Watch full screen      ◀ ▶  Move through time      ▲ ▼  Change channel      " + ("fav".equals(a.category) ? "" : "Hold OK  ★ Favorite      ") + "▲ from the top  Pick Favorites or a category, or Search      BACK  " + (a.liveOnly() ? "Exit" : "Live TV"));
 
         int screenW = a.getResources().getDisplayMetrics().widthPixels;
         chanW = a.dp(200);
@@ -310,43 +310,15 @@ final class TvGuide {
         if (ch == null) return;
         LinearLayout row = new LinearLayout(a);
         rows.addView(row, new LinearLayout.LayoutParams(-1, a.dp(40)));
-        // Star at the start of the row: Left from the first programme reaches it, OK adds or removes the favorite.
-        final String sid = ch.optString("stream_id"), chName = ch.optString("name", "Channel"), pre = prefixOf(i);
-        TextView star = text(a.isFavoriteIn(pre, "live", sid) ? "★" : "☆", 20, a.isFavoriteIn(pre, "live", sid) ? Theme.ACCENT : Theme.MUTED, true);
-        star.setGravity(Gravity.CENTER);
-        star.setFocusable(true);
-        star.setClickable(true);
-        star.setContentDescription("Favorite");
-        if (topRow(i)) star.setNextFocusUpId(sourceId);
-        star.setBackground(rowBg(false));
-        star.setOnFocusChangeListener((v, f) -> {
-            star.setBackground(rowBg(f));
-            star.setTextColor(f ? Theme.INK : a.isFavoriteIn(pre, "live", sid) ? Theme.ACCENT : Theme.MUTED);
-        });
-        star.setOnClickListener(v -> {
-            String ext = ch.optString("container_extension", "ts");
-            boolean added = a.toggleFavoriteIn(pre, "live", sid, chName, ext.isEmpty() ? "ts" : ext);
-            star.setText(added ? "★" : "☆");
-            if (!star.hasFocus()) star.setTextColor(added ? Theme.ACCENT : Theme.MUTED);
-            android.widget.Toast.makeText(a, added ? "★ Added to Favorites" : "Removed from Favorites", android.widget.Toast.LENGTH_SHORT).show();
-        });
-        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(a.dp(36), -1);
-        sp.setMargins(0, a.dp(2), a.dp(4), a.dp(2));
-        row.addView(star, sp);
-        // Showing Favorites: every row is a favorite, so the star is left out.
-        boolean favList = "fav".equals(a.category);
-        if (favList) star.setVisibility(android.view.View.GONE);
-        String num = ch.optString("num", "");
-        String label = (num.isEmpty() || num.equals("0") || mixed ? "" : num + "   ") + ch.optString("name", "Channel");
-        TextView name = text(label, 14, Theme.TEXT, true);
+        // Just the channel's logo, its name and (small, underneath) its category; hold OK on a programme for ★ Favorites.
+        String chLabel = ch.optString("name", "Channel"), sub = subLabel(i);
+        TextView name = text(chLabel, 14, Theme.TEXT, true);
         name.setSingleLine(true);
-        if (mixed) {
-            // Channels from more than one playlist: a small second line says which one.
-            String from = Library.nameOf(otherPlaylist(i) != null ? otherPlaylist(i) : a.library.find(a.library.activeId()));
-            android.text.SpannableString two = new android.text.SpannableString(label + "\n" + from);
-            two.setSpan(new android.text.style.RelativeSizeSpan(.72f), label.length() + 1, two.length(), 0);
-            two.setSpan(new android.text.style.ForegroundColorSpan(Theme.MUTED), label.length() + 1, two.length(), 0);
-            two.setSpan(new android.text.style.StyleSpan(Typeface.NORMAL), label.length() + 1, two.length(), 0);
+        if (!sub.isEmpty()) {
+            android.text.SpannableString two = new android.text.SpannableString(chLabel + "\n" + sub);
+            two.setSpan(new android.text.style.RelativeSizeSpan(.72f), chLabel.length() + 1, two.length(), 0);
+            two.setSpan(new android.text.style.ForegroundColorSpan(Theme.MUTED), chLabel.length() + 1, two.length(), 0);
+            two.setSpan(new android.text.style.StyleSpan(Typeface.NORMAL), chLabel.length() + 1, two.length(), 0);
             name.setSingleLine(false);
             name.setMaxLines(2);
             name.setLineSpacing(0, .9f);
@@ -356,7 +328,7 @@ final class TvGuide {
         name.setPadding(a.dp(12), 0, a.dp(8), 0);
         name.setBackground(rowBg(false));
         ChannelIcons.attach(name, ch.optString("stream_icon"), ch.optString("name", "Channel"), 24);
-        LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(favList ? chanW : chanW - a.dp(40), -1);
+        LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(chanW, -1);
         np.setMargins(0, a.dp(2), a.dp(8), a.dp(2));
         row.addView(name, np);
         LinearLayout cells = new LinearLayout(a);
@@ -434,6 +406,7 @@ final class TvGuide {
                 startPreview(row);
             } else playFullScreen(row);
         });
+        v.setOnLongClickListener(view -> { toggleFavorite(row); return true; });
         if (topRow(row)) v.setNextFocusUpId(sourceId);
         v.setOnKeyListener((view, key, e) -> {
             if (e.getAction() != KeyEvent.ACTION_DOWN) return false;
@@ -589,6 +562,31 @@ final class TvGuide {
     private String streamId(int row) {
         JSONObject ch = channels.optJSONObject(row);
         return ch == null ? "" : ch.optString("stream_id");
+    }
+
+    /** The small second line under a channel's name: its category, or (in a list mixing playlists) its playlist. */
+    private String subLabel(int row) {
+        JSONObject ch = channels.optJSONObject(row);
+        if (ch == null) return "";
+        if (otherPlaylist(row) == null) {
+            String cid = ch.optString("category_id");
+            for (int k = 0; !cid.isEmpty() && k < a.categories.length(); k++) {
+                JSONObject c = a.categories.optJSONObject(k);
+                if (c != null && cid.equals(c.optString("category_id"))) return c.optString("category_name");
+            }
+        }
+        if (!mixed) return categoryTitle;
+        JSONObject p = otherPlaylist(row);
+        return Library.nameOf(p != null ? p : a.library.find(a.library.activeId()));
+    }
+
+    /** Hold OK on a programme: add the channel to ★ Favorites, or take it off. */
+    private void toggleFavorite(int row) {
+        JSONObject ch = channels.optJSONObject(row);
+        if (ch == null) return;
+        String ext = ch.optString("container_extension", "ts");
+        boolean added = a.toggleFavoriteIn(prefixOf(row), "live", streamId(row), ch.optString("name", "Channel"), ext.isEmpty() ? "ts" : ext);
+        android.widget.Toast.makeText(a, added ? "★ Added to Favorites" : "Removed from Favorites", android.widget.Toast.LENGTH_SHORT).show();
     }
 
     /** The channel's playlist when it isn't the active one, else null. */
