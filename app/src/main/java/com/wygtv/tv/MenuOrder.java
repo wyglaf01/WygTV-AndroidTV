@@ -18,9 +18,12 @@ final class MenuOrder {
     private MenuOrder() { }
 
     static final String PREF = "menu_order";
-    /** Every side-menu item that can be moved. "antenna" stands for all HDHomeRun tuners together. */
-    static final String[] DEFAULT = {"home", "guide", "fav", "live", "vod", "series", "antenna", "msearch", "playlists", "settings"};
-    static final String[] LABELS = {"⌂  Home", "▦  TV Guide", "★  Favorites", "▣  Live TV", "▶  Movies", "▤  Series", "📡  Antenna TV", "⌕  Search", "☰  Playlists", "⚙  Settings"};
+    /**
+     * Every side-menu item that can be moved. "antenna" stands for all HDHomeRun tuners together. Favorites has no
+     * entry of its own (it is the first item inside Live TV); an old saved "fav" is dropped by {@link #parse}.
+     */
+    static final String[] DEFAULT = {"home", "guide", "live", "vod", "series", "antenna", "msearch", "playlists", "settings"};
+    static final String[] LABELS = {"⌂  Home", "▦  TV Guide", "▣  Live TV", "▶  Movies", "▤  Series", "📡  Antenna TV", "⌕  Search", "☰  Playlists", "⚙  Settings"};
 
     /** Settings → Appearance → "Exit button on Home". The side menu's Exit is always there. */
     static final String PREF_HOME_EXIT = "home_exit";
