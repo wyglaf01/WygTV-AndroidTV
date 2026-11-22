@@ -133,11 +133,19 @@ final class TvGuide {
         LinearLayout.LayoutParams sourceLp = new LinearLayout.LayoutParams(-2, a.dp(38));
         sourceLp.setMargins(a.dp(8), 0, a.dp(12), 0);
         source.setLayoutParams(sourceLp);
+        // Channel search (same screen as Live TV → Search): 3+ letters, every playlist, favorites from the results.
+        TextView find = a.button("⌕  Search", bar, a::searchLive);
+        find.setTextSize(15);
+        find.setSingleLine(true);
+        find.setPadding(a.dp(14), 0, a.dp(14), 0);
+        LinearLayout.LayoutParams findLp = new LinearLayout.LayoutParams(-2, a.dp(38));
+        findLp.setMargins(0, 0, a.dp(12), 0);
+        find.setLayoutParams(findLp);
         clock = text("", 20, Theme.ACCENT, true);
         bar.addView(clock, new LinearLayout.LayoutParams(-2, -1));
         a.root.addView(bar, 0, new LinearLayout.LayoutParams(-1, a.dp(44)));
         a.status.setLayoutParams(new LinearLayout.LayoutParams(-1, a.dp(24)));
-        a.status.setText("OK  Watch full screen      ◀ ▶  Move through time      ▲ ▼  Change channel      ◀ to ☆  Favorite      ▲ from the top  Pick Favorites or a category      BACK  " + (a.liveOnly() ? "Exit" : "Live TV"));
+        a.status.setText("OK  Watch full screen      ◀ ▶  Move through time      ▲ ▼  Change channel      ◀ to ☆  Favorite      ▲ from the top  Pick Favorites or a category, or Search      BACK  " + (a.liveOnly() ? "Exit" : "Live TV"));
 
         int screenW = a.getResources().getDisplayMetrics().widthPixels;
         chanW = a.dp(200);

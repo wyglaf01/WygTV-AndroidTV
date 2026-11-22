@@ -1,15 +1,17 @@
 package com.wygtv.tv;
 
 /**
- * Colour themes picked in Settings (Blue unless changed). Steampunk keeps the original brass-on-leather look and artwork;
+ * Colour themes picked in Settings (Royal blue & bronze unless changed). Steampunk keeps the original brass-on-leather look and artwork;
  * the others recolour every panel, button, menu and the guide, and wash the artwork in their own colour.
  */
 final class Theme {
-    static final String[] KEYS = {"steampunk", "blue", "cyan", "brown", "gold", "green"};
-    static final String[] LABELS = {"Steampunk (brass & leather)", "Blue (default)", "Cyan", "Brown", "Gold", "Green"};
+    static final String[] KEYS = {"royal", "steampunk", "blue", "cyan", "brown", "gold", "green"};
+    static final String[] LABELS = {"Royal blue & bronze (default)", "Steampunk (brass & leather)", "Blue", "Cyan", "Brown", "Gold", "Green"};
 
     // Order: BG, PANEL, PANEL_END, STROKE, STROKE_FOCUS, FOCUS, ACCENT, HEADER, TEXT, MUTED, HINT, INK, TILE_A, TILE_B, TILE_STROKE, COPPER, AIRING
     private static final int[][] PALETTES = {
+            // Royal blue panels with bronze trim, matching the launcher icon.
+            {0xff060C24, 0xff1A3480, 0xe60A1640, 0xffA8743A, 0xffF0C080, 0xff2D52C4, 0xffE6B070, 0xffD9A060, 0xffF4EFE6, 0xffC6CADD, 0xff8C93B8, 0xff1A0F04, 0xffF0C88A, 0xffB0743A, 0xffFFE6BC, 0xffCD7F32, 0xff23408F},
             {0xff140B06, 0xff3A2414, 0xe61C100A, 0xff8A6A3A, 0xffF0C878, 0xff9C5B22, 0xffEACB86, 0xffE8B86A, 0xffF5E8CA, 0xffD9BF94, 0xffB89F7C, 0xff2A1708, 0xffF0D797, 0xffBA904A, 0xffFFF0C1, 0xffD9822B, 0xff6E3E1C},
             {0xff070D1C, 0xff142A4E, 0xe60A1428, 0xff3F5F92, 0xff8FB8FF, 0xff2F5FB0, 0xff9CC3FF, 0xff8DB6F5, 0xffEAF1FF, 0xffB4C6E4, 0xff7F93B5, 0xff081428, 0xffA9CBFF, 0xff5D8FD9, 0xffE1ECFF, 0xff4C9BFF, 0xff1C3F78},
             {0xff04161A, 0xff0F3A42, 0xe6061F24, 0xff2F7A86, 0xff7FE7F2, 0xff148A98, 0xff8FEFF7, 0xff6FDCE8, 0xffE6FBFD, 0xffA8D9DE, 0xff6FA4AA, 0xff04191D, 0xff9FF3FA, 0xff3BBFCC, 0xffDDFCFF, 0xff22C8D8, 0xff12555F},
@@ -19,7 +21,7 @@ final class Theme {
     };
 
     /** Used when no theme has been picked in Settings. */
-    static final String DEFAULT = "blue";
+    static final String DEFAULT = "royal";
     static String key = DEFAULT;
     static int BG, PANEL, PANEL_END, STROKE, STROKE_FOCUS, FOCUS, ACCENT, HEADER, TEXT, MUTED, HINT, INK, TILE_A, TILE_B, TILE_STROKE, COPPER, AIRING;
 

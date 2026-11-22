@@ -129,11 +129,11 @@ final class Menus {
     private static void playlistActions(MainActivity a, JSONObject p) {
         boolean on = p.optString("id").equals(a.library.activeId());
         String[] items = {on ? "Go to Home" : "Watch this playlist", "Edit", "Refresh now", "Delete"};
-        new AlertDialog.Builder(a).setTitle(p.optString("title", "Playlist")).setItems(items, (d, which) -> {
+        new Dialogs.Builder(a).setTitle(p.optString("title", "Playlist")).setItems(items, (d, which) -> {
             if (which == 0) { a.switchPlaylist(p); a.home(); }
             else if (which == 1) { if (Library.M3U.equals(p.optString("type"))) m3uForm(a, p); else xtreamForm(a, p, null); }
             else if (which == 2) refresh(a, p);
-            else new AlertDialog.Builder(a).setTitle("Delete “" + p.optString("title", "Playlist") + "”?")
+            else new Dialogs.Builder(a).setTitle("Delete “" + p.optString("title", "Playlist") + "”?")
                         .setMessage("Its favorites stay saved, so they come back if you add the same playlist again.")
                         .setPositiveButton("Delete", (d2, w2) -> {
                             a.library.remove(p.optString("id"));
@@ -233,7 +233,7 @@ final class Menus {
             if (!(link.startsWith("http://") || link.startsWith("https://"))) { alert(a, "Enter a link that starts with http:// or https://."); return; }
             String[] xt = M3u.xtreamLogin(link);
             if (xt != null && existing == null) {
-                new AlertDialog.Builder(a).setTitle("This is an Xtream Codes link")
+                new Dialogs.Builder(a).setTitle("This is an Xtream Codes link")
                         .setMessage("Adding it as Xtream Codes also gives you Movies, Series and the provider's TV guide.")
                         .setPositiveButton("Add as Xtream", (d, w) -> xtreamForm(a, null, xt))
                         .setNegativeButton("Keep as M3U", (d, w) -> loadM3u(a, existing, title.getText().toString().trim(), link, epg.getText().toString().trim()))
@@ -314,6 +314,16 @@ final class Menus {
                         settings(a, formatRow);
                     }));
         }
+        final int subsLiveRow = list.getChildCount();
+        row(a, list, "Subtitles for Live TV", onOff(Subtitles.defaultOn(a.prefs, true)) + "  •  closed captions start on for every channel that sends them. Press OK to switch", () -> {
+            a.prefs.edit().putBoolean(Subtitles.PREF_LIVE, !Subtitles.defaultOn(a.prefs, true)).apply();
+            settings(a, subsLiveRow);
+        });
+        final int subsVodRow = list.getChildCount();
+        if (!liveOnly) row(a, list, "Subtitles for Movies and Series", onOff(Subtitles.defaultOn(a.prefs, false)) + "  •  press OK to switch. In the player, MENU > Subtitles picks a language", () -> {
+            a.prefs.edit().putBoolean(Subtitles.PREF_VOD, !Subtitles.defaultOn(a.prefs, false)).apply();
+            settings(a, subsVodRow);
+        });
         final int guideRow = list.getChildCount();
         String custom = a.saved("epg_url");
         String guideState = a.library.guideStatus();
@@ -323,18 +333,28 @@ final class Menus {
             new Thread(a.library::dropGuide).start();
             Toast.makeText(a, "The guide will reload the next time it's shown.", Toast.LENGTH_SHORT).show();
         });
+        final int extraRow = list.getChildCount();
+        int extraCount = a.library.extras.urls().size();
+        row(a, list, "Extra TV guides (XMLTV)", extraCount == 0
+                ? "none  •  press OK to add guide links that fill in channels with no program info"
+                : extraCount + (extraCount == 1 ? " link" : " links") + "  •  " + (a.library.extras.first() ? "used first, the playlist's guide fills the rest" : "fill in channels the playlist's guide leaves empty"),
+                () -> extraGuides(a, extraRow));
+        final int tmdbRow = list.getChildCount();
+        keyRow(a, list, "Movie & series info (TMDb)", Tmdb.PREF_KEY, Tmdb.builtInKey(), "TMDb", "posters, plots, cast and ratings", tmdbRow);
+        final int omdbRow = list.getChildCount();
+        keyRow(a, list, "IMDb ratings (OMDb)", Omdb.PREF_KEY, Omdb.builtInKey(), "OMDb", "IMDb, Rotten Tomatoes and Metacritic ratings, plus plots and cast", omdbRow);
         final int hiddenRow = list.getChildCount();
         int hidden = a.hiddenCount();
         row(a, list, "Hidden categories and channels", hidden == 0 ? "nothing hidden" : hidden + " hidden  •  press OK to show them all again", () -> {
             if (a.hiddenCount() == 0) { Toast.makeText(a, "Nothing is hidden.", Toast.LENGTH_SHORT).show(); return; }
-            new AlertDialog.Builder(a).setTitle("Show everything again?").setMessage("Every hidden category and channel in this playlist comes back.")
+            new Dialogs.Builder(a).setTitle("Show everything again?").setMessage("Every hidden category and channel in this playlist comes back.")
                     .setPositiveButton("Show all", (d, w) -> { a.unhideAll(); settings(a, hiddenRow); }).setNegativeButton("Cancel", null).show();
         });
         final int recentRow = list.getChildCount();
         int recent = a.library.recent().length();
         row(a, list, "Recently watched", recent == 0 ? "empty" : recent + " items  •  press OK to clear", () -> {
             if (a.library.recent().length() == 0) return;
-            new AlertDialog.Builder(a).setTitle("Clear Recently watched?").setPositiveButton("Clear", (d, w) -> { a.library.clearRecent(); settings(a, recentRow); })
+            new Dialogs.Builder(a).setTitle("Clear Recently watched?").setPositiveButton("Clear", (d, w) -> { a.library.clearRecent(); settings(a, recentRow); })
                     .setNegativeButton("Cancel", null).show();
         });
         row(a, list, "Back up playlists", "save playlists, favorites, your categories, My List, hidden items and all settings to a dated WygTV backup file", () -> Backup.backup(a));
@@ -353,6 +373,48 @@ final class Menus {
         list.getChildAt(i).requestFocus();
     }
 
+    private static void keyRow(MainActivity a, LinearLayout list, String name, String pref, String builtIn, String service, String what, int row) {
+        String mine = a.saved(pref).trim();
+        row(a, list, name, !mine.isEmpty() ? "On  •  your " + service + " key …" + mine.substring(Math.max(0, mine.length() - 4)) + "  •  press OK to change or remove it"
+                : !builtIn.isEmpty() ? "On  •  built-in key  •  press OK to use your own"
+                : "Off  •  press OK to add a free " + service + " API key for " + what, () -> apiKey(a, row, pref, service));
+    }
+
+    /** Settings → TMDb / OMDb: type, test and save an API key. */
+    private static void apiKey(MainActivity a, int focusRow, String pref, String service) {
+        boolean tmdb = service.equals("TMDb");
+        LinearLayout box = new LinearLayout(a);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(a.dp(20), a.dp(8), a.dp(20), 0);
+        TextView help = a.label(tmdb
+                ? "Get a free key at themoviedb.org → Settings → API, then type the \"API Key\" here. Movie and series pages then show TMDb posters, plots, cast, ratings and age ratings."
+                : "Get a free key at omdbapi.com → API Key (the free plan allows 1,000 lookups a day; WygTV saves each answer for two weeks). Movie and series pages then show IMDb, Rotten Tomatoes and Metacritic ratings.", 15);
+        help.setTextColor(Theme.MUTED);
+        box.addView(help, new LinearLayout.LayoutParams(-1, -2));
+        EditText field = new EditText(a);
+        field.setSingleLine(true);
+        field.setHint(service + " API key");
+        field.setText(a.saved(pref));
+        field.setTextColor(Theme.TEXT);
+        field.setHintTextColor(Theme.HINT);
+        box.addView(field, new LinearLayout.LayoutParams(-1, -2));
+        new Dialogs.Builder(a).setTitle(service + " API key").setView(box)
+                .setPositiveButton("Save", (d, w) -> {
+                    String key = field.getText().toString().replaceAll("\\s+", "");
+                    a.prefs.edit().putString(pref, key).apply();
+                    settings(a, focusRow);
+                    if (key.isEmpty()) return;
+                    Toast.makeText(a, "Checking the key with " + service + "…", Toast.LENGTH_SHORT).show();
+                    new Thread(() -> {
+                        boolean ok = tmdb ? Tmdb.works(key) : Omdb.works(key);
+                        a.runOnUiThread(() -> Toast.makeText(a, ok ? service + " key works. Open any movie or series to see its details." : service + " didn't accept that key (or there's no connection). Check it and try again.", Toast.LENGTH_LONG).show());
+                    }).start();
+                })
+                .setNeutralButton("Remove", (d, w) -> { a.prefs.edit().remove(pref).apply(); settings(a, focusRow); })
+                .setNegativeButton("Cancel", null).show();
+        field.requestFocus();
+    }
+
     private static void guideSource(MainActivity a, JSONObject active, int focusRow) {
         if (active == null) return;
         EditText input = new EditText(a);
@@ -361,7 +423,7 @@ final class Menus {
         input.setText(active.optString("epg"));
         input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
         boolean m3u = Library.M3U.equals(active.optString("type"));
-        new AlertDialog.Builder(a).setTitle("TV guide (XMLTV) link for this playlist")
+        new Dialogs.Builder(a).setTitle("TV guide (XMLTV) link for this playlist")
                 .setMessage(m3u ? "Leave empty to use the guide the playlist names, if it has one." : "Leave empty to use the provider's own guide.")
                 .setView(input)
                 .setPositiveButton("Save", (d, w) -> {
@@ -379,6 +441,108 @@ final class Menus {
         a.library.activate(active);
         new Thread(a.library::dropGuide).start();
         settings(a, focusRow);
+    }
+
+    // ------------------------------------------------------------------ extra (supplemental) TV guides
+
+    /** Free XMLTV guides by country (epg.pw), offered when adding a link. */
+    static final String[] FREE_GUIDE_LABELS = {"USA", "Canada", "United Kingdom", "Ireland", "Australia", "Mexico", "Spain", "Germany", "France", "Italy", "Portugal", "Brazil", "India"};
+    static final String[] FREE_GUIDE_CODES = {"US", "CA", "GB", "IE", "AU", "MX", "ES", "DE", "FR", "IT", "PT", "BR", "IN"};
+
+    static String freeGuideUrl(String code) { return "https://epg.pw/xmltv/epg_" + code + ".xml.gz"; }
+
+    /** Settings → Extra TV guides: the saved links, add, priority. */
+    static void extraGuides(MainActivity a, int focusRow) {
+        java.util.List<String> urls = a.library.extras.urls();
+        java.util.List<String> labels = new java.util.ArrayList<>();
+        for (String u : urls) {
+            String st = a.library.extras.status(u);
+            labels.add((labels.size() + 1) + ".  " + hostOf(u) + "  " + tail(u) + (st.isEmpty() ? "" : "   (" + st + ")"));
+        }
+        final int add = labels.size();
+        labels.add("+ Add a guide link");
+        labels.add("+ Add a free guide by country");
+        final int prio = labels.size();
+        labels.add(a.library.extras.first() ? "Order: extra guides first, then the playlist's  (press OK to change)"
+                : "Order: the playlist's guide first, extra guides fill the gaps  (press OK to change)");
+        new Dialogs.Builder(a).setTitle("Extra TV guides")
+                .setItems(labels.toArray(new String[0]), (d, w) -> {
+                    if (w < add) extraGuide(a, urls.get(w), focusRow);
+                    else if (w == add) addExtraGuide(a, focusRow);
+                    else if (w == add + 1) choose(a, "Free guide for which country?", FREE_GUIDE_LABELS, -1, i -> saveExtraGuide(a, freeGuideUrl(FREE_GUIDE_CODES[i]), focusRow));
+                    else if (w == prio) {
+                        a.prefs.edit().putBoolean(ExtraGuides.PREF_FIRST, !a.library.extras.first()).apply();
+                        settings(a, focusRow);
+                        extraGuides(a, focusRow);
+                    }
+                })
+                .setNegativeButton("Close", null).show();
+    }
+
+    private static String tail(String url) {
+        int slash = url.lastIndexOf('/');
+        return slash < 0 || slash == url.length() - 1 ? "" : url.substring(slash + 1);
+    }
+
+    private static void addExtraGuide(MainActivity a, int focusRow) {
+        EditText input = new EditText(a);
+        input.setSingleLine(true);
+        input.setHint("http://…/guide.xml or .xml.gz");
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        new Dialogs.Builder(a).setTitle("Add an extra TV guide")
+                .setMessage("An XMLTV link. Channels are matched by their guide id (tvg-id), then by name. It is used for every playlist.")
+                .setView(input)
+                .setPositiveButton("Add", (d, w) -> {
+                    String link = input.getText().toString().trim();
+                    if (!(link.startsWith("http://") || link.startsWith("https://"))) { alert(a, "Enter a link that starts with http:// or https://."); return; }
+                    saveExtraGuide(a, link, focusRow);
+                })
+                .setNegativeButton("Cancel", null).show();
+        input.requestFocus();
+    }
+
+    private static void saveExtraGuide(MainActivity a, String link, int focusRow) {
+        java.util.List<String> urls = a.library.extras.urls();
+        if (!urls.contains(link)) urls.add(link);
+        ExtraGuides.save(a.prefs, urls);
+        settings(a, focusRow);
+        Toast.makeText(a, "Loading the guide in the background. Large guides can take a minute.", Toast.LENGTH_LONG).show();
+        new Thread(() -> {
+            Xmltv.Guide g = a.library.extras.guide(link);
+            String st = a.library.extras.status(link);
+            a.runOnUiThread(() -> {
+                if (!a.isFinishing()) Toast.makeText(a, g != null ? "Extra guide " + st + "." : "Extra guide " + (st.isEmpty() ? "could not load" : st) + ". Check the link.", Toast.LENGTH_LONG).show();
+                if ("settings".equals(a.mode)) settings(a, focusRow);
+            });
+        }).start();
+    }
+
+    private static void extraGuide(MainActivity a, String url, int focusRow) {
+        java.util.List<String> urls = a.library.extras.urls();
+        int at = urls.indexOf(url);
+        String st = a.library.extras.status(url);
+        java.util.List<String> opts = new java.util.ArrayList<>();
+        opts.add("Reload now");
+        if (at > 0) opts.add("Move up (tried earlier)");
+        opts.add("Remove");
+        new Dialogs.Builder(a).setTitle(url + (st.isEmpty() ? "" : "  •  " + st))
+                .setItems(opts.toArray(new String[0]), (d, w) -> {
+                    String o = opts.get(w);
+                    if (o.startsWith("Reload")) { a.library.extras.drop(url); saveExtraGuide(a, url, focusRow); }
+                    else if (o.startsWith("Move")) {
+                        urls.remove(at);
+                        urls.add(at - 1, url);
+                        ExtraGuides.save(a.prefs, urls);
+                        extraGuides(a, focusRow);
+                    } else {
+                        urls.remove(url);
+                        ExtraGuides.save(a.prefs, urls);
+                        a.library.extras.drop(url);
+                        settings(a, focusRow);
+                        extraGuides(a, focusRow);
+                    }
+                })
+                .setNegativeButton("Close", null).show();
     }
 
     // ------------------------------------------------------------------ recently watched
@@ -415,13 +579,13 @@ final class Menus {
             });
             row.setTag(id);
             row.setOnLongClickListener(v -> {
-                new AlertDialog.Builder(a).setTitle(title).setItems(new String[]{"Remove from this list", "Cancel"}, (d, w) -> {
+                new Dialogs.Builder(a).setTitle(title).setItems(new String[]{"Remove from this list", "Cancel"}, (d, w) -> {
                     if (w == 0) { a.library.removeRecent(type, id); recent(a); }
                 }).show();
                 return true;
             });
         }
-        a.button("Clear the list", list, () -> new AlertDialog.Builder(a).setTitle("Clear Recently watched?")
+        a.button("Clear the list", list, () -> new Dialogs.Builder(a).setTitle("Clear Recently watched?")
                 .setPositiveButton("Clear", (d, w) -> { a.library.clearRecent(); recent(a); }).setNegativeButton("Cancel", null).show());
         if (!a.focusResume(list)) list.getChildAt(1).requestFocus();
     }
@@ -450,10 +614,12 @@ final class Menus {
         v.setTextSize(19);
     }
 
+    private static String onOff(boolean on) { return on ? "On" : "Off"; }
+
     interface Pick { void run(int index); }
 
     private static void choose(MainActivity a, String title, String[] labels, int current, Pick pick) {
-        new AlertDialog.Builder(a).setTitle(title).setSingleChoiceItems(labels, current, (d, which) -> { d.dismiss(); pick.run(which); })
+        new Dialogs.Builder(a).setTitle(title).setSingleChoiceItems(labels, current, (d, which) -> { d.dismiss(); pick.run(which); })
                 .setNegativeButton("Cancel", null).show();
     }
 
@@ -463,6 +629,6 @@ final class Menus {
     }
 
     static void alert(MainActivity a, String message) {
-        new AlertDialog.Builder(a).setMessage(message).setPositiveButton("OK", null).show();
+        new Dialogs.Builder(a).setMessage(message).setPositiveButton("OK", null).show();
     }
 }

@@ -76,6 +76,7 @@ final class TvRemote {
         ui.removeCallbacksAndMessages(null);
         playerView.setKeepScreenOn(true); // stop the TV screensaver from starting while something plays
         playerView.setControllerShowTimeoutMs(4000);
+        playerView.setShowSubtitleButton(true); // CC button in the on-screen controls
 
         zapList = null;
         zapIndex = -1;
@@ -127,8 +128,8 @@ final class TvRemote {
         bannerNext.setSingleLine(true);
         banner.addView(bannerNext);
         TextView hints = text(isLive()
-                ? "▲▼ / CH± change channel    0-9 channel number    OK info    GUIDE TV guide    MENU options    BACK exit"
-                : "◀▶ seek    ▶❚❚ play / pause    MENU options    BACK exit", 14, Theme.MUTED, false);
+                ? "▲▼ / CH± change channel    0-9 channel number    OK info    GUIDE TV guide    MENU options / subtitles    BACK exit"
+                : "◀▶ seek    ▶❚❚ play / pause    MENU options / subtitles    BACK exit", 14, Theme.MUTED, false);
         hints.setPadding(0, a.dp(8), 0, 0);
         banner.addView(hints);
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM);
@@ -218,6 +219,9 @@ final class TvRemote {
                 return isLive();
             case KeyEvent.KEYCODE_MENU:
                 if (down) playerMenu();
+                return true;
+            case KeyEvent.KEYCODE_CAPTIONS:
+                if (down && e.getRepeatCount() == 0 && a.subs != null) a.subs.toggle();
                 return true;
             case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
             case KeyEvent.KEYCODE_HEADSETHOOK:
@@ -313,6 +317,7 @@ final class TvRemote {
         title = ch.optString("name", "Channel");
         ext = ch.optString("container_extension", "ts");
         if (ext.isEmpty()) ext = "ts";
+        if (a.subs != null) a.subs.newStream();
         a.player.setMediaItem(MediaItem.fromUri(a.streamUrl("live", id, ext)));
         a.player.prepare();
         a.player.play();
@@ -411,23 +416,27 @@ final class TvRemote {
         ui.removeCallbacks(hideBanner);
         if (!isLive()) {
             boolean fav = a.isFavorite(type, id);
-            new AlertDialog.Builder(a).setTitle(title)
-                    .setItems(new String[]{fav ? "Remove from Favorites" : "Add to Favorites", "Exit player"}, (d, w) -> {
+            new Dialogs.Builder(a).setTitle(title)
+                    .setItems(new String[]{fav ? "Remove from Favorites" : "Add to Favorites", subtitlesItem(), "Exit player"}, (d, w) -> {
                         if (w == 0) toast(a.toggleFavorite(type, id, title, ext) ? "Added to Favorites" : "Removed from Favorites");
+                        else if (w == 1) { if (a.subs != null) a.subs.choose(); }
                         else a.onBackPressed();
                     }).show();
             return;
         }
         boolean fav = a.isFavorite("live", id);
-        new AlertDialog.Builder(a).setTitle(title)
-                .setItems(new String[]{fav ? "Remove from Favorites" : "Add to Favorites", "What's on (program guide)", "TV guide", "Channel list", "Exit player"}, (d, w) -> {
+        new Dialogs.Builder(a).setTitle(title)
+                .setItems(new String[]{fav ? "Remove from Favorites" : "Add to Favorites", subtitlesItem(), "What's on (program guide)", "TV guide", "Channel list", "Exit player"}, (d, w) -> {
                     if (w == 0) toast(a.toggleFavorite("live", id, title, ext) ? "Added to Favorites" : "Removed from Favorites");
-                    else if (w == 1) a.guide(id, title);
-                    else if (w == 2) openGuideFromPlayer();
-                    else if (w == 3) channelList();
+                    else if (w == 1) { if (a.subs != null) a.subs.choose(); }
+                    else if (w == 2) a.guide(id, title);
+                    else if (w == 3) openGuideFromPlayer();
+                    else if (w == 4) channelList();
                     else a.onBackPressed();
                 }).show();
     }
+
+    private String subtitlesItem() { return "Subtitles / CC: " + (a.subs != null && a.subs.on() ? "on" : "off"); }
 
     /** A quick channel picker over the video, so you can jump without leaving the player. */
     private void channelList() {
@@ -439,7 +448,7 @@ final class TvRemote {
             names[i] = (num.isEmpty() ? String.valueOf(i + 1) : num) + "   " + (o == null ? "" : o.optString("name"));
         }
         final JSONArray list = zapList;
-        AlertDialog d = new AlertDialog.Builder(a).setTitle("Channels").setSingleChoiceItems(names, Math.max(0, zapIndex), (dialog, which) -> {
+        AlertDialog d = new Dialogs.Builder(a).setTitle("Channels").setSingleChoiceItems(names, Math.max(0, zapIndex), (dialog, which) -> {
             dialog.dismiss();
             if (which != zapIndex || list != zapList) switchTo(list, which);
         }).create();
@@ -474,6 +483,10 @@ final class TvRemote {
             case KeyEvent.KEYCODE_CHANNEL_DOWN:
             case KeyEvent.KEYCODE_PAGE_DOWN:
                 return !a.mode.equals("guide") && jumpFocus(LIST_JUMP);
+            case KeyEvent.KEYCODE_DPAD_UP:
+            case KeyEvent.KEYCODE_DPAD_DOWN:
+                // Down on the last item goes back to the top, Up on the first goes to the bottom.
+                return !a.mode.equals("guide") && FocusWrap.screenKey(a.getWindow().getDecorView(), a.getCurrentFocus(), e);
             case KeyEvent.KEYCODE_MOVE_HOME:
                 return jumpFocus(-100_000);
             case KeyEvent.KEYCODE_MOVE_END:

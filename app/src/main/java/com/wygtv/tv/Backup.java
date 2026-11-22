@@ -57,7 +57,7 @@ final class Backup {
         if (!inApp && !outside) { Menus.alert(a, "Couldn't save the backup."); return; }
         String what;
         try { what = summary(new JSONObject(text).getJSONObject("prefs")); } catch (Exception e) { what = "Everything"; }
-        new AlertDialog.Builder(a).setTitle("Backup saved")
+        new Dialogs.Builder(a).setTitle("Backup saved")
                 .setMessage(what + ".\n\n"
                         + (outside ? "File: " + shared.getAbsolutePath() : "Saved inside the app as " + name + " (storage permission was not given, so it isn't in Downloads).")
                         + "\n\nThe file contains your playlist logins, so keep it private.")
@@ -101,7 +101,7 @@ final class Backup {
         boolean canPick = pick.resolveActivity(a.getPackageManager()) != null;
         if (canPick) labels.add("Choose a file from another folder…");
         if (labels.isEmpty()) { Menus.alert(a, "No backups found. Put a " + PREFIX + "….json file in Download/WygTV, or make one with Back up."); return; }
-        new AlertDialog.Builder(a).setTitle("Restore which backup?").setItems(labels.toArray(new String[0]), (d, w) -> {
+        new Dialogs.Builder(a).setTitle("Restore which backup?").setItems(labels.toArray(new String[0]), (d, w) -> {
             if (w >= files.size()) { a.startActivityForResult(pick, REQ_PICK); return; }
             File f = files.get(w);
             try (InputStream in = new FileInputStream(f)) { confirm(a, read(in), label(f.getName())); }
@@ -120,7 +120,7 @@ final class Backup {
         try { backup = new JSONObject(text); } catch (Exception e) { Menus.alert(a, "That file isn't a WygTV backup."); return; }
         JSONObject values = backup.optJSONObject("prefs");
         if (!"WygTV".equals(backup.optString("app")) || values == null) { Menus.alert(a, "That file isn't a WygTV backup."); return; }
-        new AlertDialog.Builder(a).setTitle("Restore " + label + "?")
+        new Dialogs.Builder(a).setTitle("Restore " + label + "?")
                 .setMessage("This replaces what is on this TV with the backup: " + summary(values) + ".")
                 .setPositiveButton("Restore", (d, w) -> {
                     try { apply(a.prefs, values); } catch (Exception e) { Menus.alert(a, "Restore failed. Nothing was changed."); return; }

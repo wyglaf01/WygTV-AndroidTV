@@ -59,6 +59,7 @@ final class NavRail {
             // Live TV only (Settings → App mode): the guide is the main screen, plus Live TV and Settings.
             add("▦", "TV Guide", "guide", current, () -> a.openGuide(null));
             add("▣", "Live TV", "live", current, () -> a.browse("live"));
+            add("⌕", "Search channels", "search", current, () -> a.searchLive());
             rail.addView(new View(a), new LinearLayout.LayoutParams(-1, 0, 1));
             add("⚙", "Settings", "settings", current, () -> a.settings());
             lockEnds();
@@ -78,14 +79,14 @@ final class NavRail {
         lockEnds();
     }
 
-    /** Up from the top item and Down from the bottom one stay in the menu. */
+    /** Up from the top item goes to the bottom one and Down from the bottom goes back to the top, staying in the menu. */
     private void lockEnds() {
         if (!items.isEmpty()) {
             TextView top = items.get(0), bottom = items.get(items.size() - 1);
             top.setId(View.generateViewId());
             bottom.setId(View.generateViewId());
-            top.setNextFocusUpId(top.getId());
-            bottom.setNextFocusDownId(bottom.getId());
+            top.setNextFocusUpId(bottom.getId());
+            bottom.setNextFocusDownId(top.getId());
         }
     }
 
