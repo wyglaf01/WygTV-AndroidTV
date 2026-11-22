@@ -837,7 +837,7 @@ final class Menus {
             String type = o.optString("type"), id = o.optString("id"), title = o.optString("title", "Untitled"), ext = o.optString("ext");
             String icon = type.equals("live") ? "▣" : type.equals("vod") ? "▶" : "▤";
             String when = DateUtils.getRelativeTimeSpanString(o.optLong("at", now), now, DateUtils.MINUTE_IN_MILLIS).toString();
-            TextView row = a.button(icon + "  " + (a.isFavorite(type, id) ? "★ " : "") + title + "      " + when, list, () -> {
+            TextView row = a.button(icon + "  " + (type.equals("live") ? (a.isFavorite(type, id) ? "★ " : "") : (a.inMyList(type, id) ? "☰ " : "")) + title + "      " + when, list, () -> {
                 if (type.equals("live")) a.zapList = live;
                 a.play(type, id, ext.isEmpty() ? (type.equals("live") ? "ts" : "mp4") : ext, title);
             });

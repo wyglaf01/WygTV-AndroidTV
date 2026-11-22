@@ -113,4 +113,24 @@ public class TmdbTest {
         assertEquals("", Tmdb.rating("0"));
         assertEquals("", Tmdb.rating("N/A"));
     }
+
+    @Test public void findsYoutubeTrailerKeys() throws Exception {
+        assertEquals("dQw4w9WgXcQ", Tmdb.youtubeKey("dQw4w9WgXcQ"));
+        assertEquals("dQw4w9WgXcQ", Tmdb.youtubeKey("https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=3"));
+        assertEquals("dQw4w9WgXcQ", Tmdb.youtubeKey("https://youtu.be/dQw4w9WgXcQ"));
+        assertEquals("", Tmdb.youtubeKey(""));
+        assertEquals("", Tmdb.youtubeKey("not a trailer"));
+        JSONObject answer = new JSONObject().put("info", new JSONObject().put("youtube_trailer", "abcdefghijk"));
+        assertEquals("abcdefghijk", Tmdb.fromProvider(new JSONObject().put("name", "Heat"), answer).optString("trailer"));
+    }
+
+    @Test public void picksOfficialTmdbTrailer() throws Exception {
+        JSONArray r = new JSONArray()
+                .put(new JSONObject().put("site", "YouTube").put("type", "Teaser").put("key", "teaser00001").put("official", true))
+                .put(new JSONObject().put("site", "Vimeo").put("type", "Trailer").put("key", "vimeo"))
+                .put(new JSONObject().put("site", "YouTube").put("type", "Trailer").put("key", "fanmade0001").put("official", false))
+                .put(new JSONObject().put("site", "YouTube").put("type", "Trailer").put("key", "official001").put("official", true));
+        assertEquals("official001", Tmdb.trailerFrom(new JSONObject().put("results", r)));
+        assertEquals("", Tmdb.trailerFrom(null));
+    }
 }

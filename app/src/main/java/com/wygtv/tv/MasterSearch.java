@@ -274,7 +274,7 @@ final class MasterSearch {
             text = "Type at least 2 letters to search " + ch + " channels" + (s.types.size() > 1 ? ", " + mv + " movies and " + se + " series" : "")
                     + (pls > 1 ? " in " + pls + " playlists" : "") + ".";
         } else {
-            text = lastTotal == 0 ? "Nothing matches \"" + query.trim() + "\"." : lastTotal + (lastTotal == 1 ? " match" : " matches") + "  •  ★ = in Favorites  •  OK to open";
+            text = lastTotal == 0 ? "Nothing matches \"" + query.trim() + "\"." : lastTotal + (lastTotal == 1 ? " match" : " matches") + "  •  ★ = in Favorites  •  ☰ = in My List  •  OK to open";
         }
         if (!LOADING.isEmpty()) text += "  •  still loading " + LOADING.size() + (LOADING.size() == 1 ? " list…" : " lists…");
         if (!FAILED.isEmpty()) text += "  •  " + FAILED.size() + (FAILED.size() == 1 ? " list" : " lists") + " couldn't load";
@@ -301,8 +301,8 @@ final class MasterSearch {
             if (a.fromActive(item)) a.styleSearchRow(r, id, title + a.playlistTag(item)); else a.styleOtherSearchRow(r, item);
         } else {
             JSONObject pl = a.library.find(item.optString("playlist"));
-            boolean fav = pl != null && a.isFavoriteIn(Library.prefixOf(pl), type, id);
-            r.setText((fav ? "★ " : "") + title + a.playlistTag(item));
+            boolean mine = pl != null && a.inMyListIn(Library.prefixOf(pl), type, id);
+            r.setText((mine ? "☰ " : "") + title + a.playlistTag(item));
         }
     }
 

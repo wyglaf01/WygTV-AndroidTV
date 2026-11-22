@@ -109,7 +109,36 @@ final class Tmdb {
         String id = digits(first(info, "tmdb_id", "tmdb"));
         if (id.isEmpty()) id = digits(first(item, "tmdb_id", "tmdb"));
         put(meta, "tmdb_id", id);
+        put(meta, "trailer", youtubeKey(first(info, "youtube_trailer", "trailer")));
         return meta;
+    }
+
+    /**
+     * The YouTube video id in a provider's trailer field, which may be a bare id ("dQw4w9WgXcQ") or a full
+     * youtube.com / youtu.be link. Empty when there's none.
+     */
+    static String youtubeKey(String s) {
+        if (s == null) return "";
+        s = s.trim();
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(?:v=|youtu\\.be/|embed/|shorts/)([A-Za-z0-9_-]{11})").matcher(s);
+        if (m.find()) return m.group(1);
+        return s.matches("[A-Za-z0-9_-]{11}") ? s : "";
+    }
+
+    /** The best YouTube trailer in a TMDb "videos" answer: official trailers first, then any trailer, then a teaser. */
+    static String trailerFrom(JSONObject videos) {
+        JSONArray r = videos == null ? null : videos.optJSONArray("results");
+        String best = "";
+        int bestScore = 0;
+        for (int i = 0; r != null && i < r.length(); i++) {
+            JSONObject v = r.optJSONObject(i);
+            if (v == null || !"YouTube".equalsIgnoreCase(v.optString("site")) || v.optString("key").isEmpty()) continue;
+            String type = v.optString("type");
+            int score = type.equals("Trailer") ? 4 : type.equals("Teaser") ? 2 : 1;
+            if (v.optBoolean("official")) score++;
+            if (score > bestScore) { bestScore = score; best = v.optString("key"); }
+        }
+        return best;
     }
 
     // ------------------------------------------------------------------ TMDb answers
@@ -153,6 +182,7 @@ final class Tmdb {
         if ((imdb.isEmpty() || "null".equals(imdb)) && ext != null) imdb = ext.optString("imdb_id");
         if (imdb.startsWith("tt")) put(meta, "imdb", imdb);
         if (t.optInt("id", 0) > 0) put(meta, "tmdb_id", String.valueOf(t.optInt("id")));
+        put(meta, "trailer", trailerFrom(t.optJSONObject("videos")));
         return meta;
     }
 
@@ -203,7 +233,7 @@ final class Tmdb {
         if (key.isEmpty()) return null;
         boolean tv = type.equals("series");
         String lang = Locale.getDefault().toLanguageTag();
-        File cache = new File(c.getCacheDir(), "tmdb/" + M3u.idFor(type + "|" + tmdbId + "|" + title + "|" + year + "|" + lang) + ".json");
+        File cache = new File(c.getCacheDir(), "tmdb/" + M3u.idFor("v2|" + type + "|" + tmdbId + "|" + title + "|" + year + "|" + lang) + ".json");
         JSONObject saved = cached(cache, KEEP_MS, KEEP_MISS_MS);
         if (saved != null) return saved.optBoolean("miss") ? null : saved.optJSONObject("meta");
         try {
@@ -218,7 +248,8 @@ final class Tmdb {
             }
             JSONObject full;
             try {
-                full = get(key, (tv ? "tv/" : "movie/") + id + "?language=" + lang + "&append_to_response=credits,external_ids," + (tv ? "content_ratings" : "release_dates"));
+                full = get(key, (tv ? "tv/" : "movie/") + id + "?language=" + lang + "&append_to_response=credits,external_ids,videos," + (tv ? "content_ratings" : "release_dates")
+                        + "&include_video_language=" + Locale.getDefault().getLanguage() + ",en,null");
             } catch (java.io.FileNotFoundException wrongKind) {
                 // Some providers put a movie id on a series (or the reverse): search by title instead.
                 if (tmdbId.isEmpty()) throw wrongKind;

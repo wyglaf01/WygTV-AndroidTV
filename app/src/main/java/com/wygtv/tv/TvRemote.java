@@ -485,16 +485,24 @@ final class TvRemote {
     private void playerMenu() {
         ui.removeCallbacks(hideBanner);
         if (!isLive()) {
-            boolean fav = a.isFavorite(type, id);
-            String next = "series".equals(type) ? Episodes.nextLabel(a) : null;
-            String[] items = {fav ? "Remove from Favorites" : "Add to Favorites", subtitlesItem(), "Exit player"};
+            // Favorites are for Live TV; a movie (or the series of this episode) goes in My List instead.
+            boolean series = "series".equals(type);
+            String listType = series ? "series" : "vod", listId = series ? (a.watching != null ? a.watching[0] : "") : id;
+            JSONObject listItem = new JSONObject();
+            try {
+                listItem.put(series ? "series_id" : "stream_id", listId).put("name", series && a.seriesTitle != null ? a.seriesTitle : title);
+                if (!series) listItem.put("container_extension", ext);
+            } catch (Exception ignored) { }
+            boolean mine = !listId.isEmpty() && a.inMyList(listType, listId);
+            String next = series ? Episodes.nextLabel(a) : null;
+            String[] items = {mine ? "Remove from My List" : "Add to My List", subtitlesItem(), "Exit player"};
             if (next != null) items = new String[]{"▶  Play next episode   " + next, items[0], items[1], items[2]};
             final int shift = next != null ? 1 : 0;
             new Dialogs.Builder(a).setTitle(title)
                     .setItems(items, (d, which) -> {
                         if (shift == 1 && which == 0) { Episodes.playNext(a); return; }
                         int w = which - shift;
-                        if (w == 0) toast(a.toggleFavorite(type, id, title, ext) ? "Added to Favorites" : "Removed from Favorites");
+                        if (w == 0) { if (!listId.isEmpty()) toast(a.toggleMyList(listType, listItem) ? "Added to My List" : "Removed from My List"); }
                         else if (w == 1) { if (a.subs != null) a.subs.choose(); }
                         else a.onBackPressed();
                     }).show();

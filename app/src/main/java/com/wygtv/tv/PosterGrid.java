@@ -161,8 +161,8 @@ final class PosterGrid {
         art.addView(poster, new FrameLayout.LayoutParams(-1, -1));
         Details.image(poster, m.optString("poster"), a.dp(140), generation, a);
 
-        boolean fav = a.isFavorite(type, id), watched = series && Watch.complete(a, id);
-        TextView label = a.label((fav ? "★ " : "") + (watched ? "✓ " : "") + name, 14);
+        boolean mine = a.inMyList(type, id), watched = series && Watch.complete(a, id);
+        TextView label = a.label((mine ? "☰ " : "") + (watched ? "✓ " : "") + name, 14);
         label.setSingleLine(true);
         label.setEllipsize(TextUtils.TruncateAt.END);
         label.setPadding(a.dp(2), a.dp(5), a.dp(2), 0);
