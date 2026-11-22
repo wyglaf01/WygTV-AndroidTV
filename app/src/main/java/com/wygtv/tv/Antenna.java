@@ -10,7 +10,7 @@ import java.util.List;
 
 /**
  * HDHomeRun tuners as a category. A tuner is added in Settings and saved like a playlist (see {@link Hdhr}),
- * but it shows in Live TV as its own category, "📡 Antenna TV", next to Favorites and your categories, instead
+ * but it shows in Live TV as its own category, "📡 Antenna TV" (or the name you give the tuner), next to Favorites and your categories, instead
  * of in the playlist list. Its channels play the same way a favorite from another playlist does: the tuner
  * becomes the active source while it plays, and Home, Movies and Series switch back to your main playlist.
  */
@@ -32,9 +32,18 @@ final class Antenna {
         return out;
     }
 
-    /** "📡 Antenna TV" with one tuner, "📡 Antenna TV · Bedroom" with several. */
+    /** Name a new HDHomeRun tuner gets automatically. */
+    static final String DEFAULT_NAME = "Antenna TV";
+
+    /** The tuner's name, with "Antenna TV" for tuners that were left with no name or the device's own name. */
+    static String nameOf(JSONObject tuner) {
+        String t = tuner == null ? "" : tuner.optString("title").trim();
+        return t.isEmpty() || t.startsWith("HDHomeRun") ? DEFAULT_NAME : t;
+    }
+
+    /** "📡 Antenna TV", or whatever name the tuner was given. */
     static String label(MainActivity a, JSONObject tuner) {
-        return tuners(a).size() <= 1 ? "📡 Antenna TV" : "📡 Antenna TV  ·  " + Library.nameOf(tuner);
+        return "📡 " + nameOf(tuner);
     }
 
     /** Adds the Antenna TV entries to the first tier of the Live TV menu. */
@@ -43,6 +52,38 @@ final class Antenna {
             String id = PREFIX + t.optString("id");
             a.button(label(a, t), a.side, () -> a.loadItems(id));
         }
+    }
+
+    /** Adds each tuner ("📡 Antenna TV") to the TV guide's "Showing" choices. */
+    static void addGuideChoices(MainActivity a, List<String> ids, List<String> names) {
+        for (JSONObject t : tuners(a)) { ids.add(PREFIX + t.optString("id")); names.add(label(a, t)); }
+    }
+
+    /** Opens the full TV guide on a tuner's channels. Falls back to all channels when the tuner is gone or can't be reached. */
+    static void openGuide(MainActivity a, String src, String focusId, boolean picked) {
+        JSONObject tuner = a.library.find(src.substring(PREFIX.length()));
+        if (tuner == null) { a.showGuide("all", focusId, false); return; }
+        final int ticket = ++a.listGeneration;
+        if (a.status != null) a.status.setText("Loading antenna channels…");
+        new Thread(() -> {
+            JSONArray list;
+            try { list = a.library.liveChannelsOf(tuner); } catch (Exception e) { list = null; }
+            final JSONArray got = list;
+            a.runOnUiThread(() -> {
+                if (a.isFinishing() || a.isDestroyed() || ticket != a.listGeneration) return;
+                if (got == null || got.length() == 0) {
+                    Toast.makeText(a, got == null ? "Couldn't reach the HDHomeRun at " + Menus.hostOf(tuner.optString("url")) + ". Showing all channels."
+                            : nameOf(tuner) + " has no channels. Showing all channels.", Toast.LENGTH_LONG).show();
+                    a.showGuide("all", focusId, false);
+                    return;
+                }
+                a.items = got;
+                a.category = src;
+                a.categories = new JSONArray();
+                try { a.categories.put(new JSONObject().put("category_id", src).put("category_name", label(a, tuner))); } catch (org.json.JSONException ignored) { }
+                TvGuide.open(a, focusId);
+            });
+        }).start();
     }
 
     /** Shows the tuner's channels in the mini guide. */
