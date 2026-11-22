@@ -5,6 +5,7 @@ import android.content.SharedPreferences;
 /**
  * When the live preview (Live TV and the full TV guide) switches to the highlighted channel: right away while
  * scrolling (a short pause), after resting on a channel for 5, 10 or 15 seconds, or only when OK is pressed.
+ * The first channel after the screen opens always previews right away; this only paces later changes.
  * In "OK only" mode the first OK previews the channel and a second OK opens it full screen.
  */
 final class PreviewDelay {

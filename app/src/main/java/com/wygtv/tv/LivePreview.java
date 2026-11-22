@@ -54,7 +54,7 @@ final class LivePreview {
             @Override public void onViewAttachedToWindow(View v) { }
             @Override public void onViewDetachedFromWindow(View v) { if (view == mine) release(); }
         });
-        label = a.label(PreviewDelay.okOnly(a.prefs) ? "Press OK on a channel to preview it" : "Highlight a channel to preview it", 14);
+        label = a.label("Highlight a channel to preview it", 14);
         label.setTextColor(Theme.MUTED);
         label.setGravity(Gravity.CENTER);
         frame.addView(label, new FrameLayout.LayoutParams(-1, -1));
@@ -70,7 +70,8 @@ final class LivePreview {
         wanted = item;
         if (pending != null) UI.removeCallbacks(pending);
         pending = null;
-        int delay = PreviewDelay.ms(a.prefs);
+        // The first channel after the screen opens previews right away; the Settings delay (or OK only) is for later changes.
+        int delay = player == null ? 0 : PreviewDelay.ms(a.prefs);
         if (delay < 0) return;
         pending = () -> { if (wanted == item) start(a, item); };
         UI.postDelayed(pending, delay);

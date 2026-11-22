@@ -663,7 +663,8 @@ final class TvGuide {
         if (pendingPreview != null) ui.removeCallbacks(pendingPreview);
         pendingPreview = null;
         syncPreviewLabel();
-        int delay = PreviewDelay.ms(a.prefs);
+        // The first channel after the guide opens previews right away; the Settings delay (or OK only) is for later changes.
+        int delay = preview == null ? 0 : PreviewDelay.ms(a.prefs);
         if (delay < 0) return; // "OK only": OK on a channel previews it
         final int s = session;
         pendingPreview = () -> { if (s == session && focusRow == row) startPreview(row); };
