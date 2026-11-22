@@ -178,7 +178,7 @@ final class Menus {
                 if (a.isFinishing() || a.isDestroyed()) return;
                 Toast.makeText(a, text, Toast.LENGTH_LONG).show();
                 if (gen == a.screenGeneration && a.mode.equals("playlists")) playlists(a);
-                else if (gen == a.screenGeneration && a.mode.equals("settings")) settings(a);
+                else if (gen == a.screenGeneration && a.mode.equals("settings")) backToTuners(a);
             });
         }).start();
     }
@@ -303,7 +303,7 @@ final class Menus {
                 + "(shown in your router, or at my.hdhomerun.com).");
         TextView connect = a.button("Save & load channels", form, () -> connectTuner(a, existing, title.getText().toString().trim(), host.getText().toString(), epg.getText().toString().trim()));
         a.button("⌕  Find tuners on my network", form, () -> findTuners(a, existing, title, host, epg));
-        a.button("Cancel", form, () -> { if (a.library.isEmpty()) setup(a); else settings(a); });
+        a.button("Cancel", form, () -> { if (a.library.isEmpty()) setup(a); else backToTuners(a); });
         (existing == null ? connect : host).requestFocus();
     }
 
@@ -327,7 +327,7 @@ final class Menus {
                         .setPositiveButton("Remove", (d2, w2) -> {
                             a.library.remove(t.optString("id"));
                             a.forgetPlaylistData();
-                            if (a.library.isEmpty()) setup(a); else settings(a);
+                            if (a.library.isEmpty()) setup(a); else backToTuners(a);
                         }).setNegativeButton("Cancel", null).show();
         }).show();
     }
@@ -408,138 +408,179 @@ final class Menus {
                 a.library.put(p);
                 if (first || p.optString("id").equals(a.library.activeId())) a.switchPlaylist(p);
                 Toast.makeText(a, loaded.channels.size() + " antenna channels added. Find them in Live TV under " + p.optString("title") + ".", Toast.LENGTH_LONG).show();
-                if (first) a.home(); else settings(a);
+                if (first) a.home(); else backToTuners(a);
             });
         }).start();
     }
 
     // ------------------------------------------------------------------ settings
 
-    static void settings(MainActivity a) { settings(a, 0); }
+    /** Settings is four groups; each opens its own page. "" = the top page. */
+    static final String GROUP_PLAYLISTS = "playlists", GROUP_PLAYER = "player", GROUP_APPEARANCE = "appearance", GROUP_BACKUP = "backup";
+    static final String[] GROUPS = {GROUP_PLAYLISTS, GROUP_PLAYER, GROUP_APPEARANCE, GROUP_BACKUP};
+    static String settingsGroup = "";
 
+    /** Opens the top Settings page (from Home, the side menu, or Back out of a group). */
+    static void settings(MainActivity a) { settingsGroup = ""; settings(a, 0); }
+
+    /** Back on a Settings group page goes up to the top Settings page, on that group. */
+    static boolean settingsBack(MainActivity a) {
+        if (settingsGroup.isEmpty()) return false;
+        int at = indexOf(GROUPS, settingsGroup);
+        settingsGroup = "";
+        settings(a, at);
+        return true;
+    }
+
+    /** Opens one Settings group page. */
+    static void settingsGroup(MainActivity a, String group) { settingsGroup = group; settings(a, 0); }
+
+    /** Draws the current Settings page (top or a group) and focuses row {@code focusIndex}. */
     static void settings(MainActivity a, int focusIndex) {
         a.mode = "settings";
-        a.shell("SETTINGS");
+        String g = settingsGroup;
+        a.shell(g.isEmpty() ? "SETTINGS" : "SETTINGS  •  " + groupTitle(g).toUpperCase(java.util.Locale.ROOT));
         LinearLayout list = column(a);
         boolean m3u = a.library.activeIsM3u();
         JSONObject active = a.library.find(a.library.activeId());
-
-        row(a, list, "Manage playlists", (active == null ? "none" : "Watching " + active.optString("title") + "  (" + (a.library.activeIsHdhr() ? "HDHomeRun" : m3u ? "M3U" : "Xtream Codes") + ")") + "  •  press OK to add, edit, refresh or delete playlists", () -> a.playlists());
-        java.util.List<JSONObject> tuners = Antenna.tuners(a);
-        row(a, list, "HDHomeRun antenna TV", tuners.isEmpty()
-                ? "not added  •  press OK to add your tuner. Its channels show in Live TV as " + Antenna.DEFAULT_NAME
-                : (tuners.size() == 1 ? describe(tuners.get(0)) : tuners.size() + " tuners") + "  •  press OK to add, edit, refresh or remove",
-                () -> { if (tuners.isEmpty()) hdhrForm(a, null); else tunerList(a); });
-        final int modeRow = list.getChildCount();
         boolean liveOnly = a.liveOnly();
-        row(a, list, "App mode", liveOnly ? "Live TV only  •  opens on the TV guide; press OK for the full app" : "Full  •  press OK for Live TV only (opens on the TV guide, hides Movies and Series)", () -> {
-            a.prefs.edit().putBoolean("live_only", !a.liveOnly()).apply();
-            Toast.makeText(a, a.liveOnly() ? "Live TV only. Settings stays in the side menu to switch back." : "Full app is back.", Toast.LENGTH_LONG).show();
-            settings(a, modeRow);
-        });
-        final int themeRow = list.getChildCount();
-        row(a, list, "Theme", Theme.LABELS[Theme.indexOf(a.prefs.getString("theme", Theme.DEFAULT))], () ->
-                choose(a, "Theme", Theme.LABELS, Theme.indexOf(a.prefs.getString("theme", Theme.DEFAULT)), i -> {
-                    a.prefs.edit().putString("theme", Theme.KEYS[i]).apply();
-                    a.applyTheme();
-                    settings(a, themeRow);
-                }));
-        final int startRow = list.getChildCount();
-        final String[] startKeys = liveOnly ? START_KEYS_LIVE : START_KEYS, startLabels = liveOnly ? START_LABELS_LIVE : START_LABELS;
-        row(a, list, "Open at start-up", startLabels[indexOf(startKeys, a.prefs.getString("start_screen", "home"))], () ->
-                choose(a, "Open at start-up", startLabels, indexOf(startKeys, a.prefs.getString("start_screen", "home")), i -> {
-                    a.prefs.edit().putString("start_screen", startKeys[i]).apply();
-                    settings(a, startRow);
-                }));
-        final int groupsRow = list.getChildCount();
-        row(a, list, "Channel groups", VirtualCategories.all(a).length() + " in Live TV  •  press OK to make a New Channel Group, or rename or delete one", () ->
-                VirtualCategories.manage(a, () -> settings(a, groupsRow)));
-        final int guideRowsRow = list.getChildCount();
-        final String[] guideRows = {"3", "4", "5"};
-        row(a, list, "Live TV guide rows", a.prefs.getInt("guide_rows", 4) + " channels  •  more rows make the preview smaller", () ->
-                choose(a, "Channel rows in the Live TV guide", new String[]{"3 rows", "4 rows", "5 rows"}, indexOf(guideRows, String.valueOf(a.prefs.getInt("guide_rows", 4))), i -> {
-                    a.prefs.edit().putInt("guide_rows", 3 + i).apply();
-                    settings(a, guideRowsRow);
-                }));
-        final int formatRow = list.getChildCount();
-        if (!m3u) {
-            row(a, list, "Live stream format", FORMAT_LABELS[indexOf(FORMAT_KEYS, a.prefs.getString("live_format", "auto"))], () ->
-                    choose(a, "Live stream format (try HLS if channels stutter or won't start)", FORMAT_LABELS, indexOf(FORMAT_KEYS, a.prefs.getString("live_format", "auto")), i -> {
-                        a.prefs.edit().putString("live_format", FORMAT_KEYS[i]).apply();
-                        settings(a, formatRow);
+        if (g.isEmpty()) {
+            row(a, list, "▤  " + groupTitle(GROUP_PLAYLISTS), "playlists, HDHomeRun, hidden categories, channel groups, TV guide source, extra TV guides", () -> settingsGroup(a, GROUP_PLAYLISTS));
+            row(a, list, "▶  " + groupTitle(GROUP_PLAYER), "live stream format, buffer, video decoder, subtitles", () -> settingsGroup(a, GROUP_PLAYER));
+            row(a, list, "◐  " + groupTitle(GROUP_APPEARANCE), "theme, app mode, start-up screen, guide rows, movie and series info, IMDb ratings", () -> settingsGroup(a, GROUP_APPEARANCE));
+            row(a, list, "⟳  " + groupTitle(GROUP_BACKUP), "back up, restore, check for updates  •  WygTV " + Updater.installedName(a), () -> settingsGroup(a, GROUP_BACKUP));
+        } else if (g.equals(GROUP_PLAYLISTS)) {
+            row(a, list, "Manage playlists", (active == null ? "none" : "Watching " + active.optString("title") + "  (" + (a.library.activeIsHdhr() ? "HDHomeRun" : m3u ? "M3U" : "Xtream Codes") + ")") + "  •  press OK to add, edit, refresh or delete playlists", () -> a.playlists());
+            java.util.List<JSONObject> tuners = Antenna.tuners(a);
+            row(a, list, "HDHomeRun antenna TV", tuners.isEmpty()
+                    ? "not added  •  press OK to add your tuner. Its channels show in Live TV as " + Antenna.DEFAULT_NAME
+                    : (tuners.size() == 1 ? describe(tuners.get(0)) : tuners.size() + " tuners") + "  •  press OK to add, edit, refresh or remove",
+                    () -> { if (tuners.isEmpty()) hdhrForm(a, null); else tunerList(a); });
+            final int hiddenRow = list.getChildCount();
+            int hidden = a.hiddenCount();
+            row(a, list, "Hidden categories and channels", hidden == 0 ? "nothing hidden" : hidden + " hidden  •  press OK to show them all again", () -> {
+                if (a.hiddenCount() == 0) { Toast.makeText(a, "Nothing is hidden.", Toast.LENGTH_SHORT).show(); return; }
+                new Dialogs.Builder(a).setTitle("Show everything again?").setMessage("Every hidden category and channel in this playlist comes back.")
+                        .setPositiveButton("Show all", (d, w) -> { a.unhideAll(); settings(a, hiddenRow); }).setNegativeButton("Cancel", null).show();
+            });
+            final int groupsRow = list.getChildCount();
+            row(a, list, "Channel groups", VirtualCategories.all(a).length() + " in Live TV  •  press OK to make a New Channel Group, or rename or delete one", () ->
+                    VirtualCategories.manage(a, () -> settings(a, groupsRow)));
+            final int guideRow = list.getChildCount();
+            String custom = a.saved("epg_url");
+            String guideState = a.library.guideStatus();
+            String source = !custom.isEmpty() ? hostOf(custom) + " (your link)" : a.library.activeIsHdhr() ? "HDHomeRun guide (from the tuner)" : m3u ? (a.library.guideUrl().isEmpty() ? "none in this playlist" : hostOf(a.library.guideUrl()) + " (from the playlist)") : "the provider's guide";
+            row(a, list, "TV guide source", source + (guideState.isEmpty() ? "" : "  •  " + guideState), () -> guideSource(a, active, guideRow));
+            if (!custom.isEmpty() || m3u) row(a, list, "Reload TV guide", "download the guide again now", () -> {
+                new Thread(a.library::dropGuide).start();
+                Toast.makeText(a, "The guide will reload the next time it's shown.", Toast.LENGTH_SHORT).show();
+            });
+            final int extraRow = list.getChildCount();
+            int extraCount = a.library.extras.urls().size();
+            row(a, list, "Extra TV guides (XMLTV)", extraCount == 0
+                    ? "none  •  press OK to add guide links that fill in channels with no program info"
+                    : extraCount + (extraCount == 1 ? " link" : " links") + "  •  " + (a.library.extras.first() ? "used first, the playlist's guide fills the rest" : "fill in channels the playlist's guide leaves empty"),
+                    () -> extraGuides(a, extraRow));
+            final int recentRow = list.getChildCount();
+            int recent = a.library.recent().length();
+            row(a, list, "Recently watched", recent == 0 ? "empty" : recent + " items  •  press OK to clear", () -> {
+                if (a.library.recent().length() == 0) return;
+                new Dialogs.Builder(a).setTitle("Clear Recently watched?").setPositiveButton("Clear", (d, w) -> { a.library.clearRecent(); settings(a, recentRow); })
+                        .setNegativeButton("Cancel", null).show();
+            });
+        } else if (g.equals(GROUP_PLAYER)) {
+            final int formatRow = list.getChildCount();
+            if (!m3u) {
+                row(a, list, "Live stream format", FORMAT_LABELS[indexOf(FORMAT_KEYS, a.prefs.getString("live_format", "auto"))], () ->
+                        choose(a, "Live stream format (try HLS if channels stutter or won't start)", FORMAT_LABELS, indexOf(FORMAT_KEYS, a.prefs.getString("live_format", "auto")), i -> {
+                            a.prefs.edit().putString("live_format", FORMAT_KEYS[i]).apply();
+                            settings(a, formatRow);
+                        }));
+            }
+            final int bufferRow = list.getChildCount();
+            final String bufferKey = a.prefs.getString(Players.PREF_BUFFER, Players.BUFFER_DEFAULT);
+            row(a, list, "Buffer", Players.BUFFER_LABELS[Math.max(0, indexOf(Players.BUFFER_KEYS, bufferKey))] + "  •  more buffer rides out a shaky connection but takes longer to start a channel", () ->
+                    choose(a, "Buffer before playing", Players.BUFFER_LABELS, Math.max(0, indexOf(Players.BUFFER_KEYS, bufferKey)), i -> {
+                        a.prefs.edit().putString(Players.PREF_BUFFER, Players.BUFFER_KEYS[i]).apply();
+                        settings(a, bufferRow);
                     }));
+            final int decoderRow = list.getChildCount();
+            final String decoderKey = a.prefs.getString(Players.PREF_DECODER, Players.DECODER_DEFAULT);
+            row(a, list, "Video decoder", Players.DECODER_LABELS[Math.max(0, indexOf(Players.DECODER_KEYS, decoderKey))] + "  •  try Software first if a channel freezes, shows green blocks or won't play", () ->
+                    choose(a, "Video decoder", Players.DECODER_LABELS, Math.max(0, indexOf(Players.DECODER_KEYS, decoderKey)), i -> {
+                        a.prefs.edit().putString(Players.PREF_DECODER, Players.DECODER_KEYS[i]).apply();
+                        settings(a, decoderRow);
+                    }));
+            final int subsLiveRow = list.getChildCount();
+            row(a, list, "Subtitles for Live TV", onOff(Subtitles.defaultOn(a.prefs, true)) + "  •  closed captions start on for every channel that sends them. Press OK to switch", () -> {
+                a.prefs.edit().putBoolean(Subtitles.PREF_LIVE, !Subtitles.defaultOn(a.prefs, true)).apply();
+                settings(a, subsLiveRow);
+            });
+            final int subsVodRow = list.getChildCount();
+            if (!liveOnly) row(a, list, "Subtitles for Movies and Series", onOff(Subtitles.defaultOn(a.prefs, false)) + "  •  press OK to switch. In the player, MENU > Subtitles picks a language", () -> {
+                a.prefs.edit().putBoolean(Subtitles.PREF_VOD, !Subtitles.defaultOn(a.prefs, false)).apply();
+                settings(a, subsVodRow);
+            });
+        } else if (g.equals(GROUP_APPEARANCE)) {
+            final int themeRow = list.getChildCount();
+            row(a, list, "Theme", Theme.LABELS[Theme.indexOf(a.prefs.getString("theme", Theme.DEFAULT))], () ->
+                    choose(a, "Theme", Theme.LABELS, Theme.indexOf(a.prefs.getString("theme", Theme.DEFAULT)), i -> {
+                        a.prefs.edit().putString("theme", Theme.KEYS[i]).apply();
+                        a.applyTheme();
+                        settings(a, themeRow);
+                    }));
+            final int modeRow = list.getChildCount();
+            row(a, list, "App mode", liveOnly ? "Live TV only  •  opens on the TV guide; press OK for the full app" : "Full  •  press OK for Live TV only (opens on the TV guide, hides Movies and Series)", () -> {
+                a.prefs.edit().putBoolean("live_only", !a.liveOnly()).apply();
+                Toast.makeText(a, a.liveOnly() ? "Live TV only. Settings stays in the side menu to switch back." : "Full app is back.", Toast.LENGTH_LONG).show();
+                settings(a, modeRow);
+            });
+            final int startRow = list.getChildCount();
+            final String[] startKeys = liveOnly ? START_KEYS_LIVE : START_KEYS, startLabels = liveOnly ? START_LABELS_LIVE : START_LABELS;
+            row(a, list, "Open at start-up", startLabels[indexOf(startKeys, a.prefs.getString("start_screen", "home"))], () ->
+                    choose(a, "Open at start-up", startLabels, indexOf(startKeys, a.prefs.getString("start_screen", "home")), i -> {
+                        a.prefs.edit().putString("start_screen", startKeys[i]).apply();
+                        settings(a, startRow);
+                    }));
+            final int guideRowsRow = list.getChildCount();
+            final String[] guideRows = {"3", "4", "5"};
+            row(a, list, "Live TV guide rows", a.prefs.getInt("guide_rows", 4) + " channels  •  more rows make the preview smaller", () ->
+                    choose(a, "Channel rows in the Live TV guide", new String[]{"3 rows", "4 rows", "5 rows"}, indexOf(guideRows, String.valueOf(a.prefs.getInt("guide_rows", 4))), i -> {
+                        a.prefs.edit().putInt("guide_rows", 3 + i).apply();
+                        settings(a, guideRowsRow);
+                    }));
+            final int tmdbRow = list.getChildCount();
+            keyRow(a, list, "Movie & series info (TMDb)", Tmdb.PREF_KEY, Tmdb.builtInKey(), "TMDb", "posters, plots, cast and ratings", tmdbRow);
+            final int omdbRow = list.getChildCount();
+            keyRow(a, list, "IMDb ratings (OMDb)", Omdb.PREF_KEY, Omdb.builtInKey(), "OMDb", "IMDb, Rotten Tomatoes and Metacritic ratings, plus plots and cast", omdbRow);
+        } else {
+            row(a, list, "Back up playlists", "save playlists, favorites, your categories, My List, hidden items and all settings to a dated WygTV backup file", () -> Backup.backup(a));
+            row(a, list, "Restore from a backup", "reload everything from a WygTV backup file", () -> Backup.restore(a));
+            row(a, list, "Check for updates", "WygTV " + Updater.installedName(a) + "  •  press OK to look for a newer version and install it over this one", () -> Updater.check(a, true));
+            final int autoRow = list.getChildCount();
+            boolean auto = a.prefs.getBoolean(Updater.PREF_AUTO, true);
+            row(a, list, "Look for updates at start-up", auto ? "On  •  offers new versions when WygTV opens" : "Off", () -> {
+                a.prefs.edit().putBoolean(Updater.PREF_AUTO, !a.prefs.getBoolean(Updater.PREF_AUTO, true)).apply();
+                settings(a, autoRow);
+            });
+            String version = Updater.installedName(a);
+            final String about = "WygTV " + version + " for Android TV";
+            row(a, list, "About", about, () -> Toast.makeText(a, about, Toast.LENGTH_SHORT).show());
         }
-        final int bufferRow = list.getChildCount();
-        final String bufferKey = a.prefs.getString(Players.PREF_BUFFER, Players.BUFFER_DEFAULT);
-        row(a, list, "Buffer", Players.BUFFER_LABELS[Math.max(0, indexOf(Players.BUFFER_KEYS, bufferKey))] + "  •  more buffer rides out a shaky connection but takes longer to start a channel", () ->
-                choose(a, "Buffer before playing", Players.BUFFER_LABELS, Math.max(0, indexOf(Players.BUFFER_KEYS, bufferKey)), i -> {
-                    a.prefs.edit().putString(Players.PREF_BUFFER, Players.BUFFER_KEYS[i]).apply();
-                    settings(a, bufferRow);
-                }));
-        final int decoderRow = list.getChildCount();
-        final String decoderKey = a.prefs.getString(Players.PREF_DECODER, Players.DECODER_DEFAULT);
-        row(a, list, "Video decoder", Players.DECODER_LABELS[Math.max(0, indexOf(Players.DECODER_KEYS, decoderKey))] + "  •  try Software first if a channel freezes, shows green blocks or won't play", () ->
-                choose(a, "Video decoder", Players.DECODER_LABELS, Math.max(0, indexOf(Players.DECODER_KEYS, decoderKey)), i -> {
-                    a.prefs.edit().putString(Players.PREF_DECODER, Players.DECODER_KEYS[i]).apply();
-                    settings(a, decoderRow);
-                }));
-        final int subsLiveRow = list.getChildCount();
-        row(a, list, "Subtitles for Live TV", onOff(Subtitles.defaultOn(a.prefs, true)) + "  •  closed captions start on for every channel that sends them. Press OK to switch", () -> {
-            a.prefs.edit().putBoolean(Subtitles.PREF_LIVE, !Subtitles.defaultOn(a.prefs, true)).apply();
-            settings(a, subsLiveRow);
-        });
-        final int subsVodRow = list.getChildCount();
-        if (!liveOnly) row(a, list, "Subtitles for Movies and Series", onOff(Subtitles.defaultOn(a.prefs, false)) + "  •  press OK to switch. In the player, MENU > Subtitles picks a language", () -> {
-            a.prefs.edit().putBoolean(Subtitles.PREF_VOD, !Subtitles.defaultOn(a.prefs, false)).apply();
-            settings(a, subsVodRow);
-        });
-        final int guideRow = list.getChildCount();
-        String custom = a.saved("epg_url");
-        String guideState = a.library.guideStatus();
-        String source = !custom.isEmpty() ? hostOf(custom) + " (your link)" : a.library.activeIsHdhr() ? "HDHomeRun guide (from the tuner)" : m3u ? (a.library.guideUrl().isEmpty() ? "none in this playlist" : hostOf(a.library.guideUrl()) + " (from the playlist)") : "the provider's guide";
-        row(a, list, "TV guide source", source + (guideState.isEmpty() ? "" : "  •  " + guideState), () -> guideSource(a, active, guideRow));
-        if (!custom.isEmpty() || m3u) row(a, list, "Reload TV guide", "download the guide again now", () -> {
-            new Thread(a.library::dropGuide).start();
-            Toast.makeText(a, "The guide will reload the next time it's shown.", Toast.LENGTH_SHORT).show();
-        });
-        final int extraRow = list.getChildCount();
-        int extraCount = a.library.extras.urls().size();
-        row(a, list, "Extra TV guides (XMLTV)", extraCount == 0
-                ? "none  •  press OK to add guide links that fill in channels with no program info"
-                : extraCount + (extraCount == 1 ? " link" : " links") + "  •  " + (a.library.extras.first() ? "used first, the playlist's guide fills the rest" : "fill in channels the playlist's guide leaves empty"),
-                () -> extraGuides(a, extraRow));
-        final int tmdbRow = list.getChildCount();
-        keyRow(a, list, "Movie & series info (TMDb)", Tmdb.PREF_KEY, Tmdb.builtInKey(), "TMDb", "posters, plots, cast and ratings", tmdbRow);
-        final int omdbRow = list.getChildCount();
-        keyRow(a, list, "IMDb ratings (OMDb)", Omdb.PREF_KEY, Omdb.builtInKey(), "OMDb", "IMDb, Rotten Tomatoes and Metacritic ratings, plus plots and cast", omdbRow);
-        final int hiddenRow = list.getChildCount();
-        int hidden = a.hiddenCount();
-        row(a, list, "Hidden categories and channels", hidden == 0 ? "nothing hidden" : hidden + " hidden  •  press OK to show them all again", () -> {
-            if (a.hiddenCount() == 0) { Toast.makeText(a, "Nothing is hidden.", Toast.LENGTH_SHORT).show(); return; }
-            new Dialogs.Builder(a).setTitle("Show everything again?").setMessage("Every hidden category and channel in this playlist comes back.")
-                    .setPositiveButton("Show all", (d, w) -> { a.unhideAll(); settings(a, hiddenRow); }).setNegativeButton("Cancel", null).show();
-        });
-        final int recentRow = list.getChildCount();
-        int recent = a.library.recent().length();
-        row(a, list, "Recently watched", recent == 0 ? "empty" : recent + " items  •  press OK to clear", () -> {
-            if (a.library.recent().length() == 0) return;
-            new Dialogs.Builder(a).setTitle("Clear Recently watched?").setPositiveButton("Clear", (d, w) -> { a.library.clearRecent(); settings(a, recentRow); })
-                    .setNegativeButton("Cancel", null).show();
-        });
-        row(a, list, "Back up playlists", "save playlists, favorites, your categories, My List, hidden items and all settings to a dated WygTV backup file", () -> Backup.backup(a));
-        row(a, list, "Restore from a backup", "reload everything from a WygTV backup file", () -> Backup.restore(a));
-        row(a, list, "Check for updates", "WygTV " + Updater.installedName(a) + "  •  press OK to look for a newer version and install it over this one", () -> Updater.check(a, true));
-        final int autoRow = list.getChildCount();
-        boolean auto = a.prefs.getBoolean(Updater.PREF_AUTO, true);
-        row(a, list, "Look for updates at start-up", auto ? "On  •  offers new versions when WygTV opens" : "Off", () -> {
-            a.prefs.edit().putBoolean(Updater.PREF_AUTO, !a.prefs.getBoolean(Updater.PREF_AUTO, true)).apply();
-            settings(a, autoRow);
-        });
-        String version = Updater.installedName(a);
-        final String about = "WygTV " + version + " for Android TV";
-        row(a, list, "About", about, () -> Toast.makeText(a, about, Toast.LENGTH_SHORT).show());
         int i = Math.max(0, Math.min(focusIndex, list.getChildCount() - 1));
         list.getChildAt(i).requestFocus();
+    }
+
+    /** Back to Settings > Manage playlists, on the HDHomeRun row (after a tuner form or change). */
+    static void backToTuners(MainActivity a) { settingsGroup = GROUP_PLAYLISTS; settings(a, 1); }
+
+    static String groupTitle(String group) {
+        switch (group) {
+            case GROUP_PLAYLISTS: return "Manage playlists";
+            case GROUP_PLAYER: return "Manage player";
+            case GROUP_APPEARANCE: return "Appearance";
+            default: return "Backup & update";
+        }
     }
 
     private static void keyRow(MainActivity a, LinearLayout list, String name, String pref, String builtIn, String service, String what, int row) {
