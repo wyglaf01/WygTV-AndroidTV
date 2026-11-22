@@ -35,7 +35,7 @@ import java.util.concurrent.Executors;
  */
 final class MiniGuide {
     private static final long KEEP_MS = 30 * 60_000L;
-    private static final long WINDOW = 3 * EpgGrid.SLOT;
+    private static final long WINDOW = 4 * EpgGrid.SLOT;
     private static final int AHEAD = 14;
     private static final ExecutorService POOL = Executors.newFixedThreadPool(3);
     private static final Handler UI = new Handler(Looper.getMainLooper());
@@ -102,7 +102,7 @@ final class MiniGuide {
         ViewGroup detail = (ViewGroup) scroll.getParent();
         header = new LinearLayout(a);
         header.setPadding(a.dp(6), a.dp(6), a.dp(6), a.dp(2));
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, a.dp(30));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, a.dp(HEADER_DP));
         lp.setMargins(a.dp(5), 0, a.dp(5), 0);
         detail.addView(header, detail.indexOfChild(scroll), lp);
         drawHeader(a);
@@ -123,7 +123,10 @@ final class MiniGuide {
         }
     }
 
-    private static final int CHANNEL_DP = 170;
+    private static final int CHANNEL_DP = 200, ROW_DP = 48, HEADER_DP = 30;
+
+    /** Height in dp of the guide area showing this many channel rows. */
+    static int height(int rows) { return HEADER_DP + Math.max(3, Math.min(5, rows)) * (ROW_DP + 4) + 6; }
 
     private static View addRow(MainActivity a, LinearLayout list, JSONObject item, ItemAction ok, ItemAction more) {
         String title = item.optString("name", "Untitled");
@@ -144,8 +147,8 @@ final class MiniGuide {
         row.addView(name, new LinearLayout.LayoutParams(a.dp(CHANNEL_DP - 6), -1));
         LinearLayout cells = new LinearLayout(a);
         row.addView(cells, new LinearLayout.LayoutParams(0, -1, 1));
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, a.dp(58));
-        lp.setMargins(a.dp(5), a.dp(3), a.dp(5), a.dp(3));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, a.dp(ROW_DP));
+        lp.setMargins(a.dp(5), a.dp(2), a.dp(5), a.dp(2));
         list.addView(row, lp);
         Row r = new Row(a, item, key(a, item), cells);
         ROWS.put(row, r);

@@ -38,13 +38,21 @@ final class LiveMenu {
         pick(a, "★ Favorites", "fav");
         a.sideFixed = 1;
         a.button("⌕ Search", a.side, a::searchLive);
+        a.button("▦ Full TV guide", a.side, () -> a.openGuide(null));
         Antenna.addMenuEntries(a);
         JSONArray mine = VirtualCategories.all(a);
         for (int i = 0; i < mine.length(); i++) {
             JSONObject c = mine.optJSONObject(i);
             if (c == null) continue;
             String vid = c.optString("id");
-            pick(a, "◆ " + c.optString("name"), vid);
+            String vname = c.optString("name");
+            pick(a, "◆ " + vname, vid).setOnLongClickListener(w -> {
+                new Dialogs.Builder(a).setTitle(vname).setItems(new String[]{"Rename", "Delete", "Cancel"}, (d, which) -> {
+                    if (which == 0) VirtualCategories.rename(a, vid, () -> { a.resumeCategory = vid; top(a); });
+                    else if (which == 1) VirtualCategories.delete(a, vid, () -> { a.resumeCategory = ""; top(a); });
+                }).show();
+                return true;
+            });
         }
         a.button("+ New category", a.side, () -> VirtualCategories.create(a, c -> { a.resumeCategory = c.optString("id"); top(a); }));
         JSONArray pls = a.library.all();

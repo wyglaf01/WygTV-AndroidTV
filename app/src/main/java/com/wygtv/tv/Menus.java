@@ -451,6 +451,13 @@ final class Menus {
                     a.prefs.edit().putString("start_screen", startKeys[i]).apply();
                     settings(a, startRow);
                 }));
+        final int guideRowsRow = list.getChildCount();
+        final String[] guideRows = {"3", "4", "5"};
+        row(a, list, "Live TV guide rows", a.prefs.getInt("guide_rows", 4) + " channels  •  more rows make the preview smaller", () ->
+                choose(a, "Channel rows in the Live TV guide", new String[]{"3 rows", "4 rows", "5 rows"}, indexOf(guideRows, String.valueOf(a.prefs.getInt("guide_rows", 4))), i -> {
+                    a.prefs.edit().putInt("guide_rows", 3 + i).apply();
+                    settings(a, guideRowsRow);
+                }));
         final int formatRow = list.getChildCount();
         if (!m3u) {
             row(a, list, "Live stream format", FORMAT_LABELS[indexOf(FORMAT_KEYS, a.prefs.getString("live_format", "auto"))], () ->
