@@ -11,8 +11,14 @@ const net = require('./net');
 function ffmpegPath() {
   const fs = require('fs');
   if (process.env.WYG_FFMPEG) return process.env.WYG_FFMPEG;
-  // On Linux an installed FFmpeg (apt install ffmpeg) is preferred: it uses the system's libraries.
-  if (process.platform === 'linux' && fs.existsSync('/usr/bin/ffmpeg')) return '/usr/bin/ffmpeg';
+  if (process.platform === 'linux') {
+    // An installed FFmpeg (the .deb depends on Ubuntu's) uses the system's libraries: preferred.
+    if (!process.env.WYG_NO_SYSTEM_FFMPEG && fs.existsSync('/usr/bin/ffmpeg')) return '/usr/bin/ffmpeg';
+    // Otherwise (AppImage) the up-to-date static build shipped in resources/ffmpeg. ffmpeg-static's
+    // Linux build crashes on newer kernels such as Ubuntu 24.04's, so it is only the last resort.
+    const own = process.resourcesPath ? require('path').join(process.resourcesPath, 'ffmpeg', 'ffmpeg') : '';
+    if (own && fs.existsSync(own)) return own;
+  }
   let p = '';
   try { p = require('ffmpeg-static'); } catch { }
   if (p) p = p.replace('app.asar' + require('path').sep, 'app.asar.unpacked' + require('path').sep);

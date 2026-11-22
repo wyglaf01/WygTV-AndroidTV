@@ -9,6 +9,10 @@ const hdhr = require('./hdhr');
 const stream = require('./stream');
 const updater = require('./updater');
 const { EpgStore } = require('./epg');
+const smoke = require('./smoke');
+
+// The AppImage gets --no-sandbox from its launcher script (linux/after-pack.js).
+const smokeTest = smoke.prepare(app);
 
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 // Hardware HEVC decoding where the graphics card supports it (Windows).
@@ -34,6 +38,7 @@ function createWindow() {
   });
   Menu.setApplicationMenu(null);
   win.once('ready-to-show', () => win.show());
+  if (smokeTest) smoke.run(app, win, stream);
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: 'deny' }; });
   win.webContents.on('will-navigate', (e, url) => { if (!url.startsWith('file:')) e.preventDefault(); });

@@ -107,13 +107,39 @@
     if (e.target._onfocus) e.target._onfocus(e);
   });
 
-  // Mouse: hovering focuses (so the keyboard picks up where the mouse is), right-click opens options.
+  /*
+   * Mouse: hovering focuses (so the keyboard picks up where the mouse is) - but only when the mouse itself
+   * moves. Scrolling with the wheel slides items under a still pointer and Chromium then sends "mousemove"
+   * events at the same spot; following those made focus jump around (and menus switch categories) mid-scroll.
+   */
+  W.inputMode = 'key';
+  let lastX = -1, lastY = -1, lastWheel = 0;
   document.addEventListener('mousemove', (e) => {
+    if (e.clientX === lastX && e.clientY === lastY) return;
+    lastX = e.clientX; lastY = e.clientY;
+    if (Date.now() - lastWheel < 250) return;
+    W.inputMode = 'mouse';
     const el = e.target.closest && e.target.closest('.f');
     if (el && el !== document.activeElement && scope().contains(el) && !(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))) {
       el.focus({ preventScroll: true });
     }
-  });
+  }, { passive: true });
+  document.addEventListener('mousedown', () => { W.inputMode = 'mouse'; }, { passive: true });
+  document.addEventListener('wheel', (e) => {
+    lastWheel = Date.now();
+    W.inputMode = 'mouse';
+    // Rows that scroll sideways (home strips): the ordinary wheel scrolls them too.
+    const strip = e.target.closest && e.target.closest('.strip');
+    if (strip && !e.shiftKey && Math.abs(e.deltaY) > Math.abs(e.deltaX) && strip.scrollWidth > strip.clientWidth) {
+      const before = strip.scrollLeft;
+      strip.scrollLeft += e.deltaY;
+      if (strip.scrollLeft !== before) e.preventDefault();
+    }
+  }, { passive: false });
+
+  /** Wraps a focus handler so it only runs for keyboard / remote focus, not for the mouse passing over. */
+  W.keyOnly = (fn) => (e) => { if (W.inputMode === 'key') fn(e); };
+
   document.addEventListener('contextmenu', (e) => {
     const el = e.target.closest && e.target.closest('.f');
     if (el && el._long) { e.preventDefault(); el._long(); }
@@ -122,6 +148,7 @@
   let enterTimer = null, enterLong = false, enterEl = null;
 
   document.addEventListener('keydown', (e) => {
+    W.inputMode = 'key';
     if (W.keyHook && W.keyHook(e)) { e.preventDefault(); return; }
     const t = document.activeElement;
     const typing = t && (/INPUT|TEXTAREA|SELECT/.test(t.tagName));
