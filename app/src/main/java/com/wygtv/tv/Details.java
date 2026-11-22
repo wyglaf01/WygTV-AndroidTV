@@ -44,16 +44,19 @@ final class Details {
      * Opens the details of a movie ("vod") or series row. {@code category} and {@code list} are where it was picked,
      * so Back (and the player's Back) return to the same row.
      */
-    static void open(MainActivity a, String type, JSONObject item, String category, JSONArray list) {
+    static void open(MainActivity a, String type, JSONObject item, String category, JSONArray list) { open(a, type, item, category, list, null); }
+
+    /** Same, but Back goes to {@code back} (e.g. the master Search) instead of the movie/series list. */
+    static void open(MainActivity a, String type, JSONObject item, String category, JSONArray list, Runnable back) {
         boolean series = type.equals("series");
         String id = item.optString(series ? "series_id" : "stream_id");
         String name = item.optString("name", "Untitled");
         String ext = item.optString("container_extension", "mp4");
-        Runnable reopen = () -> open(a, type, item, category, list);
+        Runnable reopen = () -> open(a, type, item, category, list, back);
 
         a.detailsType = type;
         a.mode = "details";
-        a.detailsBack = () -> { a.resumeCategory = category; a.resumeStreamId = id; a.browse(type); };
+        a.detailsBack = back != null ? back : () -> { a.resumeCategory = category; a.resumeStreamId = id; a.browse(type); };
         a.shell(series ? "SERIES" : "MOVIES");
         final int generation = a.screenGeneration;
 
