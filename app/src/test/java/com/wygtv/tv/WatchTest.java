@@ -58,4 +58,36 @@ public class WatchTest {
         assertEquals("1h 5m", Watch.clock(65 * 60_000));
         assertEquals("12 min", Watch.clock(12 * 60_000));
     }
+
+    @Test public void afterMovesToTheNextSeason() throws Exception {
+        JSONObject eps = show();
+        assertArrayEquals(new String[]{"1", "1"}, Watch.after(eps, "a1"));
+        assertArrayEquals(new String[]{"2", "0"}, Watch.after(eps, "a2"));
+        assertArrayEquals(new String[]{"10", "0"}, Watch.after(eps, "b2"));
+        assertNull(Watch.after(eps, "x1"));
+        assertNull(Watch.after(eps, "nope"));
+        assertNull(Watch.after(null, "a1"));
+    }
+
+    @Test public void afterCanSkipWatched() throws Exception {
+        JSONObject eps = show(), state = new JSONObject();
+        Watch.update(state, "a2", "1", "2", 39 * 60_000, 40 * 60_000);
+        Watch.update(state, "b1", "2", "1", 39 * 60_000, 40 * 60_000);
+        assertArrayEquals(new String[]{"2", "1"}, Watch.after(eps, "a1", state));
+        assertArrayEquals(new String[]{"2", "0"}, Watch.after(eps, "a2"));
+    }
+
+    @Test public void markSeasonAndSeries() throws Exception {
+        JSONObject eps = show(), state = new JSONObject();
+        Watch.mark(state, eps, "2", true);
+        assertTrue(Watch.done(state, "b1"));
+        assertTrue(Watch.done(state, "b2"));
+        assertFalse(Watch.done(state, "a1"));
+        assertFalse(Watch.allDone(eps, state));
+        Watch.mark(state, eps, null, true);
+        assertTrue(Watch.allDone(eps, state));
+        Watch.mark(state, eps, null, false);
+        assertFalse(Watch.done(state, "x1"));
+        assertEquals(0, Watch.doneIn(eps.optJSONArray("2"), state));
+    }
 }

@@ -11,13 +11,78 @@ import java.util.List;
 /**
  * Series watch progress, per playlist and series: for every episode played, where it stopped and whether it was
  * finished; plus which episode was played last. Saved in prefs under {@code <accountPrefix>watch_series_<id>} as
- * {"last": episodeId, "eps": {episodeId: {"pos": ms, "dur": ms, "done": bool, "s": season, "e": episode number}}}.
+ * {"last": episodeId, "complete": bool, "eps": {episodeId: {"pos": ms, "dur": ms, "done": bool, "s": season, "e": episode number}}}.
+ * "complete" is true once every episode the provider lists is watched (kept up to date whenever the episode list
+ * is loaded or changed), so lists can show ✓ or hide a watched series without loading its episodes.
  */
 final class Watch {
     /** An episode counts as watched past 90% or with under 3 minutes left. */
     static boolean finished(long pos, long dur) { return dur > 0 && (pos >= dur * 9 / 10 || dur - pos < 180_000); }
 
     private Watch() { }
+
+    // Settings: what to do with series that are all watched, and whether Play next skips watched episodes.
+    static final String PREF_HIDE_WATCHED = "hide_watched_series", PREF_SKIP_WATCHED = "next_skips_watched";
+
+    static boolean hideWatched(MainActivity a) { return a.prefs.getBoolean(PREF_HIDE_WATCHED, false); }
+
+    static boolean skipWatched(MainActivity a) { return a.prefs.getBoolean(PREF_SKIP_WATCHED, true); }
+
+    /** True when every episode of the series was marked watched (without parsing anything for unwatched series). */
+    static boolean complete(MainActivity a, String seriesId) {
+        return a.prefs.contains(key(a, seriesId)) && load(a, seriesId).optBoolean("complete");
+    }
+
+    static void save(MainActivity a, String seriesId, JSONObject state) { a.prefs.edit().putString(key(a, seriesId), state.toString()).apply(); }
+
+    /** Sets "complete" from the full episode list; returns the updated state. */
+    static JSONObject refresh(MainActivity a, String seriesId, JSONObject episodes) {
+        JSONObject state = load(a, seriesId);
+        boolean all = allDone(episodes, state);
+        if (all != state.optBoolean("complete")) {
+            try { state.put("complete", all); save(a, seriesId, state); } catch (Exception ignored) { }
+        }
+        return state;
+    }
+
+    static boolean allDone(JSONObject episodes, JSONObject state) {
+        int total = 0, done = 0;
+        for (String s : seasons(episodes)) {
+            JSONArray eps = episodes.optJSONArray(s);
+            total += eps == null ? 0 : eps.length();
+            done += doneIn(eps, state);
+        }
+        return total > 0 && done == total;
+    }
+
+    /** Marks a whole season (or, with season null, the whole series) watched or not watched. */
+    static void markAll(MainActivity a, String seriesId, JSONObject episodes, String season, boolean done) {
+        JSONObject state = load(a, seriesId);
+        try {
+            mark(state, episodes, season, done);
+            state.put("complete", allDone(episodes, state));
+            save(a, seriesId, state);
+        } catch (Exception ignored) { }
+    }
+
+    static void mark(JSONObject state, JSONObject episodes, String season, boolean done) throws Exception {
+        JSONObject eps = state.optJSONObject("eps");
+        if (eps == null) { eps = new JSONObject(); state.put("eps", eps); }
+        for (String s : seasons(episodes)) {
+            if (season != null && !season.equals(s)) continue;
+            JSONArray list = episodes.optJSONArray(s);
+            for (int i = 0; list != null && i < list.length(); i++) {
+                JSONObject e = list.optJSONObject(i);
+                if (e == null) continue;
+                String id = e.optString("id");
+                if (done) {
+                    String n = e.optString("episode_num");
+                    eps.put(id, new JSONObject().put("pos", 0).put("dur", 0).put("done", true).put("s", s).put("e", n.isEmpty() || n.equals("0") ? String.valueOf(i + 1) : n));
+                } else eps.remove(id);
+            }
+        }
+        if (!done && season == null) state.remove("last");
+    }
 
     static String key(MainActivity a, String seriesId) { return a.accountPrefix() + "watch_series_" + seriesId; }
 
@@ -112,6 +177,28 @@ final class Watch {
         return null;
     }
 
+    /**
+     * The episode straight after {@code episodeId} in season order, moving on to the next season after a season's
+     * last episode. Returns {season, index in that season}, or null for the last episode (or an unknown id).
+     */
+    static String[] after(JSONObject episodes, String episodeId) { return after(episodes, episodeId, null); }
+
+    /** Like {@link #after(JSONObject, String)}, but with a state given, skips episodes already watched. */
+    static String[] after(JSONObject episodes, String episodeId, JSONObject skipDoneIn) {
+        if (episodes == null || episodeId == null) return null;
+        boolean passed = false;
+        for (String s : seasons(episodes)) {
+            JSONArray eps = episodes.optJSONArray(s);
+            for (int i = 0; eps != null && i < eps.length(); i++) {
+                JSONObject e = eps.optJSONObject(i);
+                if (e == null) continue;
+                if (passed && (skipDoneIn == null || !done(skipDoneIn, e.optString("id")))) return new String[]{s, String.valueOf(i)};
+                if (episodeId.equals(e.optString("id"))) passed = true;
+            }
+        }
+        return null;
+    }
+
     /** How many episodes of a season are watched. */
     static int doneIn(JSONArray eps, JSONObject state) {
         int n = 0;
@@ -133,6 +220,7 @@ final class Watch {
     static String summary(JSONObject state) {
         String last = state.optString("last");
         JSONObject e = last.isEmpty() ? null : entry(state, last);
+        if (state.optBoolean("complete")) return "✓ all watched";
         if (e == null) return "";
         String at = "S" + e.optString("s") + " E" + e.optString("e");
         return e.optBoolean("done") ? "watched " + at : "stopped in " + at;
