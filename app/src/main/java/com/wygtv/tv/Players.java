@@ -1,17 +1,28 @@
 package com.wygtv.tv;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.widget.Toast;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import androidx.annotation.OptIn;
 import androidx.media3.common.C;
+import androidx.media3.common.MimeTypes;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.common.Tracks;
 import androidx.media3.common.util.UnstableApi;
+import androidx.media3.datasource.DefaultDataSource;
+import androidx.media3.datasource.DefaultHttpDataSource;
 import androidx.media3.datasource.HttpDataSource;
+import androidx.media3.exoplayer.DefaultLoadControl;
 import androidx.media3.exoplayer.DefaultRenderersFactory;
 import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.exoplayer.mediacodec.MediaCodecInfo;
+import androidx.media3.exoplayer.mediacodec.MediaCodecSelector;
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 
 /**
  * Builds every player in the app. Over-the-air TV (HDHomeRun) is MPEG-TS with MPEG-2 video and Dolby
@@ -24,21 +35,89 @@ import androidx.media3.exoplayer.ExoPlayer;
 final class Players {
     private Players() { }
 
-    static ExoPlayer create(Context c) {
-        DefaultRenderersFactory renderers = new DefaultRenderersFactory(c)
-                .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
-                .setEnableDecoderFallback(true);
-        return new ExoPlayer.Builder(c, renderers).build();
+    /** Settings: how many seconds to load before a stream starts (and after it runs dry) for the main player. */
+    static final String PREF_BUFFER = "play_buffer";
+    static final String[] BUFFER_KEYS = {"off", "small", "medium", "large"};
+    static final String[] BUFFER_LABELS = {"Off  •  starts fastest", "Small  •  5 seconds (recommended)", "Medium  •  10 seconds", "Large  •  20 seconds"};
+    static final String BUFFER_DEFAULT = "small";
+
+    /** Settings: which video decoders to try first. */
+    static final String PREF_DECODER = "video_decoder";
+    static final String[] DECODER_KEYS = {"auto", "hardware", "software"};
+    static final String[] DECODER_LABELS = {"Automatic (device default)", "Hardware first", "Software first"};
+
+    /** Seconds loaded before playback starts for a buffer choice; 0 keeps Media3's own 2.5 s start. */
+    static int bufferSeconds(String key) {
+        switch (key == null ? "" : key) {
+            case "off": return 0;
+            case "medium": return 10;
+            case "large": return 20;
+            default: return 5;
+        }
     }
 
-    /** Explains HDHomeRun problems in plain words: all tuners busy, weak signal, or video this device can't decode. */
+    /** {min buffer, max buffer, needed to start, needed to restart after running dry}, all in ms. */
+    static int[] bufferMs(int seconds) {
+        if (seconds <= 0) return new int[] {
+                DefaultLoadControl.DEFAULT_MIN_BUFFER_MS, DefaultLoadControl.DEFAULT_MAX_BUFFER_MS,
+                DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS, DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS };
+        int start = seconds * 1000;
+        int min = Math.max(DefaultLoadControl.DEFAULT_MIN_BUFFER_MS, start * 4);
+        int max = Math.max(DefaultLoadControl.DEFAULT_MAX_BUFFER_MS, min + 20_000);
+        return new int[] { min, max, start, Math.max(DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS, start * 2) };
+    }
+
+    /** The guide preview: quick start, no extra buffer. */
+    static ExoPlayer create(Context c) { return create(c, 0); }
+
+    /** The full-screen player, with the buffer and decoder chosen in Settings. */
+    static ExoPlayer create(Context c, SharedPreferences prefs) {
+        return create(c, bufferSeconds(prefs.getString(PREF_BUFFER, BUFFER_DEFAULT)), prefs.getString(PREF_DECODER, "auto"));
+    }
+
+    private static ExoPlayer create(Context c, int bufferSeconds) {
+        return create(c, bufferSeconds, c.getSharedPreferences("wygtv", Context.MODE_PRIVATE).getString(PREF_DECODER, "auto"));
+    }
+
+    private static ExoPlayer create(Context c, int bufferSeconds, String decoder) {
+        DefaultRenderersFactory renderers = new DefaultRenderersFactory(c)
+                .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+                .setEnableDecoderFallback(true)
+                .setMediaCodecSelector(codecs(decoder));
+        // Many IPTV servers redirect from http to https (or the other way); allow it, and wait a bit longer on slow servers.
+        DefaultHttpDataSource.Factory http = new DefaultHttpDataSource.Factory()
+                .setAllowCrossProtocolRedirects(true)
+                .setConnectTimeoutMs(12_000)
+                .setReadTimeoutMs(15_000);
+        int[] b = bufferMs(bufferSeconds);
+        DefaultLoadControl load = new DefaultLoadControl.Builder()
+                .setBufferDurationsMs(b[0], b[1], b[2], b[3])
+                .setPrioritizeTimeOverSizeThresholds(true)
+                .build();
+        return new ExoPlayer.Builder(c, renderers)
+                .setMediaSourceFactory(new DefaultMediaSourceFactory(new DefaultDataSource.Factory(c, http)))
+                .setLoadControl(load)
+                .build();
+    }
+
+    /** Puts hardware or software video decoders first; audio and "auto" keep the device's own order. */
+    static MediaCodecSelector codecs(String decoder) {
+        if (!"hardware".equals(decoder) && !"software".equals(decoder)) return MediaCodecSelector.DEFAULT;
+        final boolean software = "software".equals(decoder);
+        return (mimeType, secure, tunneling) -> {
+            List<MediaCodecInfo> all = MediaCodecSelector.DEFAULT.getDecoderInfos(mimeType, secure, tunneling);
+            if (!MimeTypes.isVideo(mimeType)) return all;
+            List<MediaCodecInfo> first = new ArrayList<>(), rest = new ArrayList<>();
+            for (MediaCodecInfo info : all) (info.softwareOnly == software ? first : rest).add(info);
+            first.addAll(rest);
+            return first;
+        };
+    }
+
+    /** Tells the viewer when this device can't decode an HDHomeRun channel's video. Errors are explained by {@link #tunerMessage} once {@link Recovery} gives up. */
     static void explainTunerProblems(Context c, ExoPlayer player) {
         player.addListener(new Player.Listener() {
             boolean toldVideo;
-
-            @Override public void onPlayerError(PlaybackException error) {
-                Toast.makeText(c, tunerMessage(error), Toast.LENGTH_LONG).show();
-            }
 
             @Override public void onTracksChanged(Tracks tracks) {
                 if (toldVideo || tracks.isEmpty()) return;
