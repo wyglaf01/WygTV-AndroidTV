@@ -62,7 +62,6 @@ final class LiveMenu {
             boolean on = p.optString("id").equals(active);
             a.button((on ? "▤ " : "▢ ") + Library.nameOf(p) + "  ›", a.side, () -> openPlaylist(a, p));
         }
-        a.button("⚙ Manage playlists", a.side, a::playlists);
         String resume = a.resumeCategory;
         a.resumeCategory = null;
         // Start in the menu (Favorites highlighted) unless coming back from a channel, which re-focuses that channel.

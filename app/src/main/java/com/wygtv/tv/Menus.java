@@ -424,7 +424,7 @@ final class Menus {
         boolean m3u = a.library.activeIsM3u();
         JSONObject active = a.library.find(a.library.activeId());
 
-        row(a, list, "Playlist", active == null ? "none" : active.optString("title") + "  (" + (a.library.activeIsHdhr() ? "HDHomeRun" : m3u ? "M3U" : "Xtream Codes") + ")", () -> a.playlists());
+        row(a, list, "Manage playlists", (active == null ? "none" : "Watching " + active.optString("title") + "  (" + (a.library.activeIsHdhr() ? "HDHomeRun" : m3u ? "M3U" : "Xtream Codes") + ")") + "  •  press OK to add, edit, refresh or delete playlists", () -> a.playlists());
         java.util.List<JSONObject> tuners = Antenna.tuners(a);
         row(a, list, "HDHomeRun antenna TV", tuners.isEmpty()
                 ? "not added  •  press OK to add your tuner. Its channels show in Live TV as " + Antenna.DEFAULT_NAME
