@@ -11,6 +11,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -35,9 +36,14 @@ final class PosterGrid {
     private PosterGrid() { }
 
     static void show(MainActivity a, int ignoredOffset) {
+        a.detail.removeAllViews();
+        showIn(a, a.detail, a.items, true);
+    }
+
+    /** The info panel and poster grid for these items, added to box (the right-hand pane, or under the search bar). */
+    static void showIn(MainActivity a, LinearLayout box, JSONArray items, boolean takeFocus) {
         boolean series = a.mode.equals("series");
         String type = a.mode, key = series ? "series_id" : "stream_id";
-        JSONArray items = a.items;
         // Posters are added in chunks as you scroll down, so a big category opens fast and scrolls to the end.
         int want = PAGE;
         if (a.resumeStreamId != null) {
@@ -47,13 +53,12 @@ final class PosterGrid {
             }
         }
         final int generation = a.screenGeneration, list = a.listGeneration;
-        a.detail.removeAllViews();
 
         // Info panel for the focused title.
         LinearLayout info = new LinearLayout(a);
         info.setOrientation(LinearLayout.VERTICAL);
         info.setPadding(a.dp(10), 0, a.dp(10), a.dp(6));
-        a.detail.addView(info, new LinearLayout.LayoutParams(-1, a.dp(150)));
+        box.addView(info, new LinearLayout.LayoutParams(-1, a.dp(150)));
         TextView title = line(a, info, 24, Theme.TEXT, 1);
         title.setTypeface(null, Typeface.BOLD);
         TextView facts = line(a, info, 15, Theme.ACCENT, 1);
@@ -63,7 +68,7 @@ final class PosterGrid {
 
         ScrollView sv = new ScrollView(a);
         sv.setSmoothScrollingEnabled(true);
-        a.detail.addView(sv, new LinearLayout.LayoutParams(-1, 0, 1));
+        box.addView(sv, new LinearLayout.LayoutParams(-1, 0, 1));
         LinearLayout grid = new LinearLayout(a);
         grid.setOrientation(LinearLayout.VERTICAL);
         grid.setPadding(0, a.dp(4), 0, a.dp(12));
@@ -111,6 +116,7 @@ final class PosterGrid {
         a.resumeStreamId = null;
         View first = grid.getChildCount() > 0 ? ((LinearLayout) grid.getChildAt(0)).getChildAt(0) : null;
         if (resumeTile[0] != null) resumeTile[0].requestFocus();
+        else if (!takeFocus) return;
         else if (first != null) first.requestFocus();
         else if (a.side.getChildCount() > a.sideFixed) a.side.getChildAt(a.sideFixed).requestFocus();
     }
@@ -163,6 +169,13 @@ final class PosterGrid {
 
         t.setTag(id);
         t.setOnClickListener(v -> a.select(item));
+        // Hold OK (or Menu): add to / remove from My List without opening the details.
+        t.setOnLongClickListener(v -> {
+            boolean added = a.toggleMyList(type, item);
+            Toast.makeText(a, (added ? "Added to My List: " : "Removed from My List: ") + name, Toast.LENGTH_SHORT).show();
+            if (!added && "mylist".equals(a.category)) a.showMyList();
+            return true;
+        });
         return t;
     }
 
