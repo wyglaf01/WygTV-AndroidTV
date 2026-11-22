@@ -50,12 +50,16 @@ public class MainActivity extends Activity {
   LinearLayout center=new LinearLayout(this);center.setOrientation(LinearLayout.VERTICAL);center.setGravity(Gravity.CENTER);layout.addView(center,new LinearLayout.LayoutParams(-1,0,1));
   TextView welcome=label("YOUR NEXT SAGA AWAITS",15);welcome.setTextColor(Theme.ACCENT);welcome.setLetterSpacing(.18f);welcome.setGravity(Gravity.CENTER);center.addView(welcome,new LinearLayout.LayoutParams(-1,dp(35)));
   TextView heading=label("Choose your adventure",30);heading.setTypeface(null,Typeface.BOLD);heading.setGravity(Gravity.CENTER);center.addView(heading,new LinearLayout.LayoutParams(-1,dp(60)));
-  LinearLayout tiles=new LinearLayout(this);tiles.setGravity(Gravity.CENTER);center.addView(tiles,new LinearLayout.LayoutParams(-1,dp(135)));
-  TextView live=homeTile("▣","Live TV",tiles,()->browse("live"));if(library.activeIsM3u())homeTile("▦","TV Guide",tiles,()->openGuide(null));else{homeTile("▶","Movies",tiles,()->browse("vod"));homeTile("▤","Series",tiles,()->browse("series"));}homeTile("↺","Recent",tiles,()->recent());
+  LinearLayout tiles=new LinearLayout(this);tiles.setGravity(Gravity.CENTER);center.addView(tiles,new LinearLayout.LayoutParams(-1,dp(125)));
+  TextView live=homeTile("▣","Live TV",tiles,()->browse("live"));if(library.activeIsM3u())homeTile("▦","TV Guide",tiles,()->openGuide(null));else{homeTile("▶","Movies",tiles,()->browse("vod"));homeTile("▤","Series",tiles,()->browse("series"));}
+  /* Second row: Recent, Favorites, and each HDHomeRun tuner as "Antenna TV" when one is set up. */
+  LinearLayout shortcuts=new LinearLayout(this);shortcuts.setGravity(Gravity.CENTER);center.addView(shortcuts,new LinearLayout.LayoutParams(-1,dp(105)));
+  homeTile("↺","Recent",shortcuts,()->recent());homeTile("★","Favorites",shortcuts,()->LiveMenu.openAt(this,"fav",true));for(JSONObject t:Antenna.tuners(this)){String aid=Antenna.PREFIX+t.optString("id");homeTile("📡",Antenna.nameOf(t),shortcuts,()->LiveMenu.openAt(this,aid,true));}
+  for(int i=0;i<shortcuts.getChildCount();i++)((TextView)shortcuts.getChildAt(i)).setTextSize(20);
   LinearLayout footer=new LinearLayout(this);footer.setGravity(Gravity.CENTER_VERTICAL);layout.addView(footer,new LinearLayout.LayoutParams(-1,dp(56)));
   TextView manage=button("☰  Playlists",footer,()->playlists());manage.setTextSize(16);manage.setGravity(Gravity.CENTER);manage.setLayoutParams(new LinearLayout.LayoutParams(dp(170),dp(48)));TextView gear=button("⚙  Settings",footer,()->settings());gear.setTextSize(16);gear.setGravity(Gravity.CENTER);gear.setLayoutParams(new LinearLayout.LayoutParams(dp(170),dp(48)));
   status=label("",13);status.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);status.setTextColor(Theme.MUTED);footer.addView(status,new LinearLayout.LayoutParams(0,-1,1));status.setText(saved("host").isEmpty()?"Connect your playlist to begin":"Watching • "+saved("title")+(library.activeIsHdhr()?"  (HDHomeRun)":library.activeIsM3u()?"  (M3U)":""));
-  manage.setId(View.generateViewId());live.setId(View.generateViewId());for(int i=0;i<tiles.getChildCount();i++)tiles.getChildAt(i).setNextFocusDownId(manage.getId());manage.setNextFocusUpId(live.getId());gear.setNextFocusUpId(live.getId());live.requestFocus();
+  manage.setId(View.generateViewId());live.setId(View.generateViewId());View recentTile=shortcuts.getChildAt(0);recentTile.setId(View.generateViewId());for(int i=0;i<shortcuts.getChildCount();i++)shortcuts.getChildAt(i).setNextFocusDownId(manage.getId());manage.setNextFocusUpId(recentTile.getId());gear.setNextFocusUpId(recentTile.getId());live.requestFocus();
  }
  TextView homeTile(String icon,String title,LinearLayout parent,Runnable action){
   TextView tile=label(icon+"\n"+title,24);tile.setGravity(Gravity.CENTER);tile.setTypeface(null,Typeface.BOLD);tile.setFocusable(true);tile.setClickable(true);tile.setBackground(homeTileBackground(false));
