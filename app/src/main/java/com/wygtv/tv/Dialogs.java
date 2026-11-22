@@ -18,6 +18,8 @@ final class Dialogs {
             AlertDialog d = super.create();
             if (d.getWindow() != null) d.getWindow().setBackgroundDrawable(background(getContext()));
             d.setOnShowListener(x -> tint(d));
+            // Down on the last item of a pick list goes back to the top (after the buttons, if any), Up on the first goes to the bottom.
+            d.setOnKeyListener((x, code, e) -> FocusWrap.dialogKey(d, d.getListView(), e));
             return d;
         }
     }

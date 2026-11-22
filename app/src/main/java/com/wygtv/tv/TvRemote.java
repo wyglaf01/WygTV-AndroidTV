@@ -483,6 +483,10 @@ final class TvRemote {
             case KeyEvent.KEYCODE_CHANNEL_DOWN:
             case KeyEvent.KEYCODE_PAGE_DOWN:
                 return !a.mode.equals("guide") && jumpFocus(LIST_JUMP);
+            case KeyEvent.KEYCODE_DPAD_UP:
+            case KeyEvent.KEYCODE_DPAD_DOWN:
+                // Down on the last item goes back to the top, Up on the first goes to the bottom.
+                return !a.mode.equals("guide") && FocusWrap.screenKey(a.getWindow().getDecorView(), a.getCurrentFocus(), e);
             case KeyEvent.KEYCODE_MOVE_HOME:
                 return jumpFocus(-100_000);
             case KeyEvent.KEYCODE_MOVE_END:
