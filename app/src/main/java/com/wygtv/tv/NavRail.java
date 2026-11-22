@@ -18,6 +18,11 @@ import java.util.List;
  */
 final class NavRail {
     static final int COLLAPSED_DP = 68, EXPANDED_DP = 250;
+    /**
+     * Tag a screen's top-right control with this, and Right from the top third of the menu goes straight
+     * to it (sideways across the top of the screen) instead of back to where focus was further down.
+     */
+    static final String TOP_TARGET = "navrail_top_target";
 
     private final MainActivity a;
     private final LinearLayout rail;
@@ -132,7 +137,7 @@ final class NavRail {
         });
         // Right closes the menu and goes back into the screen.
         v.setOnKeyListener((w, code, e) -> {
-            if (e.getAction() == android.view.KeyEvent.ACTION_DOWN && code == android.view.KeyEvent.KEYCODE_DPAD_RIGHT) { collapseAndReturn(); return true; }
+            if (e.getAction() == android.view.KeyEvent.ACTION_DOWN && code == android.view.KeyEvent.KEYCODE_DPAD_RIGHT) { if (!acrossTop(w)) collapseAndReturn(); return true; }
             // Up/Down stay in the menu; Left does nothing.
             if (code == android.view.KeyEvent.KEYCODE_DPAD_UP || code == android.view.KeyEvent.KEYCODE_DPAD_DOWN) {
                 if (e.getAction() == android.view.KeyEvent.ACTION_DOWN) {
@@ -164,6 +169,18 @@ final class NavRail {
             if (target == null) target = firstFocusable((ViewGroup) content);
             if (target != null) target.requestFocus();
         }
+    }
+
+    /** Right from an item in the top third of the menu: jump to the screen's top-right control, if it has one. */
+    private boolean acrossTop(View item) {
+        ViewGroup frame = (ViewGroup) rail.getParent();
+        View content = frame == null ? null : frame.getChildAt(0);
+        if (content == null || rail.getHeight() == 0) return false;
+        if (item.getTop() + item.getHeight() / 2 > rail.getHeight() / 3) return false;
+        View target = content.findViewWithTag(TOP_TARGET);
+        if (target == null || !target.isShown() || !target.isFocusable()) return false;
+        setExpanded(false);
+        return target.requestFocus();
     }
 
     private static View firstFocusable(ViewGroup g) {
