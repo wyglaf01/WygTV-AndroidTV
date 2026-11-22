@@ -73,6 +73,16 @@ final class Library {
      * The saved playlists that are switched on: everything the menus, guides, Favorites and Search read from.
      * A switched-off playlist is skipped (never downloaded or refreshed) until it is switched back on.
      */
+    /** The first switched-on playlist with movies and series (Xtream Codes), or null when none has them. */
+    JSONObject firstVod() {
+        JSONArray l = inUse();
+        for (int i = 0; i < l.length(); i++) { JSONObject p = l.optJSONObject(i); if (p != null && !M3U.equals(p.optString("type"))) return p; }
+        return null;
+    }
+
+    /** True when any switched-on playlist has movies and series, so Home and the side menu show them. */
+    boolean hasVod() { return firstVod() != null; }
+
     JSONArray inUse() {
         JSONArray l = all(), out = new JSONArray();
         java.util.Set<String> off = offIds();

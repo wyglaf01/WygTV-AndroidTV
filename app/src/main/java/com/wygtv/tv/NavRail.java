@@ -60,7 +60,7 @@ final class NavRail {
         rail.setTag(FocusWrap.MENU); // Up/Down stay in the menu (FocusWrap.menuKey), wrapping at the ends
         rail.setPadding(a.dp(8), a.dp(16), a.dp(8), a.dp(12));
         rail.setBackground(background(false));
-        boolean m3u = a.library.activeIsM3u();
+        boolean vod = a.library.hasVod(); // any switched-on playlist with movies and series
         // Each movable entry under its Settings → Appearance → Side menu order key; laid out in the saved order.
         java.util.Map<String, Runnable> entries = new java.util.HashMap<>();
         if (a.liveOnly()) {
@@ -73,9 +73,9 @@ final class NavRail {
             entries.put("home", () -> add("⌂", "Home", "home", current, () -> a.home()));
             entries.put("guide", () -> add("▦", "TV Guide", "guide", current, () -> a.openGuide(null)));
             entries.put("live", () -> add("▣", "Live TV", "live", current, () -> a.browse("live")));
-            if (!m3u) {
-                entries.put("vod", () -> add("▶", "Movies", "vod", current, () -> a.browse("vod")));
-                entries.put("series", () -> add("▤", "Series", "series", current, () -> a.browse("series")));
+            if (vod) {
+                entries.put("vod", () -> add("▶", "Movies", "vod", current, () -> a.browseVod("vod")));
+                entries.put("series", () -> add("▤", "Series", "series", current, () -> a.browseVod("series")));
             }
             java.util.List<org.json.JSONObject> tuners = Antenna.tuners(a);
             if (!tuners.isEmpty()) entries.put("antenna", () -> {
