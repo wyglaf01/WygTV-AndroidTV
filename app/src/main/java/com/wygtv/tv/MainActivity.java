@@ -54,7 +54,7 @@ public class MainActivity extends Activity {
   TextView welcome=label("YOUR NEXT SAGA AWAITS",15);welcome.setTextColor(Theme.ACCENT);welcome.setLetterSpacing(.18f);welcome.setGravity(Gravity.CENTER);center.addView(welcome,new LinearLayout.LayoutParams(-1,dp(35)));
   TextView heading=label("Choose your adventure",30);heading.setTypeface(null,Typeface.BOLD);heading.setGravity(Gravity.CENTER);center.addView(heading,new LinearLayout.LayoutParams(-1,dp(60)));
   LinearLayout tiles=new LinearLayout(this);tiles.setGravity(Gravity.CENTER);center.addView(tiles,new LinearLayout.LayoutParams(-1,dp(125)));
-  TextView live=homeTile("▣","Live TV",tiles,()->browse("live"));if(library.activeIsM3u())homeTile("▦","TV Guide",tiles,()->openGuide(null));else{homeTile("▶","Movies",tiles,()->browse("vod"));homeTile("▤","Series",tiles,()->browse("series"));}
+  TextView live=homeTile("▣","Live TV",tiles,()->browse("live"));/* Movies and Series show whenever any switched-on playlist has them, even while an M3U or antenna playlist is playing. */if(library.activeIsM3u())homeTile("▦","TV Guide",tiles,()->openGuide(null));if(library.hasVod()){homeTile("▶","Movies",tiles,()->browseVod("vod"));homeTile("▤","Series",tiles,()->browseVod("series"));}
   /* Second row: Search (everything, every playlist) and each HDHomeRun tuner as "Antenna TV" when one is set up. Favorites live inside Live TV. */
   LinearLayout shortcuts=new LinearLayout(this);shortcuts.setGravity(Gravity.CENTER);center.addView(shortcuts,new LinearLayout.LayoutParams(-1,dp(105)));
   homeTile("⌕","Search",shortcuts,()->MasterSearch.show(this));for(JSONObject t:Antenna.tuners(this)){String aid=Antenna.PREFIX+t.optString("id");homeTile("📡",Antenna.nameOf(t),shortcuts,()->showGuide(aid,null,true));/* tuner guide full screen, only the side menu (collapsed) on the left */}
@@ -82,6 +82,8 @@ public class MainActivity extends Activity {
  /** Back or Cancel from an add/edit form. */
  void leaveForm(){if(library.isEmpty())setup();else playlists();}
  /** Makes a saved playlist the one every screen shows, dropping lists loaded for the old one. */
+ /** Movies or Series: while an M3U (no movies) is the active playlist, switch to the first playlist that has them. */
+ void browseVod(String m){if(library.activeIsM3u()){JSONObject p=library.firstVod();if(p!=null)switchPlaylist(p);}browse(m);}
  void switchPlaylist(JSONObject p){Antenna.remember(this,p);library.activate(p);forgetPlaylistData();}
  void forgetPlaylistData(){MiniGuide.clear();items=new JSONArray();categories=new JSONArray();category="";liveIndex=null;liveIndexAccount="";searchQuery="";zapList=null;tvGuide=null;}
  /** The screen chosen in Settings → Open at start-up. */
