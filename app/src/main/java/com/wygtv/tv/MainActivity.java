@@ -33,7 +33,7 @@ public class MainActivity extends Activity {
  @Override protected void onActivityResult(int code,int result,Intent data){super.onActivityResult(code,result,data);if(code==Backup.REQ_PICK&&result==RESULT_OK&&data!=null)Backup.onPicked(this,data.getData());}
  void updateStatus(){String s=saved("host");if(s.isEmpty()){status.setText("No playlist connected");return;}String exp=Menus.expiryText(saved("expiry"));status.setText("Playlist: "+saved("title")+"  •  "+(library.activeIsM3u()?"M3U":"Xtream Codes")+"  •  "+Menus.hostOf(s)+(exp.isEmpty()?"":"  •  "+exp));}
  /** Which side-menu entry the current screen belongs to. */
- String railKey(){return mode.equals("search")||mode.equals("favorites")?"live":mode.equals("episodes")?"series":mode.equals("details")?detailsType:mode.equals("login")?"playlists":mode;}
+ String railKey(){return mode.equals("search")&&liveOnly()?"search":mode.equals("search")||mode.equals("favorites")?"live":mode.equals("episodes")?"series":mode.equals("details")?detailsType:mode.equals("login")?"playlists":mode;}
  /** Settings → App mode: "Live TV only" hides Movies, Series and the Home screen; the TV guide is the main screen. */
  boolean liveOnly(){return prefs.getBoolean("live_only",false);}
  void home(){
