@@ -512,8 +512,10 @@ final class TvGuide {
     private void showInfo(int row, EpgGrid.Cell c) {
         JSONObject ch = channels.optJSONObject(row);
         if (ch == null) return;
-        String name = ch.optString("name", "Channel"), num = ch.optString("num", "");
-        infoChannel.setText(((num.isEmpty() || num.equals("0")) ? "" : num + " · ") + name.toUpperCase(java.util.Locale.getDefault()));
+        String name = ch.optString("name", "Channel");
+        // The channel's logo from the playlist beside its name, not its number.
+        infoChannel.setText(name.toUpperCase(java.util.Locale.getDefault()));
+        ChannelIcons.attach(infoChannel, ch.optString("stream_icon"), name, 22);
         previewLabel.setText(name + " · live preview");
         String pid = ch.optString("playlist");
         String source = Library.sourceLabel(a.library.find(pid.isEmpty() ? a.library.activeId() : pid));

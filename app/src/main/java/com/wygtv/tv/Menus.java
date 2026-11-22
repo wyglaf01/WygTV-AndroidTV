@@ -559,6 +559,30 @@ final class Menus {
                 a.prefs.edit().putBoolean(Subtitles.PREF_VOD, !Subtitles.defaultOn(a.prefs, false)).apply();
                 settings(a, subsVodRow);
             });
+            final int subsLangRow = list.getChildCount();
+            row(a, list, "Subtitle language", SubSources.langLabels()[Math.max(0, indexOf(SubSources.LANG_CODES, a.prefs.getString(SubSources.PREF_LANG, "")))] + "  •  picked first when a stream has several, and used to search online", () ->
+                    choose(a, "Subtitle language", SubSources.langLabels(), Math.max(0, indexOf(SubSources.LANG_CODES, a.prefs.getString(SubSources.PREF_LANG, ""))), i -> {
+                        a.prefs.edit().putString(SubSources.PREF_LANG, SubSources.LANG_CODES[i]).apply();
+                        settings(a, subsLangRow);
+                    }));
+            final int subsSizeRow = list.getChildCount();
+            row(a, list, "Subtitle text size", SubSources.SIZE_LABELS[SubSources.sizeIndex(a.prefs)], () ->
+                    choose(a, "Subtitle text size", SubSources.SIZE_LABELS, SubSources.sizeIndex(a.prefs), i -> {
+                        a.prefs.edit().putString(SubSources.PREF_SIZE, SubSources.SIZE_KEYS[i]).apply();
+                        settings(a, subsSizeRow);
+                    }));
+            if (!liveOnly) {
+                final int osRow = list.getChildCount();
+                String osKey = a.saved(SubSources.PREF_OS_KEY).trim();
+                row(a, list, "Online subtitles: OpenSubtitles", osKey.isEmpty() ? "Off  •  press OK to add a free OpenSubtitles.com API key (the biggest subtitle library)"
+                        : "On  •  key …" + osKey.substring(Math.max(0, osKey.length() - 4)) + (a.saved(SubSources.PREF_OS_USER).isEmpty() ? "" : "  •  signed in as " + a.saved(SubSources.PREF_OS_USER)) + "  •  press OK to change",
+                        () -> openSubtitlesKey(a, osRow));
+                final int subdlRow = list.getChildCount();
+                String sdKey = a.saved(SubSources.PREF_SUBDL_KEY).trim();
+                row(a, list, "Online subtitles: SubDL", sdKey.isEmpty() ? "Off  •  press OK to add a free SubDL API key" : "On  •  key …" + sdKey.substring(Math.max(0, sdKey.length() - 4)) + "  •  press OK to change",
+                        () -> subdlKey(a, subdlRow));
+                note(a, list, "Podnapisi works without a key. In the player, MENU > Subtitles searches every source that's on, or loads a subtitle file from a link, the TV or a USB drive.");
+            }
             if (!liveOnly) {
                 final int watchedRow = list.getChildCount();
                 row(a, list, "Watched series", (Watch.hideWatched(a) ? "Hide" : "Show with ✓") + "  •  series with every episode watched. Mark episodes, seasons or a whole series in its episode list", () -> {
@@ -700,6 +724,70 @@ final class Menus {
                 .setNeutralButton("Remove", (d, w) -> { a.prefs.edit().remove(pref).apply(); settings(a, focusRow); })
                 .setNegativeButton("Cancel", null).show();
         field.requestFocus();
+    }
+
+    /** Settings → OpenSubtitles: API key, plus an optional account for more downloads a day. */
+    private static void openSubtitlesKey(MainActivity a, int focusRow) {
+        LinearLayout box = new LinearLayout(a);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(a.dp(20), a.dp(8), a.dp(20), 0);
+        TextView help = a.label("Make a free account at opensubtitles.com, then open opensubtitles.com/consumers, press \"New consumer\" and type its API key here. "
+                + "Your username and password are optional: without them OpenSubtitles allows only a few downloads a day.", 15);
+        help.setTextColor(Theme.MUTED);
+        box.addView(help, new LinearLayout.LayoutParams(-1, -2));
+        EditText key = keyField(a, box, "OpenSubtitles API key", a.saved(SubSources.PREF_OS_KEY));
+        EditText user = keyField(a, box, "Username (optional)", a.saved(SubSources.PREF_OS_USER));
+        EditText pass = keyField(a, box, "Password (optional)", a.saved(SubSources.PREF_OS_PASS));
+        pass.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        new Dialogs.Builder(a).setTitle("OpenSubtitles").setView(box)
+                .setPositiveButton("Save", (d, w) -> {
+                    String k = key.getText().toString().replaceAll("\\s+", "");
+                    a.prefs.edit().putString(SubSources.PREF_OS_KEY, k).putString(SubSources.PREF_OS_USER, user.getText().toString().trim())
+                            .putString(SubSources.PREF_OS_PASS, pass.getText().toString()).apply();
+                    settings(a, focusRow);
+                    if (k.isEmpty()) return;
+                    Toast.makeText(a, "Checking the key with OpenSubtitles…", Toast.LENGTH_SHORT).show();
+                    new Thread(() -> {
+                        boolean ok = SubSources.openSubtitlesWorks(a.prefs);
+                        a.runOnUiThread(() -> Toast.makeText(a, ok ? "OpenSubtitles key works. In the player, MENU > Subtitles > Search online." : "OpenSubtitles didn't accept that key (or there's no connection). Check it and try again.", Toast.LENGTH_LONG).show());
+                    }).start();
+                })
+                .setNeutralButton("Remove", (d, w) -> {
+                    a.prefs.edit().remove(SubSources.PREF_OS_KEY).remove(SubSources.PREF_OS_USER).remove(SubSources.PREF_OS_PASS).apply();
+                    settings(a, focusRow);
+                })
+                .setNegativeButton("Cancel", null).show();
+        key.requestFocus();
+    }
+
+    /** Settings → SubDL API key. */
+    private static void subdlKey(MainActivity a, int focusRow) {
+        LinearLayout box = new LinearLayout(a);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(a.dp(20), a.dp(8), a.dp(20), 0);
+        TextView help = a.label("Make a free account at subdl.com, open your account panel → API, and type the API key here.", 15);
+        help.setTextColor(Theme.MUTED);
+        box.addView(help, new LinearLayout.LayoutParams(-1, -2));
+        EditText key = keyField(a, box, "SubDL API key", a.saved(SubSources.PREF_SUBDL_KEY));
+        new Dialogs.Builder(a).setTitle("SubDL").setView(box)
+                .setPositiveButton("Save", (d, w) -> {
+                    a.prefs.edit().putString(SubSources.PREF_SUBDL_KEY, key.getText().toString().replaceAll("\\s+", "")).apply();
+                    settings(a, focusRow);
+                })
+                .setNeutralButton("Remove", (d, w) -> { a.prefs.edit().remove(SubSources.PREF_SUBDL_KEY).apply(); settings(a, focusRow); })
+                .setNegativeButton("Cancel", null).show();
+        key.requestFocus();
+    }
+
+    private static EditText keyField(MainActivity a, LinearLayout box, String hint, String value) {
+        EditText field = new EditText(a);
+        field.setSingleLine(true);
+        field.setHint(hint);
+        field.setText(value);
+        field.setTextColor(Theme.TEXT);
+        field.setHintTextColor(Theme.HINT);
+        box.addView(field, new LinearLayout.LayoutParams(-1, -2));
+        return field;
     }
 
     private static void guideSource(MainActivity a, JSONObject active, Runnable after) {

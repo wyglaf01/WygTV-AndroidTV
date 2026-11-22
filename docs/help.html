@@ -179,7 +179,8 @@
       <tr><th>Button</th><th>What it does</th></tr>
       <tr><td><kbd>CH+</kbd> <kbd>CH−</kbd> or <kbd>▲</kbd> <kbd>▼</kbd></td><td>Next / previous channel in the list you started from (Favorites, a category, a group…).</td></tr>
       <tr><td>Number keys</td><td>Type a channel number; it switches after a short pause, or press OK to go now.</td></tr>
-      <tr><td><kbd>OK</kbd> / <kbd>Info</kbd></td><td>Channel banner with what's on now and next. OK again shows the playback controls.</td></tr>
+      <tr><td><kbd>OK</kbd></td><td>Channel options: Add to Favorites, Hidden, Add to channel group, New channel group. The channel banner (logo, source, what's on) shows underneath.</td></tr>
+      <tr><td><kbd>Info</kbd></td><td>Channel banner with the channel's logo and what's on now and next.</td></tr>
       <tr><td><kbd>Last</kbd></td><td>Back to the previous channel.</td></tr>
       <tr><td><kbd>Guide</kbd></td><td>Opens the TV Guide.</td></tr>
       <tr><td><kbd>☰ Menu</kbd></td><td>Add/Remove Favorite, Subtitles / CC, What's on (program guide), TV guide, Channel list (jump without leaving), Exit player.</td></tr>
@@ -193,7 +194,7 @@
       <tr><td><kbd>⏪</kbd> <kbd>⏩</kbd></td><td>Skip back / forward 30 seconds.</td></tr>
       <tr><td><kbd>⏯</kbd></td><td>Play / pause.</td></tr>
       <tr><td><kbd>OK</kbd></td><td>Show the playback controls.</td></tr>
-      <tr><td><kbd>☰ Menu</kbd></td><td>Add to My List, Subtitles (pick a language), Exit player.</td></tr>
+      <tr><td><kbd>☰ Menu</kbd></td><td>Add to My List, Subtitles (pick a track, search online, load a file from the TV or a USB drive, load a link, text size), Exit player.</td></tr>
     </table>
     <p>If the connection drops, WygTV shows "Connection dropped. Reconnecting…" and tries again by itself, picking a live channel up at the newest point and a movie where it left off.</p>
 
@@ -214,7 +215,7 @@
     <!-- ============================================================ MINE -->
     <h2 id="mine">9. Favorites, channel groups and hiding</h2>
     <h3>★ Favorites</h3>
-    <p>Hold OK on any channel (or use the player's Menu) and choose <b>Add Favorite</b>. In the TV Guide and the Live TV guide, hold OK on a channel to get the same choices plus Hide channel. The Favorites screen collects favorites from <b>all</b> your playlists, grouped by playlist. Playing one from another playlist switches to it automatically. Deleting a playlist keeps its favorites, so they return if you add it again.</p>
+    <p>Hold OK on any channel (or press OK while watching) and choose <b>Add Favorite</b>. In the TV Guide and the Live TV guide, hold OK on a channel to get the same choices plus Hide channel. The Favorites screen collects favorites from <b>all</b> your playlists, grouped by playlist. Playing one from another playlist switches to it automatically. Deleting a playlist keeps its favorites, so they return if you add it again.</p>
     <h3>◆ Channel groups</h3>
     <p>Your own categories that can mix channels from any playlist, like "Sports" or "Kids". Hold OK on a channel → <b>Add to channel group…</b> → pick a group or <b>New category…</b>. Groups appear in the Live TV menu and the TV Guide's ☰ Showing list. Rename or delete them by holding OK on the group, or in <a href="#set-playlists">Settings → Manage playlists → Channel groups</a>. Deleting a group never deletes the channels.</p>
     <h3>⊘ Hiding</h3>
@@ -251,6 +252,9 @@
       <tr><td>Video decoder</td><td><b>Software first</b> (recommended, default), <b>Hardware first</b>, or <b>Automatic</b>. Switch if a channel freezes, shows green blocks or won't play.</td></tr>
       <tr><td>Subtitles for Live TV</td><td>On/Off. When on, closed captions start for every channel that sends them.</td></tr>
       <tr><td>Subtitles for Movies and Series</td><td>On/Off. In the player, Menu → Subtitles picks a language.</td></tr>
+      <tr><td>Subtitle language</td><td>Picked first when a stream has several, and used when searching online. Default: the TV's language.</td></tr>
+      <tr><td>Subtitle text size</td><td>Small, Normal, Large or Extra large.</td></tr>
+      <tr><td>Online subtitles: OpenSubtitles / SubDL</td><td>Add a free API key to search these too. Podnapisi works without a key. In the player, Menu → Subtitles → Search online.</td></tr>
     </table>
 
     <h3 id="set-appearance">◐ Appearance</h3>
