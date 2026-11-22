@@ -74,7 +74,7 @@ final class VirtualCategories {
 
     /** Asks for a name and creates an empty category. */
     static void create(MainActivity a, Done then) {
-        askName(a, "New Live TV category", "", name -> {
+        askName(a, "New Channel Group", "", name -> {
             JSONObject cat = new JSONObject();
             try { cat.put("id", PREFIX + UUID.randomUUID().toString()).put("name", name).put("channels", new JSONArray()); } catch (JSONException ignored) { }
             JSONArray l = all(a);
