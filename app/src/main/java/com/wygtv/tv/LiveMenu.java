@@ -54,7 +54,6 @@ final class LiveMenu {
                 return true;
             });
         }
-        a.button("+ New Channel Group", a.side, () -> VirtualCategories.create(a, c -> { a.resumeCategory = c.optString("id"); top(a); }));
         JSONArray pls = a.library.all();
         String active = a.library.activeId();
         for (int i = 0; i < pls.length(); i++) {

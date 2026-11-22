@@ -451,6 +451,9 @@ final class Menus {
                     a.prefs.edit().putString("start_screen", startKeys[i]).apply();
                     settings(a, startRow);
                 }));
+        final int groupsRow = list.getChildCount();
+        row(a, list, "Channel groups", VirtualCategories.all(a).length() + " in Live TV  •  press OK to make a New Channel Group, or rename or delete one", () ->
+                VirtualCategories.manage(a, () -> settings(a, groupsRow)));
         final int guideRowsRow = list.getChildCount();
         final String[] guideRows = {"3", "4", "5"};
         row(a, list, "Live TV guide rows", a.prefs.getInt("guide_rows", 4) + " channels  •  more rows make the preview smaller", () ->

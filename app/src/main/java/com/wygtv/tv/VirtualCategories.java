@@ -85,10 +85,28 @@ final class VirtualCategories {
         });
     }
 
+    /** Settings → Channel groups: make a new group, or rename / delete one. */
+    static void manage(MainActivity a, Runnable after) {
+        JSONArray l = all(a);
+        String[] names = new String[l.length() + 1];
+        names[0] = "+ New Channel Group";
+        for (int i = 0; i < l.length(); i++) { JSONObject c = l.optJSONObject(i); names[i + 1] = "◆ " + (c == null ? "" : c.optString("name")); }
+        new Dialogs.Builder(a).setTitle("Channel groups").setItems(names, (d, w) -> {
+            if (w == 0) { create(a, c -> after.run()); return; }
+            JSONObject c = l.optJSONObject(w - 1);
+            if (c == null) return;
+            String id = c.optString("id");
+            new Dialogs.Builder(a).setTitle(c.optString("name")).setItems(new String[]{"Rename", "Delete", "Cancel"}, (d2, w2) -> {
+                if (w2 == 0) rename(a, id, after);
+                else if (w2 == 1) delete(a, id, after);
+            }).show();
+        }).setNegativeButton("Close", null).show();
+    }
+
     static void rename(MainActivity a, String id, Runnable then) {
         JSONObject cat = find(a, id);
         if (cat == null) return;
-        askName(a, "Rename category", cat.optString("name"), name -> {
+        askName(a, "Rename channel group", cat.optString("name"), name -> {
             try { cat.put("name", name); } catch (JSONException ignored) { }
             put(a, cat);
             if (then != null) then.run();
@@ -129,7 +147,7 @@ final class VirtualCategories {
     }
 
     /**
-     * "Add to category…" for a channel of the active playlist: lists your categories (✓ = already in it) plus
+     * "Add to channel group…" for a channel of the active playlist: lists your categories (✓ = already in it) plus
      * "New category…". Picking a ticked one takes the channel out again.
      */
     static void addDialog(MainActivity a, JSONObject item) {
