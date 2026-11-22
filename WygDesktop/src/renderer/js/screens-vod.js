@@ -50,7 +50,7 @@
         menuCol.replaceChildren(...entries.map(([k, l, c]) => {
           const el = btn({ class: 'item' + (k === sel ? ' active' : ''), 'data-k': 'm:' + k, 'data-autofocus': k === sel ? '' : null,
             onclick: () => { if (k === 'search') { W.go('search', { only: kind }); return; } select(k); const f = W.$('.poster', gridCol); if (f) W.focus(f); } }, h('span', { class: 'item-label' }, l));
-          if (k !== 'search') el._onfocus = W.debounce(() => { if (el === document.activeElement && sel !== k) select(k); }, 400);
+          if (k !== 'search') el._onfocus = W.keyOnly(W.debounce(() => { if (el === document.activeElement && sel !== k) select(k); }, 400));
           if (c) el._long = () => W.menu(c.name, [{ label: '◐ Hide this category', action: () => { D.setHiddenCat(c.pid, 'v' + c.id, true); W.toast('Hidden. Settings → Hidden categories brings it back.'); renderMenu(); } }]);
           return el;
         }));

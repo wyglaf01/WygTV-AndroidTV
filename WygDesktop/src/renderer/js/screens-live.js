@@ -179,11 +179,11 @@
         for (const el of W.$$('.item[data-k^="m:cat:"]', menuCol)) {
           const m = menu.find((x) => 'm:' + x.sel === el.dataset.k);
           el._long = () => W.menu(m.label, [{ label: '◐ Hide this category', action: () => { D.setHiddenCat(m.pid, m.cat, true); W.toast('Hidden. Bring it back with “Hide / show categories”.'); W.refresh(); } }]);
-          el._onfocus = W.debounce(() => { if (el === document.activeElement && m.sel !== sel) select(m.sel); }, 350);
+          el._onfocus = W.keyOnly(W.debounce(() => { if (el === document.activeElement && m.sel !== sel) select(m.sel); }, 350));
         }
         for (const el of W.$$('.item[data-k^="m:"]:not([data-k^="m:cat:"])', menuCol)) {
           const s = el.dataset.k.slice(2);
-          el._onfocus = W.debounce(() => { if (el === document.activeElement && s !== sel) select(s); }, 350);
+          el._onfocus = W.keyOnly(W.debounce(() => { if (el === document.activeElement && s !== sel) select(s); }, 350));
         }
       };
 

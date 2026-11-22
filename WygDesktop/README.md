@@ -16,7 +16,10 @@ Every change merged into the `app` branch is built by GitHub Actions and publish
 Builds from other branches go to the `wygdesktop-test` release instead. Settings → About & updates → Check for updates installs newer builds.
 
 The Windows build isn't code-signed, so SmartScreen may say "Windows protected your PC": click **More info → Run anyway**.
-On Ubuntu: `sudo apt install ./WygDesktop-linux.deb`, or `chmod +x WygDesktop-linux.AppImage` and run it.
+On Ubuntu (22.04 and 24.04 are checked on every build):
+- **.deb** (recommended): `sudo apt install ./WygDesktop-linux.deb`, then open WygDesktop from the app menu or run `wygdesktop`.
+- **AppImage**: AppImages need FUSE 2, which Ubuntu no longer installs by default: `sudo apt install libfuse2t64` on 24.04 (`libfuse2` on 22.04). Then `chmod +x WygDesktop-linux.AppImage` and run it.
+- FFmpeg is built in. If `ffmpeg` is installed from apt, WygDesktop uses that one instead.
 
 ## Features
 

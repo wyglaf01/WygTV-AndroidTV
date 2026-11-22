@@ -9,6 +9,12 @@ const hdhr = require('./hdhr');
 const stream = require('./stream');
 const updater = require('./updater');
 const { EpgStore } = require('./epg');
+const smoke = require('./smoke');
+
+// AppImages can't use Chromium's setuid sandbox helper, and Ubuntu 24.04 blocks the namespace sandbox
+// for apps without an AppArmor profile, so the AppImage would not start at all with it on.
+if (process.platform === 'linux' && process.env.APPIMAGE) app.commandLine.appendSwitch('no-sandbox');
+const smokeTest = smoke.prepare(app);
 
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 // Hardware HEVC decoding where the graphics card supports it (Windows).
@@ -34,6 +40,7 @@ function createWindow() {
   });
   Menu.setApplicationMenu(null);
   win.once('ready-to-show', () => win.show());
+  if (smokeTest) smoke.run(app, win, stream);
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: 'deny' }; });
   win.webContents.on('will-navigate', (e, url) => { if (!url.startsWith('file:')) e.preventDefault(); });

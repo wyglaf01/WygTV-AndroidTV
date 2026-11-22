@@ -283,7 +283,7 @@
       };
       menuCol.append(...Object.entries(sections).map(([k, s]) => {
         const el = btn({ class: 'item' + (k === sec ? ' active' : ''), 'data-k': 's:' + k, 'data-autofocus': k === sec ? '' : null, onclick: () => { show(k); W.focusFirst(body); } }, h('span', { class: 'item-label' }, s.label));
-        el._onfocus = () => { if (sec !== k) show(k); };
+        el._onfocus = W.keyOnly(() => { if (sec !== k) show(k); });
         return el;
       }));
       show(sec);

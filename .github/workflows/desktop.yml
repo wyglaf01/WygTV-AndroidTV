@@ -65,11 +65,72 @@ jobs:
           path: ${{ matrix.files }}
           if-no-files-found: error
 
+  # Installs the .deb and runs the AppImage on real Ubuntu 22.04 and 24.04 machines, and has each one
+  # play a direct H.264 channel and an MPEG-2/AC-3 channel through the bundled FFmpeg (see src/main/smoke.js).
+  ubuntu-check:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Download the Ubuntu build
+        uses: actions/download-artifact@v4
+        with:
+          name: wygdesktop-linux
+          path: pkg
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Make test videos with the bundled FFmpeg
+        working-directory: WygDesktop
+        run: |
+          mkdir -p "$RUNNER_TEMP/ff" && (cd "$RUNNER_TEMP/ff" && npm init -y >/dev/null && npm install -q ffmpeg-static@5.2.0)
+          FF=$(cd "$RUNNER_TEMP/ff" && node -p "require('ffmpeg-static')")
+          mkdir -p "$RUNNER_TEMP/media/hls"
+          $FF -loglevel error -y -f lavfi -i testsrc2=size=1280x720:rate=25 -f lavfi -i sine=frequency=440 -t 40 -c:v libx264 -preset ultrafast -g 50 -c:a aac -f mpegts "$RUNNER_TEMP/media/h264.ts"
+          $FF -loglevel error -y -f lavfi -i smptebars=size=720x480:rate=30 -f lavfi -i sine=frequency=300 -t 40 -c:v mpeg2video -b:v 4M -c:a ac3 -f mpegts "$RUNNER_TEMP/media/mpeg2.ts"
+          $FF -loglevel error -y -i "$RUNNER_TEMP/media/h264.ts" -c copy -f hls -hls_time 4 -hls_list_size 0 "$RUNNER_TEMP/media/hls/index.m3u8"
+          nohup node test/mock-server.js 8765 "$RUNNER_TEMP/media" > "$RUNNER_TEMP/mock.log" 2>&1 &
+          sleep 2
+          curl -sf "http://127.0.0.1:8765/player_api.php?username=demo&password=demo"
+
+      - name: Install the .deb (apt resolves its dependencies)
+        run: |
+          sudo apt-get update -q
+          # No system FFmpeg, so the app must use the one it ships with.
+          sudo apt-get remove -y -q ffmpeg || true
+          sudo apt-get install -y -q --no-install-recommends xvfb ./pkg/WygDesktop-linux.deb
+          dpkg -s wygdesktop | grep -E '^(Version|Depends)'
+          ls -l /opt/WygDesktop/chrome-sandbox
+
+      - name: Run the installed app
+        run: timeout 300 xvfb-run -a -s "-screen 0 1600x900x24" wygdesktop --smoke=http://127.0.0.1:8765 2>&1 | tee deb.log | grep -E 'WYG-SMOKE|rror' ; test "${PIPESTATUS[0]}" = 0
+
+      - name: Run the AppImage (needs libfuse2)
+        run: |
+          if [ "${{ matrix.os }}" = "ubuntu-24.04" ]; then sudo apt-get install -y -q libfuse2t64; else sudo apt-get install -y -q libfuse2; fi
+          chmod +x pkg/WygDesktop-linux.AppImage
+          timeout 300 xvfb-run -a -s "-screen 0 1600x900x24" ./pkg/WygDesktop-linux.AppImage --smoke=http://127.0.0.1:8765 2>&1 | tee appimage.log | grep -E 'WYG-SMOKE|rror' ; test "${PIPESTATUS[0]}" = 0
+
+      - name: Logs
+        if: failure()
+        run: tail -n 80 deb.log appimage.log "$RUNNER_TEMP/mock.log" || true
+
   # Fixed download links:
   #   app branch     → release wygdesktop-latest (also used by the in-app "Check for updates")
   #   other branches → release wygdesktop-test (for trying a pull request before merging)
   publish:
-    needs: build
+    needs: [build, ubuntu-check]
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:

@@ -175,7 +175,7 @@ body { font-size: 16px; }
 .vod-body, .settings-body { display: grid; grid-template-columns: minmax(240px, 22%) 1fr; gap: 16px; padding: 0 28px 24px; min-height: 0; }
 .grid-col { padding: 4px 8px; }
 .poster-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 18px; padding: 6px 4px 24px; }
-.poster { position: relative; border-radius: 10px; border: 2px solid transparent; content-visibility: auto; contain-intrinsic-size: auto 290px; }
+.poster { position: relative; border-radius: 10px; border: 2px solid transparent; }
 .poster-img { aspect-ratio: 2 / 3; width: 100%; border-radius: 8px; }
 .poster-img img { object-fit: cover; }
 .poster-img .img-fallback { padding: 10px; text-align: center; text-transform: none; font-size: 15px; }
@@ -296,3 +296,10 @@ body { font-size: 16px; }
 .osd-btn { padding: 9px 16px; border-radius: 999px; border: 1px solid var(--stroke); background: rgba(var(--panel-rgb), .8); white-space: nowrap; }
 .osd-btn:focus, .osd-btn:hover { background: var(--focus); border-color: var(--stroke-focus); transform: scale(1.05); }
 #player.full:has(.osd[hidden]) { cursor: none; }
+
+/* Every screen is a column: header on top, the body fills the rest and its lists scroll inside it
+   (without this the bodies grew past the window, so the mouse wheel had nothing to scroll). */
+.screen { display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; }
+.screen > .live-body, .screen > .vod-body, .screen > .settings-body, .screen > .guide-grid,
+.screen > .search-results, .screen > .details-body { flex: 1 1 auto; min-height: 0; }
+.live-body > .col, .vod-body > .col, .settings-body > .col { min-height: 0; }
