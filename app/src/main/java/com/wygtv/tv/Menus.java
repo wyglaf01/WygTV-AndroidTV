@@ -424,7 +424,7 @@ final class Menus {
         boolean m3u = a.library.activeIsM3u();
         JSONObject active = a.library.find(a.library.activeId());
 
-        row(a, list, "Playlist", active == null ? "none" : active.optString("title") + "  (" + (a.library.activeIsHdhr() ? "HDHomeRun" : m3u ? "M3U" : "Xtream Codes") + ")", () -> a.playlists());
+        row(a, list, "Manage playlists", (active == null ? "none" : "Watching " + active.optString("title") + "  (" + (a.library.activeIsHdhr() ? "HDHomeRun" : m3u ? "M3U" : "Xtream Codes") + ")") + "  •  press OK to add, edit, refresh or delete playlists", () -> a.playlists());
         java.util.List<JSONObject> tuners = Antenna.tuners(a);
         row(a, list, "HDHomeRun antenna TV", tuners.isEmpty()
                 ? "not added  •  press OK to add your tuner. Its channels show in Live TV as " + Antenna.DEFAULT_NAME
@@ -450,6 +450,16 @@ final class Menus {
                 choose(a, "Open at start-up", startLabels, indexOf(startKeys, a.prefs.getString("start_screen", "home")), i -> {
                     a.prefs.edit().putString("start_screen", startKeys[i]).apply();
                     settings(a, startRow);
+                }));
+        final int groupsRow = list.getChildCount();
+        row(a, list, "Channel groups", VirtualCategories.all(a).length() + " in Live TV  •  press OK to make a New Channel Group, or rename or delete one", () ->
+                VirtualCategories.manage(a, () -> settings(a, groupsRow)));
+        final int guideRowsRow = list.getChildCount();
+        final String[] guideRows = {"3", "4", "5"};
+        row(a, list, "Live TV guide rows", a.prefs.getInt("guide_rows", 4) + " channels  •  more rows make the preview smaller", () ->
+                choose(a, "Channel rows in the Live TV guide", new String[]{"3 rows", "4 rows", "5 rows"}, indexOf(guideRows, String.valueOf(a.prefs.getInt("guide_rows", 4))), i -> {
+                    a.prefs.edit().putInt("guide_rows", 3 + i).apply();
+                    settings(a, guideRowsRow);
                 }));
         final int formatRow = list.getChildCount();
         if (!m3u) {
