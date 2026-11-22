@@ -19,16 +19,20 @@ import androidx.media3.datasource.DefaultHttpDataSource;
 import androidx.media3.datasource.HttpDataSource;
 import androidx.media3.exoplayer.DefaultLoadControl;
 import androidx.media3.exoplayer.DefaultRenderersFactory;
+import androidx.media3.exoplayer.ExoPlaybackException;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.mediacodec.MediaCodecInfo;
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector;
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector;
 
 /**
  * Builds every player in the app. Over-the-air TV (HDHomeRun) is MPEG-TS with MPEG-2 video and Dolby
  * AC-3 audio; many tablets and some TV boxes have no AC-3 decoder, so the FFmpeg audio extension
- * (AC-3, E-AC-3 and more) is added. The device's own decoders still win when it has them, so HDMI
- * passthrough to a soundbar keeps working.
+ * (AC-3, E-AC-3, DTS, TrueHD and more) is added. It is only a fallback: the device's own decoders still
+ * win when they have one, so HDMI passthrough to a soundbar keeps working. FFmpeg steps in when the
+ * device has no decoder for a track, or (see {@link #useFfmpegAudio}) when the device's audio decoder
+ * fails while playing.
  * The renderer settings are Media3 "unstable" API, which is opted into here.
  */
 @OptIn(markerClass = UnstableApi.class)
@@ -98,6 +102,35 @@ final class Players {
                 .setMediaSourceFactory(new DefaultMediaSourceFactory(new DefaultDataSource.Factory(c, http)))
                 .setLoadControl(load)
                 .build();
+    }
+
+    /** Errors from a decoder or the audio output: the ones FFmpeg can get around when it's the audio part that failed. */
+    static boolean decoderError(int errorCode) {
+        return (errorCode >= PlaybackException.ERROR_CODE_DECODER_INIT_FAILED && errorCode <= PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED)
+                || errorCode == PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED
+                || errorCode == PlaybackException.ERROR_CODE_AUDIO_TRACK_WRITE_FAILED;
+    }
+
+    /**
+     * When the device's own audio decoder fails, turns it off for this player so the FFmpeg audio decoder
+     * takes over on the next try. Returns false when the error wasn't the device's audio decoder, or FFmpeg
+     * is already in use (so there's nothing left to fall back to here).
+     */
+    static boolean useFfmpegAudio(ExoPlayer p, PlaybackException error) {
+        if (!(error instanceof ExoPlaybackException) || !decoderError(error.errorCode)) return false;
+        ExoPlaybackException e = (ExoPlaybackException) error;
+        if (e.type != ExoPlaybackException.TYPE_RENDERER || e.rendererIndex < 0 || e.rendererIndex >= p.getRendererCount()) return false;
+        if (p.getRendererType(e.rendererIndex) != C.TRACK_TYPE_AUDIO) return false;
+        if (e.rendererName != null && e.rendererName.toLowerCase(java.util.Locale.US).contains("ffmpeg")) return false;
+        boolean haveFfmpeg = false;
+        for (int i = 0; i < p.getRendererCount(); i++)
+            if (i != e.rendererIndex && p.getRendererType(i) == C.TRACK_TYPE_AUDIO
+                    && p.getRenderer(i).getName().toLowerCase(java.util.Locale.US).contains("ffmpeg")) haveFfmpeg = true;
+        if (!haveFfmpeg || !(p.getTrackSelector() instanceof DefaultTrackSelector)) return false;
+        DefaultTrackSelector ts = (DefaultTrackSelector) p.getTrackSelector();
+        if (ts.getParameters().getRendererDisabled(e.rendererIndex)) return false;
+        ts.setParameters(ts.buildUponParameters().setRendererDisabled(e.rendererIndex, true));
+        return true;
     }
 
     /** Puts hardware or software video decoders first; audio and "auto" keep the device's own order. */
