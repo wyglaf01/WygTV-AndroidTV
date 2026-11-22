@@ -189,13 +189,12 @@ final class PosterGrid {
             JSONObject provider = Tmdb.fromProvider(item, answer);
             try { provider.put("fetched", true); } catch (Exception ignored) { }
             meta[0] = provider;
-            if (Tmdb.key(a).isEmpty()) { META.put(cacheKey, provider); render[0].run(); return; }
+            if (!Tmdb.enabled(a)) { META.put(cacheKey, provider); render[0].run(); return; }
             render[0].run();
-            String[] clean = Tmdb.cleanTitle(item.optString("name"));
             POOL.execute(() -> {
-                JSONObject t = Tmdb.lookup(a, type, provider.optString("tmdb_id"), clean[0], provider.optString("year", clean[1]));
+                JSONObject t = Tmdb.enrich(a, type, provider, item.optString("name"));
                 UI.post(() -> {
-                    meta[0] = t == null ? provider : Tmdb.merge(provider, t);
+                    meta[0] = t == null ? provider : t;
                     META.put(cacheKey, meta[0]);
                     render[0].run();
                 });

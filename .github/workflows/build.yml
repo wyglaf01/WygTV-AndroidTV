@@ -54,6 +54,7 @@ jobs:
         env:
           WYGTV_KEY_PASSWORD: ${{ secrets.WYGTV_KEY_PASSWORD }}
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
         run: gradle --no-daemon :app:lintDebug :app:testDebugUnitTest :app:assembleDebug
 
       - name: Name the APK wygtv.apk

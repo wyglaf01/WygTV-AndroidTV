@@ -146,15 +146,14 @@ final class Details {
         a.apiQuiet((series ? "get_series_info&series_id=" : "get_vod_info&vod_id=") + a.enc(id), answer -> {
             if (generation != a.screenGeneration) return;
             if (answer != null) { provider[0] = Tmdb.fromProvider(item, answer); shown[0] = provider[0]; render[0].run(); }
-            if (Tmdb.key(a).isEmpty()) return;
+            if (!Tmdb.enabled(a)) return;
             JSONObject p = provider[0];
-            String[] clean = Tmdb.cleanTitle(name);
             POOL.execute(() -> {
-                JSONObject t = Tmdb.lookup(a, type, p.optString("tmdb_id"), clean[0], p.optString("year", clean[1]));
+                JSONObject t = Tmdb.enrich(a, type, p, name);
                 UI.post(() -> {
                     if (generation != a.screenGeneration || a.isFinishing()) return;
                     if (t == null) { source.setText(sourceLine(a, shown[0]) + "  •  no TMDb match"); return; }
-                    shown[0] = Tmdb.merge(p, t);
+                    shown[0] = t;
                     render[0].run();
                 });
             });
@@ -168,16 +167,19 @@ final class Details {
         int min = m.optInt("runtime", 0);
         if (min > 0) parts.add((series ? "~" : "") + (min >= 60 ? min / 60 + "h " + (min % 60 > 0 ? min % 60 + "m" : "") : min + "m").trim());
         if (!m.optString("cert").isEmpty()) parts.add(m.optString("cert"));
-        if (!m.optString("rating").isEmpty()) parts.add("★ " + m.optString("rating") + ("TMDb".equals(m.optString("rating_source")) ? " TMDb" : ""));
+        if (!m.optString("imdb_rating").isEmpty()) parts.add("★ " + m.optString("imdb_rating") + " IMDb");
+        else if (!m.optString("rating").isEmpty()) parts.add("★ " + m.optString("rating") + ("TMDb".equals(m.optString("rating_source")) ? " TMDb" : ""));
+        if (!m.optString("rt").isEmpty()) parts.add("Rotten Tomatoes " + m.optString("rt"));
+        if (!m.optString("metascore").isEmpty()) parts.add("Metacritic " + m.optString("metascore"));
         int seasons = m.optInt("seasons", 0);
         if (series && seasons > 0) parts.add(seasons + (seasons == 1 ? " season" : " seasons"));
-        if (!m.optString("imdb").isEmpty()) parts.add("IMDb " + m.optString("imdb"));
         return android.text.TextUtils.join("   •   ", parts);
     }
 
     private static String sourceLine(MainActivity a, JSONObject m) {
-        if ("TMDb".equals(m.optString("source"))) return "Details from TMDb (The Movie Database) and your provider.";
-        if (Tmdb.key(a).isEmpty()) return "Details from your provider.  Add a free TMDb API key in Settings → Movie & series info for posters, plots, cast and ratings.";
+        boolean tmdb = "TMDb".equals(m.optString("source")), omdb = m.has("omdb");
+        if (tmdb || omdb) return "Details from " + (tmdb ? "TMDb" : "") + (tmdb && omdb ? ", " : "") + (omdb ? "OMDb (IMDb ratings)" : "") + " and your provider.";
+        if (!Tmdb.enabled(a)) return "Details from your provider.  Add a free TMDb or OMDb API key in Settings for posters, plots, cast and IMDb ratings.";
         return "Details from your provider.";
     }
 

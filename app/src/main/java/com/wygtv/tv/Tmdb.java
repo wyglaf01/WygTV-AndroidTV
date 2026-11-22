@@ -204,14 +204,8 @@ final class Tmdb {
         boolean tv = type.equals("series");
         String lang = Locale.getDefault().toLanguageTag();
         File cache = new File(c.getCacheDir(), "tmdb/" + M3u.idFor(type + "|" + tmdbId + "|" + title + "|" + year + "|" + lang) + ".json");
-        try {
-            if (cache.exists()) {
-                JSONObject saved = new JSONObject(read(new java.io.FileInputStream(cache)));
-                long age = System.currentTimeMillis() - saved.optLong("saved");
-                boolean miss = saved.optBoolean("miss");
-                if (age < (miss ? KEEP_MISS_MS : KEEP_MS)) return miss ? null : saved.optJSONObject("meta");
-            }
-        } catch (Exception ignored) { }
+        JSONObject saved = cached(cache, KEEP_MS, KEEP_MISS_MS);
+        if (saved != null) return saved.optBoolean("miss") ? null : saved.optJSONObject("meta");
         try {
             String id = tmdbId;
             if (id.isEmpty()) {
@@ -241,6 +235,33 @@ final class Tmdb {
         }
     }
 
+    /** A saved answer ({"saved", "meta"} or {"saved", "miss"}) still fresh enough to use, else null. */
+    static JSONObject cached(File cache, long keepMs, long keepMissMs) {
+        try {
+            if (!cache.exists()) return null;
+            JSONObject saved = new JSONObject(read(new java.io.FileInputStream(cache)));
+            long age = System.currentTimeMillis() - saved.optLong("saved");
+            return age < (saved.optBoolean("miss") ? keepMissMs : keepMs) ? saved : null;
+        } catch (Exception e) { return null; }
+    }
+
+    /** True when a TMDb or an OMDb key is set, so lookups beyond the provider are worth doing. */
+    static boolean enabled(Context c) { return !key(c).isEmpty() || !Omdb.key(c).isEmpty(); }
+
+    /**
+     * The provider's meta plus TMDb (when its key is set) and then OMDb's IMDb / Rotten Tomatoes / Metacritic
+     * ratings (when its key is set). Off the UI thread. Null when neither found the title.
+     */
+    static JSONObject enrich(Context c, String type, JSONObject provider, String rawName) {
+        String[] clean = cleanTitle(rawName);
+        String year = provider.optString("year", clean[1]);
+        JSONObject t = key(c).isEmpty() ? null : lookup(c, type, provider.optString("tmdb_id"), clean[0], year);
+        JSONObject m = t == null ? provider : merge(provider, t);
+        JSONObject o = Omdb.key(c).isEmpty() ? null : Omdb.lookup(c, type, m.optString("imdb"), clean[0], year);
+        if (o != null) m = Omdb.merge(m, o);
+        return t == null && o == null ? null : m;
+    }
+
     /** True when TMDb accepts the key (for Settings). */
     static boolean works(String key) {
         try { return get(key, "configuration").has("images"); } catch (Exception e) { return false; }
@@ -261,7 +282,7 @@ final class Tmdb {
         } finally { conn.disconnect(); }
     }
 
-    private static String read(InputStream stream) throws java.io.IOException {
+    static String read(InputStream stream) throws java.io.IOException {
         try (InputStream in = stream) {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             byte[] buf = new byte[8192];
@@ -271,7 +292,7 @@ final class Tmdb {
         }
     }
 
-    private static void save(File cache, JSONObject meta) {
+    static void save(File cache, JSONObject meta) {
         try {
             File dir = cache.getParentFile();
             if (dir != null) dir.mkdirs();

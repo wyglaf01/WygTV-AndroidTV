@@ -2,7 +2,8 @@ plugins { id 'com.android.application' }
 android { namespace 'com.wygtv.tv'; compileSdk 35
     defaultConfig { applicationId 'com.wygtv.tv'; minSdk 23; targetSdk 28; versionCode((System.getenv('GITHUB_RUN_NUMBER') ?: '1') as int); versionName "1.0.${System.getenv('GITHUB_RUN_NUMBER') ?: '0'}"
         // Optional TMDb key for movie/series details, from the GitHub secret TMDB_API_KEY (Settings can override it).
-        buildConfigField 'String', 'TMDB_API_KEY', "\"${(System.getenv('TMDB_API_KEY') ?: '').replaceAll('[^A-Za-z0-9._-]', '')}\"" }
+        buildConfigField 'String', 'TMDB_API_KEY', "\"${(System.getenv('TMDB_API_KEY') ?: '').replaceAll('[^A-Za-z0-9._-]', '')}\""
+        buildConfigField 'String', 'OMDB_API_KEY', "\"${(System.getenv('OMDB_API_KEY') ?: '').replaceAll('[^A-Za-z0-9._-]', '')}\"" }
     buildFeatures { buildConfig true }
     // Preserve the existing sideloaded TV runtime behavior; Play target migration needs device testing.
     lint { warning 'ExpiredTargetSdkVersion' }
