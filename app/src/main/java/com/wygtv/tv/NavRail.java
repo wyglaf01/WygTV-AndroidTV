@@ -57,6 +57,7 @@ final class NavRail {
         this.a = a;
         rail = new LinearLayout(a);
         rail.setOrientation(LinearLayout.VERTICAL);
+        rail.setTag(FocusWrap.MENU); // Up/Down stay in the menu (FocusWrap.menuKey), wrapping at the ends
         rail.setPadding(a.dp(8), a.dp(16), a.dp(8), a.dp(12));
         rail.setBackground(background(false));
         boolean m3u = a.library.activeIsM3u();
@@ -103,7 +104,22 @@ final class NavRail {
         exit.setTextSize(16);
         exit.getLayoutParams().height = a.dp(34);
         exit.setTextColor(Theme.MUTED);
+        fitHeight();
         lockEnds();
+    }
+
+    /** With many entries (several tuners), shrink the rows so every one fits on screen and none hides below the edge. */
+    private void fitHeight() {
+        int screen = a.getResources().getDisplayMetrics().heightPixels;
+        int room = screen - a.dp(16 + 12) - items.size() * a.dp(4);
+        int want = 0;
+        for (TextView v : items) want += v.getLayoutParams().height;
+        if (want <= room) return;
+        float k = Math.max(0.6f, room / (float) want);
+        for (TextView v : items) {
+            v.getLayoutParams().height = Math.round(v.getLayoutParams().height * k);
+            v.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, v.getTextSize() * Math.max(0.75f, k));
+        }
     }
 
     /**
