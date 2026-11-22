@@ -236,10 +236,10 @@ final class Manage {
             root.setBackground(new SteampunkBackdrop(a.getResources(), R.drawable.steampunk_panel, false));
             a.setContentView(root);
 
-            TextView h = a.label(title, 26);
+            TextView h = a.label(title, 22);
             h.setTypeface(null, Typeface.BOLD);
             h.setTextColor(a.BRASS);
-            root.addView(h, new LinearLayout.LayoutParams(-1, a.dp(48)));
+            root.addView(h, new LinearLayout.LayoutParams(-1, a.dp(36)));
 
             // The fixed menu bar: it never scrolls away, and Back from a list lands here.
             bar = new LinearLayout(a);
@@ -248,11 +248,11 @@ final class Manage {
             TextView tickAll = a.button("☑ Tick all", bar, () -> tickAll(true));
             TextView untickAll = a.button("☐ Untick all", bar, () -> tickAll(false));
             TextView exit = a.button("✕ Exit", bar, this::exit);
-            for (TextView t : new TextView[]{save, tickAll, untickAll, exit}) { t.setLayoutParams(a.rowLp()); t.setTextSize(18); t.setGravity(Gravity.CENTER); }
+            for (TextView t : new TextView[]{save, tickAll, untickAll, exit}) { t.setLayoutParams(a.rowLp()); t.setTextSize(16); t.setGravity(Gravity.CENTER); t.setPadding(a.dp(10), a.dp(7), a.dp(10), a.dp(7)); }
 
-            info = a.label("", 15);
+            info = a.label("", 14);
             info.setTextColor(Theme.MUTED);
-            info.setPadding(a.dp(8), a.dp(6), a.dp(8), a.dp(6));
+            info.setPadding(a.dp(8), a.dp(2), a.dp(8), a.dp(2));
             root.addView(info, new LinearLayout.LayoutParams(-1, -2));
 
             LinearLayout panes = new LinearLayout(a);
@@ -315,7 +315,7 @@ final class Manage {
             lv.setSelector(a.bg(Theme.FOCUS));
             lv.setDrawSelectorOnTop(false);
             lv.setDivider(null);
-            lv.setDividerHeight(a.dp(4));
+            lv.setDividerHeight(a.dp(1));
             lv.setItemsCanFocus(false);
             lv.setPadding(a.dp(4), a.dp(4), a.dp(4), a.dp(4));
             lv.setClipToPadding(false);
@@ -337,8 +337,8 @@ final class Manage {
         }
 
         TextView text(View recycled, String s) {
-            TextView t = recycled instanceof TextView ? (TextView) recycled : a.label("", 19);
-            t.setPadding(a.dp(16), a.dp(11), a.dp(12), a.dp(11));
+            TextView t = recycled instanceof TextView ? (TextView) recycled : a.label("", 16);
+            t.setPadding(a.dp(14), a.dp(6), a.dp(10), a.dp(6));
             t.setSingleLine(true);
             t.setEllipsize(TextUtils.TruncateAt.END);
             t.setText(s);
@@ -351,16 +351,22 @@ final class Manage {
             else {
                 row = new LinearLayout(a);
                 row.setGravity(Gravity.CENTER_VERTICAL);
-                row.setPadding(a.dp(12), a.dp(6), a.dp(12), a.dp(6));
+                row.setPadding(a.dp(8), 0, a.dp(10), 0);
                 CheckBox box = new CheckBox(a);
                 box.setFocusable(false);
                 box.setClickable(false);
                 box.setButtonTintList(ColorStateList.valueOf(Theme.ACCENT));
-                row.addView(box, new LinearLayout.LayoutParams(-2, -2));
-                TextView t = a.label("", 19);
+                // Compact rows so more channels fit on screen: no built-in minimum height, a slightly smaller box.
+                box.setMinimumHeight(0);
+                box.setMinHeight(0);
+                box.setPadding(0, 0, 0, 0);
+                box.setScaleX(0.8f);
+                box.setScaleY(0.8f);
+                row.addView(box, new LinearLayout.LayoutParams(a.dp(30), a.dp(30)));
+                TextView t = a.label("", 16);
                 t.setSingleLine(true);
                 t.setEllipsize(TextUtils.TruncateAt.END);
-                t.setPadding(a.dp(10), a.dp(4), 0, a.dp(4));
+                t.setPadding(a.dp(6), 0, 0, 0);
                 row.addView(t, new LinearLayout.LayoutParams(0, -2, 1));
             }
             out[0] = (TextView) row.getChildAt(1);
