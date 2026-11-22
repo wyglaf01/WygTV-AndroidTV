@@ -1,13 +1,13 @@
 package com.wygtv.tv;
 
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Handler;
 import android.os.Looper;
-import android.text.SpannableStringBuilder;
-import android.text.Spanned;
-import android.text.style.ForegroundColorSpan;
-import android.text.style.RelativeSizeSpan;
-import android.text.style.StyleSpan;
+import android.text.TextUtils;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -28,12 +28,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * The mini TV guide on the right of Live TV: each channel row shows its logo and name, then what is on now (with
- * times and minutes left) and what is on next. Guide data is fetched a few rows ahead of the focused row and kept
- * for a while, so going back to a category shows it straight away.
+ * The TV guide on the right half of Live TV: a time header (now and the next half hours) over one row per channel,
+ * with the channel's logo and name and its programs laid out across the next 90 minutes. The focused channel's
+ * now/next details show in the status line. Guide data is fetched a few rows ahead of the focused row and kept for
+ * a while, so going back to a category shows it straight away.
  */
 final class MiniGuide {
     private static final long KEEP_MS = 30 * 60_000L;
+    private static final long WINDOW = 3 * EpgGrid.SLOT;
     private static final int AHEAD = 14;
     private static final ExecutorService POOL = Executors.newFixedThreadPool(3);
     private static final Handler UI = new Handler(Looper.getMainLooper());
@@ -42,11 +44,16 @@ final class MiniGuide {
         final List<EpgGrid.Program> programs; final long fetched;
         Entry(List<EpgGrid.Program> programs, long fetched) { this.programs = programs; this.fetched = fetched; }
     }
+    private static final class Row {
+        final MainActivity a; final JSONObject item; final String key; final LinearLayout cells;
+        Row(MainActivity a, JSONObject item, String key, LinearLayout cells) { this.a = a; this.item = item; this.key = key; this.cells = cells; }
+    }
     private static final Map<String, Entry> CACHE = new HashMap<>();
     private static final Set<String> LOADING = new HashSet<>();
-    /** Which channel each row shows, so late guide data never lands on a row that was rebuilt. */
-    private static final Map<TextView, String> ROWS = new WeakHashMap<>();
-    private static final Map<TextView, Object[]> ROW_DATA = new WeakHashMap<>();
+    /** Each row on screen and what it shows, so late guide data never lands on a row that was rebuilt. */
+    private static final Map<View, Row> ROWS = new WeakHashMap<>();
+    private static LinearLayout header;
+    private static long winStart;
     private static Runnable ticker;
 
     private MiniGuide() { }
@@ -54,41 +61,99 @@ final class MiniGuide {
     /** Forget all guide data, e.g. after switching playlists. */
     static void clear() { CACHE.clear(); }
 
-    /** Fills the channel list with guide rows for items[from, limit). */
-    static List<TextView> fill(MainActivity a, LinearLayout list, JSONArray items, int from, int limit, ItemAction ok, ItemAction more) {
-        List<TextView> rows = new ArrayList<>();
+    interface ItemAction { void run(JSONObject item); }
+
+    /** Fills the channel list with guide rows for items[from, limit), and puts the time header above the list. */
+    static void fill(MainActivity a, LinearLayout list, JSONArray items, int from, int limit, ItemAction ok, ItemAction more) {
+        winStart = EpgGrid.windowStart(System.currentTimeMillis());
+        addHeader(a, list);
+        List<View> rows = new ArrayList<>();
         List<JSONObject> data = new ArrayList<>();
         for (int i = from; i < limit; i++) {
             JSONObject item = items.optJSONObject(i);
             if (item == null) continue;
-            String title = item.optString("name", "Untitled");
-            TextView row = a.button(title, list, () -> ok.run(item));
-            row.setTag(item.optString("stream_id"));
-            row.setOnLongClickListener(v -> { more.run(item); return true; });
-            row.setPadding(row.getPaddingLeft(), a.dp(9), row.getPaddingRight(), a.dp(9));
-            row.setLineSpacing(0, 1.05f);
-            ChannelIcons.attach(row, item.optString("stream_icon"), title, 46);
-            ROWS.put(row, key(a, item));
-            ROW_DATA.put(row, new Object[]{a, item});
-            render(a, row, item);
+            View row = addRow(a, list, item, ok, more);
             rows.add(row);
             data.add(item);
         }
         for (int i = 0; i < rows.size(); i++) {
             final int at = i;
-            TextView row = rows.get(i);
-            android.view.View.OnFocusChangeListener old = row.getOnFocusChangeListener();
+            View row = rows.get(i);
             row.setOnFocusChangeListener((v, f) -> {
-                if (old != null) old.onFocusChange(v, f);
-                if (f) for (int k = Math.max(0, at - 2); k < Math.min(rows.size(), at + AHEAD); k++) request(a, rows.get(k), data.get(k));
+                row.setBackground(rowBg(a, f));
+                Row r = ROWS.get(row);
+                if (r != null) render(r, f);
+                if (!f) return;
+                showDetails(a, data.get(at));
+                for (int k = Math.max(0, at - 2); k < Math.min(rows.size(), at + AHEAD); k++) request(a, data.get(k));
             });
         }
-        for (int k = 0; k < Math.min(rows.size(), AHEAD); k++) request(a, rows.get(k), data.get(k));
+        for (int k = 0; k < Math.min(rows.size(), AHEAD); k++) request(a, data.get(k));
         startTicker();
-        return rows;
     }
 
-    interface ItemAction { void run(JSONObject item); }
+    private static void addHeader(MainActivity a, LinearLayout list) {
+        if (!(list.getParent() instanceof View) || !(((View) list.getParent()).getParent() instanceof ViewGroup)) return;
+        View scroll = (View) list.getParent();
+        ViewGroup detail = (ViewGroup) scroll.getParent();
+        header = new LinearLayout(a);
+        header.setPadding(a.dp(6), a.dp(6), a.dp(6), a.dp(2));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, a.dp(30));
+        lp.setMargins(a.dp(5), 0, a.dp(5), 0);
+        detail.addView(header, detail.indexOfChild(scroll), lp);
+        drawHeader(a);
+    }
+
+    private static void drawHeader(MainActivity a) {
+        if (header == null) return;
+        header.removeAllViews();
+        DateFormat tf = android.text.format.DateFormat.getTimeFormat(a);
+        TextView today = a.label("Today", 15);
+        today.setTextColor(Theme.MUTED);
+        header.addView(today, new LinearLayout.LayoutParams(a.dp(CHANNEL_DP - 6), -1));
+        for (long t = winStart; t < winStart + WINDOW; t += EpgGrid.SLOT) {
+            TextView v = a.label(tf.format(new Date(t)), 15);
+            v.setTextColor(Theme.ACCENT);
+            v.setTypeface(null, Typeface.BOLD);
+            header.addView(v, new LinearLayout.LayoutParams(0, -1, 1));
+        }
+    }
+
+    private static final int CHANNEL_DP = 170;
+
+    private static View addRow(MainActivity a, LinearLayout list, JSONObject item, ItemAction ok, ItemAction more) {
+        String title = item.optString("name", "Untitled");
+        LinearLayout row = new LinearLayout(a);
+        row.setFocusable(true);
+        row.setClickable(true);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(a.dp(6), a.dp(4), a.dp(6), a.dp(4));
+        row.setBackground(rowBg(a, false));
+        row.setTag(item.optString("stream_id"));
+        row.setOnClickListener(v -> ok.run(item));
+        row.setOnLongClickListener(v -> { more.run(item); return true; });
+        TextView name = a.label(starred(a, item) + title, 15);
+        name.setMaxLines(2);
+        name.setEllipsize(TextUtils.TruncateAt.END);
+        name.setTypeface(null, Typeface.BOLD);
+        ChannelIcons.attach(name, item.optString("stream_icon"), title, 28);
+        row.addView(name, new LinearLayout.LayoutParams(a.dp(CHANNEL_DP - 6), -1));
+        LinearLayout cells = new LinearLayout(a);
+        row.addView(cells, new LinearLayout.LayoutParams(0, -1, 1));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, a.dp(58));
+        lp.setMargins(a.dp(5), a.dp(3), a.dp(5), a.dp(3));
+        list.addView(row, lp);
+        Row r = new Row(a, item, key(a, item), cells);
+        ROWS.put(row, r);
+        render(r, false);
+        return row;
+    }
+
+    private static String starred(MainActivity a, JSONObject item) {
+        String pid = item.optString("playlist");
+        boolean fav = (pid.isEmpty() || pid.equals(a.library.activeId())) && a.isFavorite("live", item.optString("stream_id"));
+        return fav ? "★ " : "";
+    }
 
     /** Playlist + channel id, since two providers can use the same channel number. */
     private static String key(MainActivity a, JSONObject item) {
@@ -96,14 +161,14 @@ final class MiniGuide {
         return (pid.isEmpty() ? a.library.activeId() : pid) + "|" + item.optString("stream_id");
     }
 
-    private static void request(MainActivity a, TextView row, JSONObject item) {
+    private static void request(MainActivity a, JSONObject item) {
         String id = key(a, item), sid = item.optString("stream_id");
         Entry have = CACHE.get(id);
         long now = System.currentTimeMillis();
         if (sid.isEmpty() || (have != null && now - have.fetched < KEEP_MS && !runOut(have, now)) || !LOADING.add(id)) return;
         String pid = item.optString("playlist");
         final JSONObject other = pid.isEmpty() || pid.equals(a.library.activeId()) ? null : a.library.find(pid);
-        final String action = "get_short_epg&stream_id=" + a.enc(sid) + "&limit=6";
+        final String action = "get_short_epg&stream_id=" + a.enc(sid) + "&limit=8";
         POOL.execute(() -> {
             List<EpgGrid.Program> progs = new ArrayList<>();
             try {
@@ -123,10 +188,10 @@ final class MiniGuide {
             UI.post(() -> {
                 LOADING.remove(id);
                 CACHE.put(id, new Entry(clean, System.currentTimeMillis()));
-                for (Map.Entry<TextView, String> r : new ArrayList<>(ROWS.entrySet())) {
-                    if (!id.equals(r.getValue()) || !r.getKey().isAttachedToWindow()) continue;
-                    Object[] d = ROW_DATA.get(r.getKey());
-                    if (d != null) render((MainActivity) d[0], r.getKey(), (JSONObject) d[1]);
+                for (Map.Entry<View, Row> r : new ArrayList<>(ROWS.entrySet())) {
+                    if (!id.equals(r.getValue().key) || !r.getKey().isAttachedToWindow()) continue;
+                    render(r.getValue(), r.getKey().hasFocus());
+                    if (r.getKey().hasFocus()) showDetails(r.getValue().a, r.getValue().item);
                 }
             });
         });
@@ -136,65 +201,88 @@ final class MiniGuide {
         return !e.programs.isEmpty() && e.programs.get(e.programs.size() - 1).end <= now;
     }
 
-    /** Name on the first line, then "Now" and "Next" lines from the guide. */
-    private static void render(MainActivity a, TextView row, JSONObject item) {
-        String title = item.optString("name", "Untitled");
-        String sid = item.optString("stream_id");
-        String pid = item.optString("playlist");
-        boolean fav = (pid.isEmpty() || pid.equals(a.library.activeId())) && a.isFavorite("live", sid);
-        SpannableStringBuilder s = new SpannableStringBuilder();
-        int st = s.length();
-        s.append(fav ? "★ " : "").append(title);
-        s.setSpan(new StyleSpan(Typeface.BOLD), st, s.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+    /** Program blocks across the window, sized by their length. */
+    private static void render(Row r, boolean focused) {
+        MainActivity a = r.a;
+        r.cells.removeAllViews();
+        Entry e = CACHE.get(r.key);
+        long winEnd = winStart + WINDOW, now = System.currentTimeMillis();
+        if (e == null || e.programs.isEmpty()) {
+            TextView v = cell(a, e == null ? "Loading guide…" : "No guide information", false, focused);
+            v.setTextColor(Theme.MUTED);
+            r.cells.addView(v, cellLp(a, 1));
+            return;
+        }
+        for (EpgGrid.Cell c : EpgGrid.cells(e.programs, winStart, winEnd)) {
+            boolean airing = c.program != null && c.contains(now);
+            String t = c.program == null ? "" : (c.program.title.isEmpty() ? "Untitled" : c.program.title);
+            r.cells.addView(cell(a, t, airing, focused), cellLp(a, (int) Math.max(1, (c.end - c.start) / EpgGrid.MINUTE)));
+        }
+    }
+
+    private static TextView cell(MainActivity a, String text, boolean airing, boolean rowFocused) {
+        TextView v = a.label(text, 14);
+        v.setSingleLine(true);
+        v.setEllipsize(TextUtils.TruncateAt.END);
+        v.setPadding(a.dp(8), 0, a.dp(6), 0);
+        GradientDrawable g = new GradientDrawable();
+        int base = airing ? Theme.AIRING : Theme.PANEL;
+        g.setColor(Theme.alpha(rowFocused ? Theme.mix(base, Theme.FOCUS, 0.45f) : base, 0xe6));
+        g.setCornerRadius(a.dp(6));
+        g.setStroke(a.dp(1), airing ? Theme.mix(Theme.STROKE, Theme.ACCENT, 0.4f) : Theme.STROKE);
+        v.setBackground(g);
+        return v;
+    }
+
+    private static LinearLayout.LayoutParams cellLp(MainActivity a, int weight) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -1, weight);
+        lp.setMargins(a.dp(2), a.dp(2), a.dp(2), a.dp(2));
+        return lp;
+    }
+
+    private static GradientDrawable rowBg(MainActivity a, boolean focused) {
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(focused ? Theme.alpha(Theme.FOCUS, 0xd0) : Theme.alpha(Theme.mix(Theme.BG, Theme.PANEL, 0.4f), 0xe0));
+        g.setCornerRadius(a.dp(8));
+        g.setStroke(a.dp(focused ? 2 : 1), focused ? Theme.STROKE_FOCUS : Theme.mix(Theme.STROKE, Theme.BG, 0.3f));
+        return g;
+    }
+
+    /** "Now" and "Next" for the focused channel in the status line under the guide. */
+    private static void showDetails(MainActivity a, JSONObject item) {
+        if (a.status == null) return;
+        String name = item.optString("name", "Untitled");
         Entry e = CACHE.get(key(a, item));
         long now = System.currentTimeMillis();
-        EpgGrid.Program cur = null, next = null;
-        if (e != null) for (EpgGrid.Program p : e.programs) {
-            if (p.end <= now) continue;
-            if (p.start <= now && cur == null) { cur = p; continue; }
-            if (next == null) { next = p; break; }
-        }
+        if (e == null) { a.status.setText(name + "  •  loading guide…"); return; }
+        EpgGrid.Program cur = EpgGrid.at(e.programs, now), next = null;
+        for (EpgGrid.Program p : e.programs) if (p.start >= (cur == null ? now : cur.end)) { next = p; break; }
         DateFormat tf = android.text.format.DateFormat.getTimeFormat(a);
-        if (e == null) {
-            line(s, "Loading guide…", null, Theme.MUTED);
-        } else if (cur == null && next == null) {
-            line(s, "No guide information", null, Theme.MUTED);
-        } else {
-            if (cur != null) {
-                long left = Math.max(1, (cur.end - now + 59_999) / 60_000);
-                line(s, "Now  " + tf.format(new Date(cur.start)) + " – " + tf.format(new Date(cur.end)) + "   ",
-                        (cur.title.isEmpty() ? "Untitled" : cur.title) + "   (" + left + " min left)", Theme.ACCENT);
-            } else {
-                line(s, "Now  ", "No guide information", Theme.ACCENT);
-            }
-            if (next != null) line(s, "Next  " + tf.format(new Date(next.start)) + "   ", next.title.isEmpty() ? "Untitled" : next.title, Theme.MUTED);
-        }
-        row.setText(s);
+        StringBuilder s = new StringBuilder(name);
+        if (cur == null && next == null) s.append("  •  no guide information");
+        if (cur != null) s.append("  •  Now: ").append(cur.title.isEmpty() ? "Untitled" : cur.title).append("  ")
+                .append(tf.format(new Date(cur.start))).append("–").append(tf.format(new Date(cur.end)))
+                .append(" (").append(EpgGrid.minutesLeft(cur, now)).append(" min left)");
+        if (next != null) s.append("  •  Next: ").append(tf.format(new Date(next.start))).append("  ").append(next.title.isEmpty() ? "Untitled" : next.title);
+        a.status.setText(s);
     }
 
-    private static void line(SpannableStringBuilder s, String head, String text, int headColor) {
-        s.append("\n");
-        int st = s.length();
-        s.append(head);
-        s.setSpan(new ForegroundColorSpan(headColor), st, s.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        if (text != null) s.append(text);
-        s.setSpan(new RelativeSizeSpan(0.78f), st, s.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-    }
-
-    /** Re-draws visible rows once a minute so "Now" moves on while the screen stays open. */
+    /** Once a minute: move the window on at each half hour and re-draw the rows on screen. */
     private static void startTicker() {
         if (ticker != null) return;
         ticker = new Runnable() {
             @Override public void run() {
                 boolean any = false;
-                for (Map.Entry<TextView, Object[]> r : new ArrayList<>(ROW_DATA.entrySet())) {
+                long start = EpgGrid.windowStart(System.currentTimeMillis());
+                boolean moved = start != winStart;
+                winStart = start;
+                for (Map.Entry<View, Row> r : new ArrayList<>(ROWS.entrySet())) {
                     if (!r.getKey().isAttachedToWindow()) continue;
+                    if (!any && moved && header != null && header.isAttachedToWindow()) drawHeader(r.getValue().a);
                     any = true;
-                    MainActivity a = (MainActivity) r.getValue()[0];
-                    JSONObject item = (JSONObject) r.getValue()[1];
-                    render(a, r.getKey(), item);
-                    Entry e = CACHE.get(key(a, item));
-                    if (e != null && runOut(e, System.currentTimeMillis()) && r.getKey().hasFocus()) request(a, r.getKey(), item);
+                    render(r.getValue(), r.getKey().hasFocus());
+                    Entry e = CACHE.get(r.getValue().key);
+                    if (e != null && runOut(e, System.currentTimeMillis()) && r.getKey().hasFocus()) request(r.getValue().a, r.getValue().item);
                 }
                 if (any) UI.postDelayed(this, 60_000L); else ticker = null;
             }
