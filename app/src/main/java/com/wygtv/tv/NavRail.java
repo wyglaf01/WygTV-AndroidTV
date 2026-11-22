@@ -85,7 +85,7 @@ final class NavRail {
                 }
             });
             entries.put("msearch", () -> add("⌕", "Search", "msearch", current, () -> MasterSearch.show(a)));
-            entries.put("playlists", () -> add("☰", "Playlists", "playlists", current, () -> a.playlists()));
+            entries.put("playlists", () -> add("☰", "Playlists", "playlists", current, () -> { Menus.playlistsFromSettings = false; a.playlists(); }));
             entries.put("settings", () -> add("⚙", "Settings", "settings", current, () -> a.settings()));
         }
         java.util.List<String> keys = new ArrayList<>();
