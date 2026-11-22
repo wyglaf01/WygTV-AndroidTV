@@ -46,7 +46,7 @@ final class Episodes {
                 String what = Watch.label(next[0], e, idx);
                 cont.setText(next[2].equals("resume") ? "▶  Resume " + what + (at > 0 ? "  •  from " + Watch.clock(at) : "")
                         : next[2].equals("next") ? "▶  Next: " + what : "▶  Start " + what);
-                cont.setOnClickListener(v -> play(a, sid, next[0], e, idx));
+                cont.setOnClickListener(v -> play(a, sid, next[0], e, idx, episodes));
             } else {
                 cont.setText("✓  All watched");
                 cont.setOnClickListener(v -> Toast.makeText(a, "You've watched every episode. Pick a season to watch again.", Toast.LENGTH_SHORT).show());
@@ -97,7 +97,7 @@ final class Episodes {
             if (e == null) continue;
             final int idx = i;
             String eid = e.optString("id");
-            TextView row = a.button(episodeLabel(state, season, e, i), right, () -> play(a, sid, season, e, idx));
+            TextView row = a.button(episodeLabel(state, season, e, i), right, () -> play(a, sid, season, e, idx, episodes));
             row.setTag(eid);
             row.setTextSize(19);
             row.setOnLongClickListener(v -> {
@@ -131,7 +131,41 @@ final class Episodes {
         return n.isEmpty() || n.equals("0") ? String.valueOf(i + 1) : n;
     }
 
-    private static void play(MainActivity a, String sid, String season, JSONObject e, int idx) {
+    /** The episode after the one playing, as {season, index}, or null (not an episode, or the last one). */
+    static String[] next(MainActivity a) {
+        if (a.watching == null || a.seriesEpisodes == null) return null;
+        return Watch.after(a.seriesEpisodes, a.watching[1]);
+    }
+
+    /** "S1 E5  Title" for the episode after the one playing, or null. */
+    static String nextLabel(MainActivity a) {
+        String[] n = next(a);
+        if (n == null) return null;
+        int idx = Integer.parseInt(n[1]);
+        JSONObject e = a.seriesEpisodes.optJSONArray(n[0]).optJSONObject(idx);
+        String name = e.optString("title");
+        return Watch.label(n[0], e, idx) + (name.isEmpty() ? "" : "   " + name);
+    }
+
+    /** From the player: saves progress on this episode and starts the next one (next season after a season's last). */
+    static boolean playNext(MainActivity a) {
+        String[] n = next(a);
+        if (n == null) return false;
+        String sid = a.watching[0];
+        JSONObject episodes = a.seriesEpisodes;
+        int idx = Integer.parseInt(n[1]);
+        JSONObject e = episodes.optJSONArray(n[0]).optJSONObject(idx);
+        Runnable back = a.playerReturn;
+        a.closePlayer();
+        // Back from the next episode still goes to wherever the first one was started from.
+        a.mode = "episodes";
+        a.playerReturn = back;
+        play(a, sid, n[0], e, idx, episodes);
+        return true;
+    }
+
+    private static void play(MainActivity a, String sid, String season, JSONObject e, int idx, JSONObject episodes) {
+        a.seriesEpisodes = episodes;
         String eid = e.optString("id"), ext = e.optString("container_extension", "mp4"), name = e.optString("title", "Episode " + (idx + 1));
         a.pendingWatch = new String[]{sid, eid, season, number(e, idx)};
         a.play("series", eid, ext, name);

@@ -112,6 +112,25 @@ final class Watch {
         return null;
     }
 
+    /**
+     * The episode straight after {@code episodeId} in season order, moving on to the next season after a season's
+     * last episode. Returns {season, index in that season}, or null for the last episode (or an unknown id).
+     */
+    static String[] after(JSONObject episodes, String episodeId) {
+        if (episodes == null || episodeId == null) return null;
+        boolean passed = false;
+        for (String s : seasons(episodes)) {
+            JSONArray eps = episodes.optJSONArray(s);
+            for (int i = 0; eps != null && i < eps.length(); i++) {
+                JSONObject e = eps.optJSONObject(i);
+                if (e == null) continue;
+                if (passed) return new String[]{s, String.valueOf(i)};
+                if (episodeId.equals(e.optString("id"))) passed = true;
+            }
+        }
+        return null;
+    }
+
     /** How many episodes of a season are watched. */
     static int doneIn(JSONArray eps, JSONObject state) {
         int n = 0;

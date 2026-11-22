@@ -9,6 +9,8 @@ public class MainActivity extends Activity {
  String detailsType="vod"; Runnable detailsBack, episodesBack;
  // Series watch progress (Watch.java): the episode about to play {series, episode, season, number}, and the one playing.
  String[] pendingWatch, watching;
+ // The seasons and episodes of the series being watched (get_series_info "episodes"), for Play next episode.
+ JSONObject seriesEpisodes; String seriesTitle;
  /** Saves how far the playing episode got. */
  void saveWatch(){if(watching!=null&&player!=null)Watch.record(this,watching[0],watching[1],watching[2],watching[3],player.getCurrentPosition(),player.getDuration());}
  // Saved playlists (Xtream or M3U), Recently watched and the optional XMLTV guide.

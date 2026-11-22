@@ -58,4 +58,14 @@ public class WatchTest {
         assertEquals("1h 5m", Watch.clock(65 * 60_000));
         assertEquals("12 min", Watch.clock(12 * 60_000));
     }
+
+    @Test public void afterMovesToTheNextSeason() throws Exception {
+        JSONObject eps = show();
+        assertArrayEquals(new String[]{"1", "1"}, Watch.after(eps, "a1"));
+        assertArrayEquals(new String[]{"2", "0"}, Watch.after(eps, "a2"));
+        assertArrayEquals(new String[]{"10", "0"}, Watch.after(eps, "b2"));
+        assertNull(Watch.after(eps, "x1"));
+        assertNull(Watch.after(eps, "nope"));
+        assertNull(Watch.after(null, "a1"));
+    }
 }

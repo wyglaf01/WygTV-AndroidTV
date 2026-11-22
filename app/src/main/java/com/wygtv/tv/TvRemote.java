@@ -53,6 +53,15 @@ final class TvRemote {
     private final Runnable hideBanner = () -> { if (banner != null) banner.setVisibility(View.GONE); };
     private final Runnable commitNumber = this::commitNumber;
 
+    // Series: the "Up next" card shown near the end of an episode. OK plays the next episode, Back hides the card;
+    // when the episode finishes it starts the next one by itself after a short countdown.
+    private static final long UP_NEXT_MS = 40_000;
+    private static final int AUTO_NEXT_SECONDS = 8;
+    private TextView upNext;
+    private boolean upNextDismissed;
+    private int endedSeconds = -1;
+    private final Runnable upNextTick = this::upNextTick;
+
     // Full live channel list, loaded in the background so channel numbers can reach any channel.
     private JSONArray allLive;
     private String allLiveAccount = "";
@@ -97,6 +106,7 @@ final class TvRemote {
         FrameLayout.LayoutParams nlp = new FrameLayout.LayoutParams(a.dp(170), a.dp(90), Gravity.TOP | Gravity.END);
         nlp.setMargins(0, a.dp(28), a.dp(36), 0);
         frame.addView(numberBox, nlp);
+        buildUpNext(frame);
 
         if (isLive()) {
             playerView.setControllerAutoShow(false);
@@ -129,6 +139,7 @@ final class TvRemote {
         banner.addView(bannerNext);
         TextView hints = text(isLive()
                 ? "▲▼ / CH± change channel    0-9 channel number    OK info    GUIDE TV guide    MENU options / subtitles    BACK exit"
+                : "series".equals(type) && Episodes.next(a) != null ? "◀▶ seek    ▶❚❚ play / pause    MENU next episode / options / subtitles    BACK exit"
                 : "◀▶ seek    ▶❚❚ play / pause    MENU options / subtitles    BACK exit", 14, Theme.MUTED, false);
         hints.setPadding(0, a.dp(8), 0, 0);
         banner.addView(hints);
@@ -136,6 +147,43 @@ final class TvRemote {
         lp.setMargins(a.dp(36), 0, a.dp(36), a.dp(28));
         frame.addView(banner, lp);
     }
+
+    private void buildUpNext(FrameLayout frame) {
+        upNext = text("", 20, Theme.TEXT, true);
+        upNext.setSingleLine(false);
+        upNext.setMaxLines(3);
+        upNext.setPadding(a.dp(22), a.dp(14), a.dp(22), a.dp(14));
+        upNext.setBackground(panel());
+        upNext.setVisibility(View.GONE);
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(a.dp(420), -2, Gravity.BOTTOM | Gravity.END);
+        lp.setMargins(0, 0, a.dp(36), a.dp(120));
+        frame.addView(upNext, lp);
+        upNextDismissed = false;
+        endedSeconds = -1;
+        if ("series".equals(type) && Episodes.next(a) != null) ui.postDelayed(upNextTick, 1000);
+    }
+
+    /** Once a second while an episode plays: shows the Up next card in its last 40 seconds, and counts down at the end. */
+    private void upNextTick() {
+        if (view == null || a.player == null || upNext == null) return;
+        String label = Episodes.nextLabel(a);
+        if (label == null) return;
+        long dur = a.player.getDuration(), pos = a.player.getCurrentPosition();
+        boolean ended = a.player.getPlaybackState() == Player.STATE_ENDED;
+        boolean near = ended || (dur > 0 && dur - pos <= UP_NEXT_MS);
+        if (!near) { endedSeconds = -1; upNextDismissed = false; upNext.setVisibility(View.GONE); }
+        else if (!upNextDismissed) {
+            if (ended) {
+                if (endedSeconds < 0) endedSeconds = AUTO_NEXT_SECONDS;
+                if (endedSeconds == 0) { Episodes.playNext(a); return; }
+                upNext.setText("Up next   " + label + "\nStarting in " + endedSeconds-- + "…   OK play now   BACK cancel");
+            } else upNext.setText("Up next   " + label + "\nOK play next episode   BACK hide");
+            upNext.setVisibility(View.VISIBLE);
+        }
+        ui.postDelayed(upNextTick, 1000);
+    }
+
+    private boolean upNextShowing() { return upNext != null && upNext.getVisibility() == View.VISIBLE; }
 
     private void showBanner() {
         if (banner == null) return;
@@ -201,6 +249,7 @@ final class TvRemote {
             case KeyEvent.KEYCODE_ENTER:
             case KeyEvent.KEYCODE_NUMPAD_ENTER:
                 if (controls) return false;
+                if (upNextShowing()) { if (down && e.getRepeatCount() == 0) Episodes.playNext(a); return true; }
                 if (!typed.isEmpty()) { if (down) { ui.removeCallbacks(commitNumber); commitNumber(); } return true; }
                 if (!isLive()) return false; // movies and episodes: OK shows the playback controls
                 if (down && e.getRepeatCount() == 0) {
@@ -241,6 +290,13 @@ final class TvRemote {
                 if (down) seek(key == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD ? SEEK_LONG_MS : -SEEK_LONG_MS);
                 return true;
             case KeyEvent.KEYCODE_MEDIA_NEXT:
+                if (!isLive()) {
+                    boolean hasNext = Episodes.next(a) != null;
+                    if (down && hasNext && e.getRepeatCount() == 0) Episodes.playNext(a);
+                    return hasNext;
+                }
+                if (down) zap(1);
+                return true;
             case KeyEvent.KEYCODE_MEDIA_PREVIOUS:
                 if (!isLive()) return false;
                 if (down) zap(key == KeyEvent.KEYCODE_MEDIA_NEXT ? 1 : -1);
@@ -260,6 +316,7 @@ final class TvRemote {
         if (!a.mode.equals("player") || view == null) return false;
         if (!typed.isEmpty()) { ui.removeCallbacks(commitNumber); typed = ""; numberBox.setVisibility(View.GONE); return true; }
         if (view.isControllerFullyVisible()) { view.hideController(); return true; }
+        if (upNextShowing()) { upNextDismissed = true; endedSeconds = -1; upNext.setVisibility(View.GONE); return true; }
         return false;
     }
 
@@ -270,6 +327,7 @@ final class TvRemote {
         if (a.tvGuide != null && isLive()) a.tvGuide.focusStream(id);
         view = null;
         banner = null;
+        upNext = null;
     }
 
     private void flashControls() { if (!isLive()) view.showController(); }
@@ -417,8 +475,14 @@ final class TvRemote {
         ui.removeCallbacks(hideBanner);
         if (!isLive()) {
             boolean fav = a.isFavorite(type, id);
+            String next = "series".equals(type) ? Episodes.nextLabel(a) : null;
+            String[] items = {fav ? "Remove from Favorites" : "Add to Favorites", subtitlesItem(), "Exit player"};
+            if (next != null) items = new String[]{"▶  Play next episode   " + next, items[0], items[1], items[2]};
+            final int shift = next != null ? 1 : 0;
             new Dialogs.Builder(a).setTitle(title)
-                    .setItems(new String[]{fav ? "Remove from Favorites" : "Add to Favorites", subtitlesItem(), "Exit player"}, (d, w) -> {
+                    .setItems(items, (d, which) -> {
+                        if (shift == 1 && which == 0) { Episodes.playNext(a); return; }
+                        int w = which - shift;
                         if (w == 0) toast(a.toggleFavorite(type, id, title, ext) ? "Added to Favorites" : "Removed from Favorites");
                         else if (w == 1) { if (a.subs != null) a.subs.choose(); }
                         else a.onBackPressed();
