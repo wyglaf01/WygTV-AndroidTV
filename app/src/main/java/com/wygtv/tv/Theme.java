@@ -1,24 +1,30 @@
 package com.wygtv.tv;
 
 /**
- * Colour themes picked in Settings (Royal blue & bronze unless changed). Steampunk keeps the original brass-on-leather look and artwork;
- * the others recolour every panel, button, menu and the guide, and wash the artwork in their own colour.
+ * Colour themes picked in Settings (Royal blue & bronze unless changed). Every theme follows the royal blue & bronze style:
+ * a deep main colour for panels and focus, with bronze (or gold) trim, headings and focused tiles. Steampunk keeps the
+ * original brass-on-leather artwork; the others wash the artwork in their own colour.
+ * Settings > Appearance > Glass effect turns panels and buttons into frosted see-through glass (see {@link #glass}).
  */
 final class Theme {
-    static final String[] KEYS = {"royal", "steampunk", "blue", "cyan", "brown", "gold", "green"};
-    static final String[] LABELS = {"Royal blue & bronze (default)", "Steampunk (brass & leather)", "Blue", "Cyan", "Brown", "Gold", "Green"};
+    static final String[] KEYS = {"royal", "steampunk", "cyan", "green", "brown", "gold"};
+    static final String[] LABELS = {"Royal blue & bronze (default)", "Steampunk (brass & leather)", "Teal & bronze", "Emerald & bronze", "Mahogany & bronze", "Black & gold"};
 
-    // Order: BG, PANEL, PANEL_END, STROKE, STROKE_FOCUS, FOCUS, ACCENT, HEADER, TEXT, MUTED, HINT, INK, TILE_A, TILE_B, TILE_STROKE, COPPER, AIRING
-    private static final int[][] PALETTES = {
-            // Royal blue panels with bronze trim, matching the launcher icon.
-            {0xff060C24, 0xff1A3480, 0xe60A1640, 0xffA8743A, 0xffF0C080, 0xff2D52C4, 0xffE6B070, 0xffD9A060, 0xffF4EFE6, 0xffC6CADD, 0xff8C93B8, 0xff1A0F04, 0xffF0C88A, 0xffB0743A, 0xffFFE6BC, 0xffCD7F32, 0xff23408F},
-            {0xff140B06, 0xff3A2414, 0xe61C100A, 0xff8A6A3A, 0xffF0C878, 0xff9C5B22, 0xffEACB86, 0xffE8B86A, 0xffF5E8CA, 0xffD9BF94, 0xffB89F7C, 0xff2A1708, 0xffF0D797, 0xffBA904A, 0xffFFF0C1, 0xffD9822B, 0xff6E3E1C},
-            {0xff070D1C, 0xff142A4E, 0xe60A1428, 0xff3F5F92, 0xff8FB8FF, 0xff2F5FB0, 0xff9CC3FF, 0xff8DB6F5, 0xffEAF1FF, 0xffB4C6E4, 0xff7F93B5, 0xff081428, 0xffA9CBFF, 0xff5D8FD9, 0xffE1ECFF, 0xff4C9BFF, 0xff1C3F78},
-            {0xff04161A, 0xff0F3A42, 0xe6061F24, 0xff2F7A86, 0xff7FE7F2, 0xff148A98, 0xff8FEFF7, 0xff6FDCE8, 0xffE6FBFD, 0xffA8D9DE, 0xff6FA4AA, 0xff04191D, 0xff9FF3FA, 0xff3BBFCC, 0xffDDFCFF, 0xff22C8D8, 0xff12555F},
-            {0xff1A100A, 0xff4A2E1C, 0xe62A1A10, 0xff7A5638, 0xffD9A877, 0xff8A5530, 0xffE3BE96, 0xffD9A877, 0xffF6EADC, 0xffD5BFA6, 0xffA88E74, 0xff2A180C, 0xffE8C9A4, 0xffA9764A, 0xffFBEBD8, 0xffC07A45, 0xff6A4128},
-            {0xff171104, 0xff4A3A10, 0xe6261D06, 0xffA88A30, 0xffFFE07A, 0xffB58A12, 0xffFFD966, 0xffFFCF40, 0xffFFF6DC, 0xffE6D59E, 0xffB3A268, 0xff2A2004, 0xffFFE48A, 0xffD4A520, 0xffFFF6C8, 0xffF2B705, 0xff6B5412},
-            {0xff07150A, 0xff173F22, 0xe60B2112, 0xff3F7F4E, 0xff9BE6A8, 0xff2E8A45, 0xffA6EBB2, 0xff8FDE9E, 0xffEAFBEE, 0xffB5DDBD, 0xff7FA889, 0xff06180B, 0xffB2F0BD, 0xff4FB866, 0xffE2FCE6, 0xff3FCF63, 0xff1F5A2E},
+    // The shared trim: Order STROKE, STROKE_FOCUS, ACCENT, HEADER, INK, TILE_A, TILE_B, TILE_STROKE, COPPER
+    private static final int[] BRONZE = {0xffA8743A, 0xffF0C080, 0xffE6B070, 0xffD9A060, 0xff1A0F04, 0xffF0C88A, 0xffB0743A, 0xffFFE6BC, 0xffCD7F32};
+    private static final int[] GOLD = {0xffB8913A, 0xffF5D488, 0xffEDC66E, 0xffE0B655, 0xff1A1404, 0xffF5D58E, 0xffB8893A, 0xffFFF0C4, 0xffD9A632};
+    private static final int[] BRASS = {0xff8A6A3A, 0xffF0C878, 0xffEACB86, 0xffE8B86A, 0xff2A1708, 0xffF0D797, 0xffBA904A, 0xffFFF0C1, 0xffD9822B};
+
+    // Each theme's own colours. Order: BG, PANEL, PANEL_END, FOCUS, TEXT, MUTED, HINT, AIRING
+    private static final int[][] BASES = {
+            {0xff060C24, 0xff1A3480, 0xe60A1640, 0xff2D52C4, 0xffF4EFE6, 0xffC6CADD, 0xff8C93B8, 0xff23408F}, // royal blue
+            {0xff140B06, 0xff3A2414, 0xe61C100A, 0xff9C5B22, 0xffF5E8CA, 0xffD9BF94, 0xffB89F7C, 0xff6E3E1C}, // steampunk leather
+            {0xff04161A, 0xff0E4A52, 0xe6062428, 0xff168A96, 0xffEEF8F6, 0xffB6D3D2, 0xff7FA6A6, 0xff13606A}, // teal
+            {0xff04140C, 0xff0F4A2C, 0xe6062614, 0xff1E7A48, 0xffEEF8F0, 0xffB8D6C2, 0xff82A68E, 0xff145C36}, // emerald
+            {0xff160A08, 0xff5A2418, 0xe62A100A, 0xff8E3A26, 0xffF6ECE2, 0xffD9C2B2, 0xffA88E7E, 0xff6E2E1E}, // mahogany
+            {0xff0A0A0C, 0xff2A2A31, 0xe6141418, 0xff4C4C58, 0xffF5F1E8, 0xffCFCAC0, 0xff9A968E, 0xff3A3A44}, // black
     };
+    private static final int[][] TRIMS = {BRONZE, BRASS, BRONZE, BRONZE, BRONZE, GOLD};
 
     /** Used when no theme has been picked in Settings. */
     static final String DEFAULT = "royal";
@@ -32,14 +38,46 @@ final class Theme {
     static void apply(String k) {
         int i = indexOf(k);
         key = KEYS[i];
-        int[] p = PALETTES[i];
-        BG = p[0]; PANEL = p[1]; PANEL_END = p[2]; STROKE = p[3]; STROKE_FOCUS = p[4]; FOCUS = p[5]; ACCENT = p[6]; HEADER = p[7];
-        TEXT = p[8]; MUTED = p[9]; HINT = p[10]; INK = p[11]; TILE_A = p[12]; TILE_B = p[13]; TILE_STROKE = p[14]; COPPER = p[15]; AIRING = p[16];
+        int[] b = BASES[i], t = TRIMS[i];
+        BG = b[0]; PANEL = b[1]; PANEL_END = b[2]; FOCUS = b[3]; TEXT = b[4]; MUTED = b[5]; HINT = b[6]; AIRING = b[7];
+        STROKE = t[0]; STROKE_FOCUS = t[1]; ACCENT = t[2]; HEADER = t[3]; INK = t[4]; TILE_A = t[5]; TILE_B = t[6]; TILE_STROKE = t[7]; COPPER = t[8];
     }
 
     static int indexOf(String k) {
         for (int i = 0; i < KEYS.length; i++) if (KEYS[i].equals(k)) return i;
         return k.equals(DEFAULT) ? 0 : indexOf(DEFAULT);
+    }
+
+    /** Themes that were removed, and the theme their users move to. */
+    static String migrate(String k) {
+        return k == null || k.equals("blue") ? DEFAULT : k;
+    }
+
+    /** Settings > Appearance > Glass effect: frosted see-through panels and buttons over a blurred backdrop. */
+    static final String PREF_GLASS = "glass_effect";
+    static boolean glass;
+
+    /** Top and bottom fill of a button, row or panel: solid, or see-through glass with a light sheen on top. */
+    static int[] surface(boolean focused) {
+        if (glass) return focused
+                ? new int[]{alpha(mix(FOCUS, 0xffffffff, 0.18f), 0xb8), alpha(FOCUS, 0x8c)}
+                : new int[]{alpha(mix(PANEL, 0xffffffff, 0.14f), 0x5c), alpha(mix(PANEL, BG, 0.5f), 0x3d)};
+        return focused
+                ? new int[]{mix(FOCUS, 0xffffffff, 0.10f), FOCUS}
+                : new int[]{alpha(PANEL, 0xf2), alpha(mix(PANEL, BG, 0.55f), 0xf2)};
+    }
+
+    /** The thin edge around a button, row or panel. Glass gets a frosted light edge, solid gets bronze. */
+    static int edge(boolean focused) {
+        if (focused) return STROKE_FOCUS;
+        return glass ? alpha(mix(STROKE_FOCUS, 0xffffffff, 0.45f), 0x73) : alpha(STROKE, 0xb3);
+    }
+
+    /** A panel colour with the glass see-through applied (alpha scaled down when the glass effect is on). */
+    static int pane(int color) {
+        if (!glass) return color;
+        int a = color >>> 24;
+        return alpha(color, Math.round(a * 0.55f));
     }
 
     static boolean steampunk() { return key.equals("steampunk"); }

@@ -233,16 +233,17 @@ final class NavRail {
 
     private GradientDrawable background(boolean open) {
         GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                open ? new int[]{Theme.alpha(Theme.BG,0xfa), Theme.alpha(Theme.PANEL,0xf2)} : new int[]{Theme.alpha(Theme.BG,0xe6), Theme.alpha(Theme.PANEL,0xcc)});
-        g.setStroke(a.dp(1), Theme.STROKE);
+                open ? new int[]{Theme.pane(Theme.alpha(Theme.BG,0xfa)), Theme.pane(Theme.alpha(Theme.PANEL,0xf2))} : new int[]{Theme.pane(Theme.alpha(Theme.BG,0xe6)), Theme.pane(Theme.alpha(Theme.PANEL,0xcc))});
+        g.setStroke(a.dp(1), Theme.edge(false));
         return g;
     }
 
     private GradientDrawable itemBg(boolean focused, boolean here) {
-        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                focused ? new int[]{Theme.TILE_A, Theme.TILE_B} : here ? new int[]{Theme.alpha(Theme.PANEL,0x66), Theme.alpha(Theme.FOCUS,0x66)} : new int[]{0x00000000, 0x00000000});
+        if (focused) { GradientDrawable t = Skin.tile(a, true); t.setCornerRadius(a.dp(10)); t.setStroke(a.dp(2), Theme.TILE_STROKE); return t; }
+        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                here ? new int[]{Theme.alpha(Theme.FOCUS,0x70), Theme.alpha(Theme.FOCUS,0x40)} : new int[]{0x00000000, 0x00000000});
         g.setCornerRadius(a.dp(10));
-        if (focused || here) g.setStroke(a.dp(focused ? 2 : 1), focused ? Theme.TILE_STROKE : Theme.STROKE);
+        if (here) g.setStroke(a.dp(1), Theme.edge(false));
         return g;
     }
 }

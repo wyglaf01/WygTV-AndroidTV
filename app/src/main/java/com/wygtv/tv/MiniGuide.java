@@ -235,9 +235,9 @@ final class MiniGuide {
         v.setPadding(a.dp(8), 0, a.dp(6), 0);
         GradientDrawable g = new GradientDrawable();
         int base = airing ? Theme.AIRING : Theme.PANEL;
-        g.setColor(Theme.alpha(rowFocused ? Theme.mix(base, Theme.FOCUS, 0.45f) : base, 0xe6));
+        g.setColor(Theme.pane(Theme.alpha(rowFocused ? Theme.mix(base, Theme.FOCUS, 0.45f) : base, 0xe6)));
         g.setCornerRadius(a.dp(6));
-        g.setStroke(a.dp(1), airing ? Theme.mix(Theme.STROKE, Theme.ACCENT, 0.4f) : Theme.STROKE);
+        g.setStroke(a.dp(1), airing ? Theme.mix(Theme.STROKE, Theme.ACCENT, 0.4f) : Theme.edge(false));
         v.setBackground(g);
         return v;
     }
@@ -250,9 +250,9 @@ final class MiniGuide {
 
     private static GradientDrawable rowBg(MainActivity a, boolean focused) {
         GradientDrawable g = new GradientDrawable();
-        g.setColor(focused ? Theme.alpha(Theme.FOCUS, 0xd0) : Theme.alpha(Theme.mix(Theme.BG, Theme.PANEL, 0.4f), 0xe0));
+        g.setColor(Theme.pane(focused ? Theme.alpha(Theme.FOCUS, 0xd0) : Theme.alpha(Theme.mix(Theme.BG, Theme.PANEL, 0.4f), 0xe0)));
         g.setCornerRadius(a.dp(8));
-        g.setStroke(a.dp(focused ? 2 : 1), focused ? Theme.STROKE_FOCUS : Theme.mix(Theme.STROKE, Theme.BG, 0.3f));
+        g.setStroke(a.dp(focused ? 2 : 1), focused ? Theme.STROKE_FOCUS : Theme.edge(false));
         return g;
     }
 
