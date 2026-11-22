@@ -30,23 +30,47 @@ final class LiveMenu {
         }, "Unable to load categories");
     }
 
+    /** Menu entries made by {@link #pick} on the current first tier, by id. */
+    private static final Map<String, android.widget.TextView> picks = new HashMap<>();
+    /** Entry to highlight once the first tier is built (set by {@link #openAt}). */
+    private static String focusOnOpen;
+
+    /**
+     * Opens Live TV at the first tier showing one entry ("fav" or an Antenna TV tuner). With focusIt the menu
+     * highlights that entry; otherwise it starts on Favorites as usual.
+     */
+    static void openAt(MainActivity a, String id, boolean focusIt) {
+        tier = TOP;
+        a.resumeCategory = id;
+        focusOnOpen = focusIt ? id : null;
+        a.browse("live");
+    }
+
     /** First tier: Favorites, Search, added categories, added playlists. */
     static void top(MainActivity a) {
         tier = TOP;
+        picks.clear();
         a.side.removeAllViews();
         a.button(a.liveOnly() ? "← TV Guide" : "← Home", a.side, a::home);
         pick(a, "★ Favorites", "fav");
         a.sideFixed = 1;
         a.button("⌕ Search", a.side, a::searchLive);
+        a.button("▦ Full TV guide", a.side, () -> a.openGuide(null));
         Antenna.addMenuEntries(a);
         JSONArray mine = VirtualCategories.all(a);
         for (int i = 0; i < mine.length(); i++) {
             JSONObject c = mine.optJSONObject(i);
             if (c == null) continue;
             String vid = c.optString("id");
-            pick(a, "◆ " + c.optString("name"), vid);
+            String vname = c.optString("name");
+            pick(a, "◆ " + vname, vid).setOnLongClickListener(w -> {
+                new Dialogs.Builder(a).setTitle(vname).setItems(new String[]{"Rename", "Delete", "Cancel"}, (d, which) -> {
+                    if (which == 0) VirtualCategories.rename(a, vid, () -> { a.resumeCategory = vid; top(a); });
+                    else if (which == 1) VirtualCategories.delete(a, vid, () -> { a.resumeCategory = ""; top(a); });
+                }).show();
+                return true;
+            });
         }
-        a.button("+ New category", a.side, () -> VirtualCategories.create(a, c -> { a.resumeCategory = c.optString("id"); top(a); }));
         JSONArray pls = a.library.all();
         String active = a.library.activeId();
         for (int i = 0; i < pls.length(); i++) {
@@ -55,13 +79,15 @@ final class LiveMenu {
             boolean on = p.optString("id").equals(active);
             a.button((on ? "▤ " : "▢ ") + Library.nameOf(p) + "  ›", a.side, () -> openPlaylist(a, p));
         }
-        a.button("⚙ Manage playlists", a.side, a::playlists);
         String resume = a.resumeCategory;
         a.resumeCategory = null;
         // Start in the menu (Favorites highlighted) unless coming back from a channel, which re-focuses that channel.
         a.previewOnly = a.resumeStreamId == null;
         if (a.previewOnly && a.side.getChildCount() > 1) a.side.getChildAt(1).requestFocus();
         a.loadItems(resume != null && (VirtualCategories.isVirtual(resume) || Antenna.isAntenna(resume)) ? resume : "fav");
+        android.widget.TextView want = focusOnOpen == null ? null : picks.get(focusOnOpen);
+        focusOnOpen = null;
+        if (want != null && a.resumeStreamId == null) want.requestFocus();
     }
 
     private static final android.os.Handler UI = new android.os.Handler(android.os.Looper.getMainLooper());
@@ -86,6 +112,7 @@ final class LiveMenu {
             pending = () -> { if (v.hasFocus() && !id.equals(a.category)) { a.previewOnly = true; a.loadItems(id); } };
             UI.postDelayed(pending, 450);
         });
+        picks.put(id, v);
         return v;
     }
 
