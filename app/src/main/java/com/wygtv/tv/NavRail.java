@@ -59,6 +59,7 @@ final class NavRail {
             // Live TV only (Settings → App mode): the guide is the main screen, plus Live TV and Settings.
             add("▦", "TV Guide", "guide", current, () -> a.openGuide(null));
             add("▣", "Live TV", "live", current, () -> a.browse("live"));
+            add("⌕", "Search channels", "search", current, () -> a.searchLive());
             rail.addView(new View(a), new LinearLayout.LayoutParams(-1, 0, 1));
             add("⚙", "Settings", "settings", current, () -> a.settings());
             lockEnds();
