@@ -34,17 +34,19 @@ final class PosterGrid {
 
     private PosterGrid() { }
 
-    static void show(MainActivity a, int offset) {
+    static void show(MainActivity a, int ignoredOffset) {
         boolean series = a.mode.equals("series");
         String type = a.mode, key = series ? "series_id" : "stream_id";
         JSONArray items = a.items;
-        if (offset == 0 && a.resumeStreamId != null) {
+        // Posters are added in chunks as you scroll down, so a big category opens fast and scrolls to the end.
+        int want = PAGE;
+        if (a.resumeStreamId != null) {
             for (int i = 0; i < items.length(); i++) {
                 JSONObject it = items.optJSONObject(i);
-                if (it != null && a.resumeStreamId.equals(it.optString(key))) { offset = i / PAGE * PAGE; break; }
+                if (it != null && a.resumeStreamId.equals(it.optString(key))) { want = (i / PAGE + 1) * PAGE; break; }
             }
         }
-        final int from = offset, generation = a.screenGeneration, list = a.listGeneration;
+        final int generation = a.screenGeneration, list = a.listGeneration;
         a.detail.removeAllViews();
 
         // Info panel for the focused title.
@@ -57,62 +59,60 @@ final class PosterGrid {
         TextView facts = line(a, info, 15, Theme.ACCENT, 1);
         TextView plot = line(a, info, 15, Theme.MUTED, 4);
         title.setText(items.length() == 0 ? "Nothing here yet" : series ? "Series" : "Movies");
-        facts.setText(items.length() == 0 ? "" : items.length() + (series ? " series" : " movies") + "  •  press OK on a poster for details");
+        facts.setText(items.length() == 0 ? "" : items.length() + (series ? " series" : " movies") + "  •  scroll with the arrows, press OK on a poster for details");
 
         ScrollView sv = new ScrollView(a);
+        sv.setSmoothScrollingEnabled(true);
         a.detail.addView(sv, new LinearLayout.LayoutParams(-1, 0, 1));
         LinearLayout grid = new LinearLayout(a);
         grid.setOrientation(LinearLayout.VERTICAL);
+        grid.setPadding(0, a.dp(4), 0, a.dp(12));
         sv.addView(grid);
-
-        LinearLayout top = new LinearLayout(a);
-        grid.addView(top, new LinearLayout.LayoutParams(-1, -2));
-        TextView back = a.button("← Categories", top, () -> { if (a.side.getChildCount() > a.sideFixed) a.side.getChildAt(a.sideFixed).requestFocus(); });
-        small(a, back);
-        if (from > 0) small(a, a.button("← Previous page", top, () -> show(a, Math.max(0, from - PAGE))));
-        int limit = Math.min(items.length(), from + PAGE);
-        if (limit < items.length()) small(a, a.button("Next page →", top, () -> show(a, limit)));
-        if (items.length() > PAGE) {
-            TextView where = a.label((from + 1) + "–" + limit + " of " + items.length(), 14);
-            where.setTextColor(Theme.MUTED);
-            where.setPadding(a.dp(10), 0, a.dp(10), 0);
-            top.addView(where, new LinearLayout.LayoutParams(-2, -1));
-        }
 
         Runnable[] pending = new Runnable[1];
         String[] focused = new String[1];
-        View firstTile = null, resumeTile = null;
-        LinearLayout row = null;
-        for (int i = from; i < limit; i++) {
-            if ((i - from) % COLUMNS == 0) {
-                row = new LinearLayout(a);
-                grid.addView(row, new LinearLayout.LayoutParams(-1, -2));
+        int[] shown = {0};
+        Runnable[] more = new Runnable[1];
+        View[] resumeTile = new View[1];
+        more[0] = () -> {
+            int from = shown[0], to = Math.min(items.length(), from + PAGE);
+            LinearLayout row = null;
+            for (int i = from; i < to; i++) {
+                if (i % COLUMNS == 0) {
+                    row = new LinearLayout(a);
+                    grid.addView(row, new LinearLayout.LayoutParams(-1, -2));
+                } else if (row == null) row = (LinearLayout) grid.getChildAt(grid.getChildCount() - 1);
+                JSONObject item = items.optJSONObject(i);
+                if (item == null) item = new JSONObject();
+                final JSONObject it = item;
+                final int index = i;
+                String id = it.optString(key);
+                View tile = tile(a, row, type, it, id, generation);
+                tile.setOnFocusChangeListener((v, f) -> {
+                    v.setScaleX(f ? 1.07f : 1f);
+                    v.setScaleY(f ? 1.07f : 1f);
+                    v.setBackground(a.bg(f ? Theme.FOCUS : a.PANEL));
+                    v.setElevation(f ? a.dp(6) : 0);
+                    if (!f) return;
+                    focused[0] = id;
+                    if (index >= shown[0] - COLUMNS * 2 && shown[0] < items.length() && list == a.listGeneration) more[0].run();
+                    if (pending[0] != null) UI.removeCallbacks(pending[0]);
+                    pending[0] = () -> describe(a, type, it, id, title, facts, plot, focused, generation, list);
+                    UI.postDelayed(pending[0], 220);
+                });
+                if (a.resumeStreamId != null && a.resumeStreamId.equals(id)) resumeTile[0] = tile;
             }
-            JSONObject item = items.optJSONObject(i);
-            if (item == null) item = new JSONObject();
-            final JSONObject it = item;
-            String id = it.optString(key);
-            View tile = tile(a, row, type, it, id, generation);
-            tile.setOnFocusChangeListener((v, f) -> {
-                v.setScaleX(f ? 1.07f : 1f);
-                v.setScaleY(f ? 1.07f : 1f);
-                v.setBackground(a.bg(f ? Theme.FOCUS : a.PANEL));
-                v.setElevation(f ? a.dp(6) : 0);
-                if (!f) return;
-                focused[0] = id;
-                if (pending[0] != null) UI.removeCallbacks(pending[0]);
-                pending[0] = () -> describe(a, type, it, id, title, facts, plot, focused, generation, list);
-                UI.postDelayed(pending[0], 220);
-            });
-            if (firstTile == null) firstTile = tile;
-            if (a.resumeStreamId != null && a.resumeStreamId.equals(id)) resumeTile = tile;
-        }
-        // Keep the last row's tiles the same width as the rest.
-        if (row != null) for (int k = row.getChildCount(); k < COLUMNS; k++) row.addView(new View(a), new LinearLayout.LayoutParams(0, 1, 1));
+            shown[0] = to;
+            // Keep the last row's tiles the same width as the rest (spacers are removed when more posters come).
+            if (to < items.length() || row == null) return;
+            for (int k = row.getChildCount(); k < COLUMNS; k++) row.addView(new View(a), new LinearLayout.LayoutParams(0, 1, 1));
+        };
+        while (shown[0] < Math.min(want, items.length())) more[0].run();
         a.resumeStreamId = null;
-        if (resumeTile != null) resumeTile.requestFocus();
-        else if (firstTile != null) firstTile.requestFocus();
-        else back.requestFocus();
+        View first = grid.getChildCount() > 0 ? ((LinearLayout) grid.getChildAt(0)).getChildAt(0) : null;
+        if (resumeTile[0] != null) resumeTile[0].requestFocus();
+        else if (first != null) first.requestFocus();
+        else if (a.side.getChildCount() > a.sideFixed) a.side.getChildAt(a.sideFixed).requestFocus();
     }
 
     private static View tile(MainActivity a, LinearLayout row, String type, JSONObject item, String id, int generation) {
@@ -213,11 +213,4 @@ final class PosterGrid {
         return t;
     }
 
-    private static void small(MainActivity a, TextView b) {
-        b.setTextSize(16);
-        b.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
-        lp.setMargins(a.dp(5), a.dp(2), a.dp(5), a.dp(4));
-        b.setLayoutParams(lp);
-    }
 }
