@@ -658,7 +658,10 @@ final class TvGuide {
             preview = Players.create(a);
             previewView.setPlayer(preview);
             preview.addListener(new Player.Listener() {
-                @Override public void onPlayerError(PlaybackException error) { previewError.setVisibility(View.VISIBLE); }
+                @Override public void onPlayerError(PlaybackException error) {
+                    if (Players.useFfmpegAudio(preview, error)) { preview.prepare(); return; }
+                    previewError.setVisibility(View.VISIBLE);
+                }
             });
         }
         preview.setMediaItem(MediaItem.fromUri(url));

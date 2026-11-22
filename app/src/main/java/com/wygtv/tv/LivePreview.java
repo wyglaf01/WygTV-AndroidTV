@@ -89,10 +89,11 @@ final class LivePreview {
         label.setText("Loading " + item.optString("name", "") + "…");
         label.setVisibility(View.VISIBLE);
         if (player == null) {
-            player = new ExoPlayer.Builder(a).build();
+            player = Players.create(a);
             view.setPlayer(player);
             player.addListener(new Player.Listener() {
                 @Override public void onPlayerError(PlaybackException error) {
+                    if (player != null && Players.useFfmpegAudio(player, error)) { player.prepare(); return; }
                     if (label != null) { label.setText("Preview unavailable"); label.setVisibility(View.VISIBLE); }
                 }
                 @Override public void onRenderedFirstFrame() { if (label != null) label.setVisibility(View.GONE); }
