@@ -457,10 +457,10 @@ final class Menus {
                     : (tuners.size() == 1 ? describe(tuners.get(0)) : tuners.size() + " tuners") + "  •  press OK to add, edit, refresh or remove",
                     () -> { if (tuners.isEmpty()) hdhrForm(a, null); else tunerList(a); });
             final int catsRow = list.getChildCount();
-            row(a, list, "Manage categories", Manage.categorySummary(a) + "  •  press OK to hide or show categories, one at a time or all at once",
+            row(a, list, "Manage categories", Manage.categorySummary(a) + "  •  press OK to tick the categories to show, one at a time or all at once",
                     () -> Manage.categories(a, () -> settings(a, catsRow)));
             final int chansRow = list.getChildCount();
-            row(a, list, "Hide and show channels", Manage.channelSummary(a) + "  •  press OK to pick a category, then tick the channels to show",
+            row(a, list, "Hide and show channels", Manage.channelSummary(a) + "  •  press OK to tick the channels to show, category by category",
                     () -> Manage.channels(a, () -> settings(a, chansRow)));
             final int hiddenRow = list.getChildCount();
             int hidden = a.hiddenCount();
