@@ -201,6 +201,14 @@ final class VirtualCategories {
                 }).show();
     }
 
+    /** OK on a channel in the mini guide: switch to its playlist if needed and play, zapping through this category. */
+    static void play(MainActivity a, JSONObject item, String categoryId) {
+        if (!useItsPlaylist(a, item)) return;
+        String sid = item.optString("stream_id"), ext = item.optString("container_extension", "ts");
+        a.zapList = channelsFrom(a, categoryId, item.optString("playlist"));
+        a.play("live", sid, ext.isEmpty() ? "ts" : ext, item.optString("name", "Untitled"));
+    }
+
     /** Switches to the channel's playlist when it isn't the active one, keeping the category open. False if that playlist is gone. */
     static boolean useItsPlaylist(MainActivity a, JSONObject item) {
         String playlist = item.optString("playlist");
