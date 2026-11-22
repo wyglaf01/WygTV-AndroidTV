@@ -233,6 +233,8 @@ final class TvRemote {
         if (a.mode.equals("player") && a.player != null && view != null) return playerKey(e, key);
         // Up/Down in a menu column (side menu, Live TV / Movies / Series menu) stay in it; only sideways leaves.
         if (FocusWrap.menuKey(a.getCurrentFocus(), e)) return true;
+        // Live TV: Left from a playlist's categories goes to the compacted first tier beside it, Right comes back.
+        if (LiveMenu.sideways(a, e)) return true;
         if (e.getAction() != KeyEvent.ACTION_DOWN) return false;
         return listKey(e, key);
     }
