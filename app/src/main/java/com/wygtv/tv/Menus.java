@@ -447,7 +447,7 @@ final class Menus {
         if (g.isEmpty()) {
             row(a, list, "▤  " + groupTitle(GROUP_PLAYLISTS), "playlists, HDHomeRun, manage categories, hide and show channels, channel groups, TV guide source, extra TV guides", () -> settingsGroup(a, GROUP_PLAYLISTS));
             row(a, list, "▶  " + groupTitle(GROUP_PLAYER), "live stream format, buffer, video decoder, subtitles", () -> settingsGroup(a, GROUP_PLAYER));
-            row(a, list, "◐  " + groupTitle(GROUP_APPEARANCE), "theme, app mode, start-up screen, side menu order, Exit button, guide rows, live preview, watched series, play next, movie and series info, IMDb ratings", () -> settingsGroup(a, GROUP_APPEARANCE));
+            row(a, list, "◐  " + groupTitle(GROUP_APPEARANCE), "theme, glass effect, app mode, start-up screen, side menu order, Exit button, guide rows, live preview, watched series, play next, movie and series info, IMDb ratings", () -> settingsGroup(a, GROUP_APPEARANCE));
             row(a, list, "⟳  " + groupTitle(GROUP_BACKUP), "back up, restore, check for updates  •  WygTV " + Updater.installedName(a), () -> settingsGroup(a, GROUP_BACKUP));
         } else if (g.equals(GROUP_PLAYLISTS)) {
             row(a, list, "Manage playlists", (active == null ? "none" : "Watching " + active.optString("title") + "  (" + (a.library.activeIsHdhr() ? "HDHomeRun" : m3u ? "M3U" : "Xtream Codes") + ")") + "  •  press OK to add, edit, refresh or delete playlists", () -> a.playlists());
@@ -535,6 +535,12 @@ final class Menus {
                         a.applyTheme();
                         settings(a, themeRow);
                     }));
+            final int glassRow = list.getChildCount();
+            row(a, list, "Glass effect", onOff(Theme.glass) + "  •  frosted see-through panels and buttons over a softly blurred background. Press OK to switch", () -> {
+                a.prefs.edit().putBoolean(Theme.PREF_GLASS, !Theme.glass).apply();
+                a.applyTheme();
+                settings(a, glassRow);
+            });
             final int modeRow = list.getChildCount();
             row(a, list, "App mode", liveOnly ? "Live TV only  •  opens on the TV guide; press OK for the full app" : "Full  •  press OK for Live TV only (opens on the TV guide, hides Movies and Series)", () -> {
                 a.prefs.edit().putBoolean("live_only", !a.liveOnly()).apply();
