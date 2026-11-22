@@ -585,7 +585,7 @@ final class Menus {
                         settings(a, guideRowsRow);
                     }));
             final int previewRow = list.getChildCount();
-            row(a, list, "Live preview switches", PreviewDelay.label(a.prefs) + "  •  when the preview above the guide changes to the channel you highlight", () ->
+            row(a, list, "Live preview switches", PreviewDelay.label(a.prefs) + "  •  Live preview guide change delay", () ->
                     choose(a, "Change the live preview", PreviewDelay.LABELS, Menus.indexOf(PreviewDelay.KEYS, PreviewDelay.key(a.prefs)), i -> {
                         a.prefs.edit().putString(PreviewDelay.PREF, PreviewDelay.KEYS[i]).apply();
                         settings(a, previewRow);
