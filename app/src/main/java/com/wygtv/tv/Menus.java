@@ -447,7 +447,7 @@ final class Menus {
         if (g.isEmpty()) {
             row(a, list, "▤  " + groupTitle(GROUP_PLAYLISTS), "playlists, HDHomeRun, manage categories, hide and show channels, channel groups, TV guide source, extra TV guides", () -> settingsGroup(a, GROUP_PLAYLISTS));
             row(a, list, "▶  " + groupTitle(GROUP_PLAYER), "live stream format, buffer, video decoder, subtitles", () -> settingsGroup(a, GROUP_PLAYER));
-            row(a, list, "◐  " + groupTitle(GROUP_APPEARANCE), "theme, app mode, start-up screen, guide rows, live preview, watched series, play next, movie and series info, IMDb ratings", () -> settingsGroup(a, GROUP_APPEARANCE));
+            row(a, list, "◐  " + groupTitle(GROUP_APPEARANCE), "theme, app mode, start-up screen, side menu order, Exit button, guide rows, live preview, watched series, play next, movie and series info, IMDb ratings", () -> settingsGroup(a, GROUP_APPEARANCE));
             row(a, list, "⟳  " + groupTitle(GROUP_BACKUP), "back up, restore, check for updates  •  WygTV " + Updater.installedName(a), () -> settingsGroup(a, GROUP_BACKUP));
         } else if (g.equals(GROUP_PLAYLISTS)) {
             row(a, list, "Manage playlists", (active == null ? "none" : "Watching " + active.optString("title") + "  (" + (a.library.activeIsHdhr() ? "HDHomeRun" : m3u ? "M3U" : "Xtream Codes") + ")") + "  •  press OK to add, edit, refresh or delete playlists", () -> a.playlists());
@@ -548,6 +548,15 @@ final class Menus {
                         a.prefs.edit().putString("start_screen", startKeys[i]).apply();
                         settings(a, startRow);
                     }));
+            final int orderRow = list.getChildCount();
+            row(a, list, "Side menu order", "press OK to move side menu items up and down", () -> MenuOrder.edit(a, () -> settings(a, orderRow)));
+            if (!liveOnly) {
+                final int exitRow = list.getChildCount();
+                row(a, list, "Exit button on Home", (MenuOrder.homeExit(a.prefs) ? "On" : "Off") + "  •  a small Exit at the bottom of the Home screen. The side menu always has one. Press OK to switch", () -> {
+                    a.prefs.edit().putBoolean(MenuOrder.PREF_HOME_EXIT, !MenuOrder.homeExit(a.prefs)).apply();
+                    settings(a, exitRow);
+                });
+            }
             final int guideRowsRow = list.getChildCount();
             final String[] guideRows = {"3", "4", "5"};
             row(a, list, "Live TV guide rows", a.prefs.getInt("guide_rows", 4) + " channels  •  more rows make the preview smaller", () ->
