@@ -246,7 +246,7 @@
     <!-- ============================================================ PLAYLISTS -->
     <h2 id="playlists">10. Playlists</h2>
     <p>Open <b>☰ Playlists</b> from Home or the side menu (also Settings → Manage playlists → Manage playlists). Each row shows the name, type, server, and for Xtream the username and expiry date. Every playlist that is on (☑) is ready to watch at once in Live TV, Movies, Series, the TV guide, Favorites and Search, so there is no single playlist to pick. ☐ marks one that is off.</p>
-    <p>Press OK on a playlist for: <b>Turn off</b> / <b>Turn on</b>, <b>Edit</b>, <b>Refresh now</b> (re-downloads an M3U, or re-checks an Xtream account and its expiry), and <b>Delete</b>. At the bottom: <b>+ Add an Xtream Codes login</b> and <b>+ Add an M3U playlist link</b>. HDHomeRun tuners are managed in Settings.</p>
+    <p>Press OK on a playlist for: <b>Turn off</b> / <b>Turn on</b>, <b>Edit</b>, <b>Refresh now</b> (re-downloads an M3U, or re-checks an Xtream account and its expiry, then downloads its TV guide again), and <b>Delete</b>. Each playlist shows when it was last updated, or ⚠ and the problem if its last update failed. <b>⟳ Update playlists and guides now</b> updates everything at once. At the bottom: <b>+ Add an Xtream Codes login</b> and <b>+ Add an M3U playlist link</b>. HDHomeRun tuners are managed in Settings.</p>
 
     <!-- ============================================================ SETTINGS -->
     <h2 id="settings">11. Settings</h2>
@@ -261,9 +261,16 @@
       <tr><td>Hidden categories and channels</td><td>Shows how many are hidden; OK shows them all again.</td></tr>
       <tr><td>Channel groups</td><td>Make a <b>New Channel Group</b>, or rename or delete one.</td></tr>
       <tr><td>TV guide source</td><td>Shows where the guide comes from. OK lets you type your own XMLTV link (<code>.xml</code> or <code>.xml.gz</code>) for this playlist, or <b>Use default</b> to go back to the provider's / playlist's own.</td></tr>
-      <tr><td>Reload TV guide</td><td>Appears for M3U playlists or your own link: downloads the guide again.</td></tr>
+      <tr><td>Reload TV guide</td><td>Appears for M3U playlists or your own link: downloads the playlist and its guide again now.</td></tr>
       <tr><td>Extra TV guides (XMLTV)</td><td>Extra guide links used for <b>every</b> playlist, to fill in channels with no program info. <b>+ Add a guide link</b>, or <b>+ Add a free guide by country</b> (USA, Canada, UK, Ireland, Australia, Mexico, Spain, Germany, France, Italy, Portugal, Brazil, India). Choose the <b>Order</b>: playlist's guide first, or extra guides first. Pick a link to Reload, Move up or Remove. Channels are matched by guide id, then by name.</td></tr>
       <tr><td>Recently watched</td><td>Shows how many items; OK clears the list.</td></tr>
+    </table>
+    <p><b>Keeping playlists and guides up to date</b> (also in Manage playlists):</p>
+    <table>
+      <tr><td>Update playlists and guides now</td><td>Downloads every playlist that is on, and every TV guide, again. Shows when the last update finished, or what went wrong.</td></tr>
+      <tr><td>Automatic updates</td><td><b>Every time WygTV starts</b>, <b>Every 6 / 12 / 24 hours</b> (default 12, checked at start-up and while WygTV is open), or <b>Only when I press Update now</b>.</td></tr>
+      <tr><td>New playlists and guides</td><td><b>Load right away</b> (default): a playlist's TV guide and any extra guide link load as soon as you add them. Or <b>Load the first time they're opened</b>.</td></tr>
+      <tr><td>While updating</td><td><b>In the background</b> (default): keep watching while it updates. Or <b>Show a progress screen and wait</b>, with a <b>Continue in the background</b> button. Either way, the status line at the bottom of the screen shows <i>⟳ Updating 2 of 5…</i>, <i>Updated 3:14 PM</i> or <i>⚠ Update problem</i>.</td></tr>
     </table>
 
     <h3 id="set-player">▶ Manage player</h3>

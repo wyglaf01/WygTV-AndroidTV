@@ -8,10 +8,7 @@ import org.json.JSONObject;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -28,6 +25,7 @@ final class ExtraGuides {
     /** true: the supplemental guides are used first and the provider's guide only fills what they lack. */
     static final String PREF_FIRST = "extra_epg_first";
 
+    /** Guides in memory are re-read from disk this often, so programmes that ended drop out. */
     private static final long MAX_AGE = 12 * 3600_000L;
 
     private static final class Slot {
@@ -91,16 +89,7 @@ final class ExtraGuides {
             s.loadedAt = now;
             try {
                 File f = cacheFile(url);
-                if (!f.exists() || now - f.lastModified() > MAX_AGE) {
-                    File tmp = new File(cacheDir, f.getName() + ".part");
-                    HttpURLConnection c = Library.open(url, 120000);
-                    try (InputStream in = c.getInputStream(); OutputStream out = new FileOutputStream(tmp)) {
-                        byte[] buf = new byte[65536];
-                        int n;
-                        while ((n = in.read(buf)) != -1) out.write(buf, 0, n);
-                    } finally { c.disconnect(); }
-                    if (!tmp.renameTo(f)) throw new IllegalStateException("could not save guide");
-                }
+                if (!f.exists() || now - f.lastModified() > AutoRefresh.maxAge(prefs)) Library.fetchTo(url, f);
                 try (InputStream in = new FileInputStream(f)) { s.guide = Xmltv.parse(in, now - 3 * 3600_000L, now + 30 * 3600_000L); }
                 s.error = "";
             } catch (Throwable e) {
@@ -108,6 +97,30 @@ final class ExtraGuides {
                 s.error = "could not load (" + e.getClass().getSimpleName() + ")";
             }
             return s.guide;
+        }
+    }
+
+    /**
+     * Downloads one guide again now (Update now, or a scheduled update). The old copy stays in use if the
+     * download fails. Returns "" when fine, else the problem. Blocking: call off the UI thread.
+     */
+    String reload(String url) {
+        Slot s;
+        synchronized (slots) { s = slots.get(url); if (s == null) { s = new Slot(); slots.put(url, s); } }
+        synchronized (s) {
+            long now = System.currentTimeMillis();
+            try {
+                File f = cacheFile(url);
+                Library.fetchTo(url, f);
+                try (InputStream in = new FileInputStream(f)) { s.guide = Xmltv.parse(in, now - 3 * 3600_000L, now + 30 * 3600_000L); }
+                s.loadedAt = now;
+                s.error = "";
+                return "";
+            } catch (Throwable e) {
+                String err = "could not load (" + e.getClass().getSimpleName() + ")";
+                if (s.guide == null) { s.error = err; s.loadedAt = now; }
+                return err;
+            }
         }
     }
 

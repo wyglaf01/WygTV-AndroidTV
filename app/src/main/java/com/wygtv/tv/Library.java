@@ -435,16 +435,8 @@ final class Library {
         guideLoadedAt = now;
         try {
             File f = new File(a.getCacheDir(), guideCacheName(url));
-            if (!f.exists() || now - f.lastModified() > GUIDE_MAX_AGE) {
-                File tmp = new File(a.getCacheDir(), f.getName() + ".part");
-                HttpURLConnection c = open(url, 120000);
-                try (InputStream in = c.getInputStream(); OutputStream out = new FileOutputStream(tmp)) {
-                    byte[] buf = new byte[65536];
-                    int n;
-                    while ((n = in.read(buf)) != -1) out.write(buf, 0, n);
-                } finally { c.disconnect(); }
-                if (!tmp.renameTo(f)) throw new IllegalStateException("could not save guide");
-            }
+            // Kept as long as Settings > Update playlists and guides says (AutoRefresh does the scheduled updates).
+            if (!f.exists() || now - f.lastModified() > AutoRefresh.maxAge(prefs)) fetchTo(url, f);
             try (InputStream in = new FileInputStream(f)) { guide = Xmltv.parse(in, now - 3 * 3600_000L, now + 30 * 3600_000L); }
             guideError = "";
             return guide;
@@ -453,6 +445,51 @@ final class Library {
             guideError = "could not load (" + e.getClass().getSimpleName() + ")";
             return null;
         }
+    }
+
+    /**
+     * Downloads the active playlist's own guide again now (its XMLTV link, the M3U's guide, or the HDHomeRun
+     * guide). The old guide stays in use if the download fails. Returns "" when fine, else the problem.
+     * Call off the UI thread.
+     */
+    String reloadGuide() {
+        synchronized (hdhrGuideLock) { hdhrGuides.clear(); }
+        if (activeIsM3u()) try { m3uBlocking(); } catch (Exception ignored) { } // an M3U names its guide inside
+        String url = guideUrl();
+        if (url.isEmpty()) return "";
+        synchronized (guideLock) {
+            long now = System.currentTimeMillis();
+            try {
+                File f = new File(a.getCacheDir(), guideCacheName(url));
+                fetchTo(url, f);
+                Xmltv.Guide g;
+                try (InputStream in = new FileInputStream(f)) { g = Xmltv.parse(in, now - 3 * 3600_000L, now + 30 * 3600_000L); }
+                guide = g;
+                guideKey = url;
+                guideLoadedAt = now;
+                guideError = "";
+                return "";
+            } catch (Throwable e) {
+                String err = "could not load (" + e.getClass().getSimpleName() + ")";
+                if (guide == null || !url.equals(guideKey)) { guide = null; guideKey = url; guideLoadedAt = now; guideError = err; }
+                return err;
+            }
+        }
+    }
+
+    /** Downloads a link into a file, through a ".part" file so a failed download never replaces a good copy. */
+    static void fetchTo(String url, File f) throws Exception {
+        File tmp = new File(f.getParentFile(), f.getName() + ".part");
+        HttpURLConnection c = open(url, 120000);
+        try (InputStream in = c.getInputStream(); OutputStream out = new FileOutputStream(tmp)) {
+            byte[] buf = new byte[65536];
+            int n;
+            while ((n = in.read(buf)) != -1) {
+                if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+                out.write(buf, 0, n);
+            }
+        } finally { c.disconnect(); }
+        if (!tmp.renameTo(f)) { tmp.delete(); throw new IllegalStateException("could not save guide"); }
     }
 
     /**

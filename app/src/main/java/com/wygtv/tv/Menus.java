@@ -88,7 +88,8 @@ final class Menus {
             JSONObject p = all.optJSONObject(i);
             if (p == null || Library.isHdhr(p)) continue; // tuners are managed in Settings > HDHomeRun antenna TV
             boolean on = a.library.isOn(p);
-            TextView row = a.button((on ? "☑  " : "☐  ") + p.optString("title", "Playlist") + (on ? "" : "   (off)") + "\n      " + describe(p), list, () -> playlistActions(a, p));
+            String updated = on ? AutoRefresh.playlistLine(a, p) : "";
+            TextView row = a.button((on ? "☑  " : "☐  ") + p.optString("title", "Playlist") + (on ? "" : "   (off)") + "\n      " + describe(p) + (updated.isEmpty() ? "" : "  •  " + updated), list, () -> playlistActions(a, p));
             row.setTextSize(19);
             if (!on) row.setTextColor(Theme.MUTED);
             if (focus == null) focus = row;
@@ -98,9 +99,11 @@ final class Menus {
         a.button("+  Add an M3U playlist link", list, () -> m3uForm(a, null));
         int extraCount = a.library.extras.urls().size();
         a.button("▦  TV guides (EPG)" + "\n      " + (extraCount == 0 ? "extra XMLTV guide links, free guides by country, which guide wins" : extraCount + (extraCount == 1 ? " extra guide link" : " extra guide links")), list, () -> extraGuides(a, () -> playlists(a)));
-        a.button("⟳  Reload TV guides\n      download every playlist's guide again", list, () -> {
-            new Thread(() -> { a.library.dropGuide(); for (String u : a.library.extras.urls()) a.library.extras.drop(u); }).start();
-            Toast.makeText(a, "The guides will reload the next time they're shown.", Toast.LENGTH_SHORT).show();
+        a.button("⟳  Update playlists and guides now\n      " + AutoRefresh.summary(a), list, () -> {
+            if (AutoRefresh.running()) { Toast.makeText(a, "Already updating. The status line at the bottom shows how it's going.", Toast.LENGTH_LONG).show(); return; }
+            boolean wait = AutoRefresh.waits(a.prefs);
+            AutoRefresh.updateAll(a, wait ? () -> playlists(a) : null);
+            if (!wait) playlists(a);
         });
         (focus == null ? addX : focus).requestFocus();
     }
@@ -173,36 +176,10 @@ final class Menus {
         playlists(a);
     }
 
+    /** Refresh now: the playlist's channels (or account) and its guide, shown in the status line or on the progress screen. */
     private static void refresh(MainActivity a, JSONObject p) {
-        Toast.makeText(a, "Refreshing " + p.optString("title", "playlist") + "…", Toast.LENGTH_SHORT).show();
-        final int gen = a.screenGeneration;
-        new Thread(() -> {
-            String msg;
-            try {
-                if (Library.M3U.equals(p.optString("type"))) {
-                    M3u.Playlist m = a.library.downloadM3u(p.optString("url"));
-                    p.put("count", m.channels.size());
-                    msg = m.channels.size() + " channels loaded.";
-                } else {
-                    JSONObject info = new JSONObject(Library.download(p.optString("host") + "/player_api.php?username=" + a.enc(p.optString("user"))
-                            + "&password=" + a.enc(p.optString("pass")), 20000)).optJSONObject("user_info");
-                    if (info == null || info.optInt("auth", 0) != 1) throw new IllegalStateException("login rejected");
-                    p.put("expiry", info.optString("exp_date", ""));
-                    msg = "Account is " + info.optString("status", "active").toLowerCase(java.util.Locale.ROOT) + ".";
-                }
-                a.library.put(p);
-                if (p.optString("id").equals(a.library.activeId())) a.library.activate(p);
-            } catch (Exception e) {
-                msg = "Couldn't refresh. Check the address, account and network.";
-            }
-            final String text = msg;
-            a.runOnUiThread(() -> {
-                if (a.isFinishing() || a.isDestroyed()) return;
-                Toast.makeText(a, text, Toast.LENGTH_LONG).show();
-                if (gen == a.screenGeneration && a.mode.equals("playlists")) playlists(a);
-                else if (gen == a.screenGeneration && a.mode.equals("settings")) backToTuners(a);
-            });
-        }).start();
+        boolean tuner = Library.isHdhr(p);
+        AutoRefresh.updateOne(a, p, () -> { if (tuner) backToTuners(a); else playlists(a); });
     }
 
     // ------------------------------------------------------------------ add / edit forms
@@ -242,7 +219,7 @@ final class Menus {
                 a.library.put(p);
                 a.switchPlaylist(p);
                 Toast.makeText(a, "Connected to " + p.optString("title"), Toast.LENGTH_SHORT).show();
-                a.home();
+                AutoRefresh.added(a, p, a::home);
             }, "Connection failed");
         });
         a.button("Cancel", form, () -> a.leaveForm());
@@ -299,7 +276,7 @@ final class Menus {
                 a.library.put(p);
                 a.switchPlaylist(p);
                 Toast.makeText(a, loaded.channels.size() + " channels in " + loaded.groups.size() + " groups", Toast.LENGTH_LONG).show();
-                a.home();
+                AutoRefresh.added(a, p, a::home);
             });
         }).start();
     }
@@ -506,16 +483,16 @@ final class Menus {
             String guideState = a.library.guideStatus();
             String source = !custom.isEmpty() ? hostOf(custom) + " (your link)" : a.library.activeIsHdhr() ? "HDHomeRun guide (from the tuner)" : m3u ? (a.library.guideUrl().isEmpty() ? "none in this playlist" : hostOf(a.library.guideUrl()) + " (from the playlist)") : "the provider's guide";
             row(a, list, "TV guide source", source + (guideState.isEmpty() ? "" : "  •  " + guideState), () -> guideSource(a, active, () -> settings(a, guideRow)));
-            if (!custom.isEmpty() || m3u) row(a, list, "Reload TV guide", "download the guide again now", () -> {
-                new Thread(a.library::dropGuide).start();
-                Toast.makeText(a, "The guide will reload the next time it's shown.", Toast.LENGTH_SHORT).show();
-            });
+            final int reloadRow = list.getChildCount();
+            if ((!custom.isEmpty() || m3u) && active != null) row(a, list, "Reload TV guide", "download this playlist and its guide again now", () ->
+                    AutoRefresh.updateOne(a, active, () -> settings(a, reloadRow)));
             final int extraRow = list.getChildCount();
             int extraCount = a.library.extras.urls().size();
             row(a, list, "Extra TV guides (XMLTV)", extraCount == 0
                     ? "none  •  press OK to add guide links that fill in channels with no program info"
                     : extraCount + (extraCount == 1 ? " link" : " links") + "  •  " + (a.library.extras.first() ? "used first, the playlist's guide fills the rest" : "fill in channels the playlist's guide leaves empty"),
                     () -> extraGuides(a, () -> settings(a, extraRow)));
+            updateRows(a, list);
             final int recentRow = list.getChildCount();
             int recent = a.library.recent().length();
             row(a, list, "Recently watched", recent == 0 ? "empty" : recent + " items  •  press OK to clear", () -> {
@@ -854,6 +831,37 @@ final class Menus {
         after.run();
     }
 
+    /** Settings > Manage playlists: update now, how often, loading new playlists and guides, wait or background. */
+    private static void updateRows(MainActivity a, LinearLayout list) {
+        final int nowRow = list.getChildCount();
+        row(a, list, "Update playlists and guides now", AutoRefresh.summary(a), () -> {
+            if (AutoRefresh.running()) { Toast.makeText(a, "Already updating. The status line at the bottom shows how it's going.", Toast.LENGTH_LONG).show(); return; }
+            boolean wait = AutoRefresh.waits(a.prefs);
+            AutoRefresh.updateAll(a, wait ? () -> settings(a, nowRow) : null);
+            if (!wait) settings(a, nowRow);
+        });
+        final int everyRow = list.getChildCount();
+        int every = indexOf(AutoRefresh.EVERY_KEYS, AutoRefresh.every(a.prefs));
+        row(a, list, "Automatic updates", AutoRefresh.EVERY_LABELS[every] + "  •  downloads every playlist and TV guide again, so channels and programs stay current", () ->
+                choose(a, "Update playlists and TV guides", AutoRefresh.EVERY_LABELS, every, i -> {
+                    a.prefs.edit().putString(AutoRefresh.PREF_EVERY, AutoRefresh.EVERY_KEYS[i]).apply();
+                    settings(a, everyRow);
+                }));
+        final int addRow = list.getChildCount();
+        boolean onAdd = AutoRefresh.onAdd(a.prefs);
+        row(a, list, "New playlists and guides", (onAdd ? "Load right away" : "Load the first time they're opened") + "  •  press OK to switch", () -> {
+            a.prefs.edit().putBoolean(AutoRefresh.PREF_ON_ADD, !AutoRefresh.onAdd(a.prefs)).apply();
+            settings(a, addRow);
+        });
+        final int styleRow = list.getChildCount();
+        int style = AutoRefresh.waits(a.prefs) ? 1 : 0;
+        row(a, list, "While updating", AutoRefresh.STYLE_LABELS[style] + "  •  the status line at the bottom always shows progress, the last update and any problem", () ->
+                choose(a, "While playlists and guides update", AutoRefresh.STYLE_LABELS, style, i -> {
+                    a.prefs.edit().putString(AutoRefresh.PREF_STYLE, AutoRefresh.STYLE_KEYS[i]).apply();
+                    settings(a, styleRow);
+                }));
+    }
+
     /** Settings → Manage player → Player: WygTV's own player (default), Android asks, or one installed video app. */
     private static void choosePlayer(MainActivity a, int focusRow) {
         java.util.List<android.content.pm.ResolveInfo> apps = ExternalPlayer.apps(a);
@@ -936,16 +944,7 @@ final class Menus {
         java.util.List<String> urls = a.library.extras.urls();
         if (!urls.contains(link)) urls.add(link);
         ExtraGuides.save(a.prefs, urls);
-        redraw.run();
-        Toast.makeText(a, "Loading the guide in the background. Large guides can take a minute.", Toast.LENGTH_LONG).show();
-        new Thread(() -> {
-            Xmltv.Guide g = a.library.extras.guide(link);
-            String st = a.library.extras.status(link);
-            a.runOnUiThread(() -> {
-                if (!a.isFinishing()) Toast.makeText(a, g != null ? "Extra guide " + st + "." : "Extra guide " + (st.isEmpty() ? "could not load" : st) + ". Check the link.", Toast.LENGTH_LONG).show();
-                if ("settings".equals(a.mode) || "playlists".equals(a.mode)) redraw.run();
-            });
-        }).start();
+        AutoRefresh.guideAdded(a, link, redraw, false);
     }
 
     private static void extraGuide(MainActivity a, String url, Runnable redraw) {
@@ -959,7 +958,7 @@ final class Menus {
         new Dialogs.Builder(a).setTitle(url + (st.isEmpty() ? "" : "  •  " + st))
                 .setItems(opts.toArray(new String[0]), (d, w) -> {
                     String o = opts.get(w);
-                    if (o.startsWith("Reload")) { a.library.extras.drop(url); saveExtraGuide(a, url, redraw); }
+                    if (o.startsWith("Reload")) AutoRefresh.guideAdded(a, url, redraw, true);
                     else if (o.startsWith("Move")) {
                         urls.remove(at);
                         urls.add(at - 1, url);
