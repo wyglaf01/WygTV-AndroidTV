@@ -381,7 +381,7 @@ final class LiveMenu {
             String text = String.valueOf(f != null ? f.text : v.getText());
             fulls.add(text);
             String icon = MenuIcons.iconOf(text);
-            if (!icon.isEmpty()) uses.merge(icon, 1, Integer::sum);
+            if (!icon.isEmpty()) { Integer n = uses.get(icon); uses.put(icon, n == null ? 1 : n + 1); }
         }
         for (int i = 0; i < entries.size(); i++) {
             android.widget.TextView v = entries.get(i);
