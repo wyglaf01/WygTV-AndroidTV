@@ -10,14 +10,15 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 
 /**
- * Movies / Series → Search: a search bar above the poster grid. Every movie (or series) of the playlist is loaded
- * once and filtered as you type; results open the details page on OK, and holding OK adds them to My List.
+ * Movies / Series → Search: a search bar above the poster grid, ready to type in right away. Every movie (or series)
+ * of the playlist loads once something is typed, is kept for the session and filtered as you type; results open the details page on OK, and holding OK adds them to My List.
  */
 final class VodSearch {
     static final String CATEGORY = "search";
@@ -27,6 +28,8 @@ final class VodSearch {
     private static JSONArray index;
     private static String[] keys = new String[0];
     private static final java.util.Map<String, String> QUERIES = new java.util.HashMap<>();
+    /** The list being loaded now ("" when none), so typing doesn't start it twice. */
+    private static String loadingKey = "";
 
     private VodSearch() { }
 
@@ -61,8 +64,13 @@ final class VodSearch {
             String q = field.getText().toString();
             QUERIES.put(key, q);
             results.removeAllViews();
-            if (index == null || !indexKey.equals(key)) { note(a, results, "Loading the list…"); return; }
             String qk = XtreamProtocol.searchKey(q);
+            if (index == null || !indexKey.equals(key)) {
+                if (qk.length() < 2) { note(a, results, "Type at least 2 letters, then press Search. The " + (type.equals("series") ? "series" : "movie") + " list loads after you type."); return; }
+                note(a, results, "Loading the list…");
+                load(a, type, key, render[0]);
+                return;
+            }
             if (qk.length() < 2) { note(a, results, "Type at least 2 letters. " + index.length() + (type.equals("series") ? " series" : " movies") + " to search."); return; }
             JSONArray hits = XtreamProtocol.filter(index, keys, qk);
             a.items = hits;
@@ -87,16 +95,42 @@ final class VodSearch {
         field.setSelection(last.length());
         UI.removeCallbacks(render[0]);
         if (!returning) field.requestFocus();
-        if (index != null && indexKey.equals(key)) { render[0].run(); return; }
-        note(a, results, "Loading the list…");
-        a.request(type.equals("series") ? "get_series" : "get_vod_streams", o -> {
-            JSONArray all = o.optJSONArray("list");
-            index = a.withoutHiddenIn(type, all == null ? new JSONArray() : all);
-            keys = new String[index.length()];
-            for (int i = 0; i < keys.length; i++) { JSONObject it = index.optJSONObject(i); keys[i] = it == null ? "" : XtreamProtocol.searchKey(it.optString("name")); }
-            indexKey = key;
-            render[0].run();
-        }, "Unable to load the list");
+        // Nothing loads until something is typed: render starts the loading then.
+        render[0].run();
+    }
+
+    /** Loads the playlist's whole movie or series list in the background (only the fields search needs), then renders. */
+    private static void load(MainActivity a, String type, String key, Runnable render) {
+        if (loadingKey.equals(key)) return;
+        loadingKey = key;
+        if (a.library.activeIsM3u()) {
+            a.request(type.equals("series") ? "get_series" : "get_vod_streams", o -> {
+                JSONArray all = o.optJSONArray("list");
+                done(a, type, key, all == null ? new JSONArray() : all, null, render);
+            }, "Unable to load the list");
+            return;
+        }
+        JSONObject p = a.library.find(a.library.activeId());
+        new Thread(() -> {
+            JSONArray got = null;
+            String error = null;
+            try { got = p == null ? new JSONArray() : a.library.vodOf(p, type); }
+            catch (OutOfMemoryError e) { error = "This list is too big for this device's memory. Browse it by category instead."; }
+            catch (Throwable e) { error = "Unable to load the list. Check the network and try again."; }
+            final JSONArray list = got;
+            final String problem = error;
+            a.runOnUiThread(() -> { if (!a.isFinishing() && !a.isDestroyed()) done(a, type, key, list, problem, render); });
+        }, "vod-search").start();
+    }
+
+    private static void done(MainActivity a, String type, String key, JSONArray all, String problem, Runnable render) {
+        loadingKey = "";
+        if (problem != null) { Toast.makeText(a, problem, Toast.LENGTH_LONG).show(); return; }
+        index = a.withoutHiddenIn(type, all);
+        keys = new String[index.length()];
+        for (int i = 0; i < keys.length; i++) { JSONObject it = index.optJSONObject(i); keys[i] = it == null ? "" : XtreamProtocol.searchKey(it.optString("name")); }
+        indexKey = key;
+        render.run();
     }
 
     private static void note(MainActivity a, LinearLayout box, String text) {

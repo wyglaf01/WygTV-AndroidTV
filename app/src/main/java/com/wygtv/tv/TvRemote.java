@@ -24,7 +24,7 @@ import org.json.JSONObject;
 /**
  * Android TV remote handling for the whole app.
  *
- * Full-screen player: CH+/CH- (or D-pad up/down) change channel, digit keys type a channel number,
+ * Full-screen player: CH+/CH- (or D-pad up) change channel, D-pad down shows the playback controls, digit keys type a channel number,
  * OK/Info shows the channel banner, Guide opens the TV guide, Last returns to the previous channel,
  * Menu opens options, and the media keys play, pause, rewind and fast-forward.
  * List screens: CH+/CH- and Page keys jump ten rows, Menu opens a row's options, Guide and Search jump
@@ -85,7 +85,7 @@ final class TvRemote {
         ui.removeCallbacksAndMessages(null);
         playerView.setKeepScreenOn(true); // stop the TV screensaver from starting while something plays
         playerView.setControllerShowTimeoutMs(4000);
-        playerView.setShowSubtitleButton(true); // CC button in the on-screen controls
+        playerView.setShowSubtitleButton(true); // Media3 CC button; Subtitles.useView swaps it for WygTV's own always-on CC button
         if (a.subs != null) a.subs.useView(playerView, type, title);
 
         zapList = null;
@@ -125,7 +125,7 @@ final class TvRemote {
         banner.setVisibility(View.GONE);
         LinearLayout top = new LinearLayout(a);
         top.setGravity(Gravity.CENTER_VERTICAL);
-        // The channel's logo from the playlist (or a letter badge), not its number.
+        // The channel's logo from the playlist (or nothing), never its number.
         bannerLogo = text("", 30, Theme.ACCENT, true);
         top.addView(bannerLogo, new LinearLayout.LayoutParams(-2, -2));
         bannerTitle = text("", 28, Theme.TEXT, true);
@@ -144,7 +144,7 @@ final class TvRemote {
         bannerNext.setSingleLine(true);
         banner.addView(bannerNext);
         TextView hints = text(isLive()
-                ? "▲▼ / CH± change channel    0-9 channel number    OK favorites / groups    INFO channel info    GUIDE TV guide    MENU options / subtitles    BACK exit"
+                ? "▲ / CH± change channel    ▼ controls    0-9 channel number    OK restart / favorites / groups    INFO channel info    GUIDE TV guide    MENU options / subtitles    BACK exit"
                 : "series".equals(type) && Episodes.next(a) != null ? "◀▶ seek    ▶❚❚ play / pause    MENU next episode / options / subtitles    BACK exit"
                 : "◀▶ seek    ▶❚❚ play / pause    MENU options / subtitles    BACK exit", 14, Theme.MUTED, false);
         hints.setPadding(0, a.dp(8), 0, 0);
@@ -194,7 +194,9 @@ final class TvRemote {
     private void showBanner() {
         if (banner == null) return;
         JSONObject ch = channel();
-        ChannelIcons.attach(bannerLogo, ch.optString("stream_icon"), title, 48);
+        String icon = ch.optString("stream_icon").trim();
+        bannerLogo.setVisibility(icon.isEmpty() ? View.GONE : View.VISIBLE);
+        ChannelIcons.attach(bannerLogo, icon, title, 48);
         bannerTitle.setText(title);
         String source = Library.sourceLabel(a.library.find(a.library.activeId()));
         bannerSource.setText(source.isEmpty() ? "" : "Source  " + source);
@@ -257,9 +259,13 @@ final class TvRemote {
                 if (down && isLive()) zap(-1);
                 return isLive();
             case KeyEvent.KEYCODE_DPAD_UP:
-            case KeyEvent.KEYCODE_DPAD_DOWN:
                 if (!isLive() || controls) return false;
-                if (down) zap(key == KeyEvent.KEYCODE_DPAD_UP ? 1 : -1);
+                if (down) zap(1);
+                return true;
+            case KeyEvent.KEYCODE_DPAD_DOWN:
+                // Down shows the playback controls (live too) instead of changing channel; CH- still goes down a channel.
+                if (controls) return false;
+                if (down && e.getRepeatCount() == 0) { hideBanner.run(); view.showController(); }
                 return true;
             case KeyEvent.KEYCODE_DPAD_CENTER:
             case KeyEvent.KEYCODE_ENTER:
@@ -442,15 +448,26 @@ final class TvRemote {
     }
 
     /**
-     * OK on a live channel: the same pop-up as holding OK in a guide (Favorites, Hidden, Add to channel group,
-     * New channel group), with the channel banner shown under it for the logo, source and what's on.
+     * OK on a live channel: Restart, Favorites, Add to channel group and New channel group (the guide pop-up
+     * without Hidden), with the channel banner shown under it for the logo, source and what's on.
      */
     private void channelOptions() {
         showBanner();
         ui.removeCallbacks(hideBanner);
-        android.app.AlertDialog d = GuideOptions.show(a, channel(), null, null);
+        android.app.AlertDialog d = GuideOptions.showInPlayer(a, channel(), this::restart);
         if (d == null) { ui.postDelayed(hideBanner, BANNER_MS); return; }
         d.setOnDismissListener(x -> { ui.removeCallbacks(hideBanner); ui.postDelayed(hideBanner, BANNER_MS); });
+    }
+
+    /** Start the channel playing again from scratch (a fresh connection to the stream). */
+    private void restart() {
+        if (a.player == null || view == null || id.isEmpty()) return;
+        if (a.recovery != null) a.recovery.newStream();
+        a.player.stop();
+        a.player.setMediaItem(MediaItem.fromUri(a.streamUrl("live", id, ext)));
+        a.player.prepare();
+        a.player.play();
+        Toast.makeText(a, "Restarting " + title + "…", Toast.LENGTH_SHORT).show();
     }
 
     private static String[] numbers(JSONArray list) {
