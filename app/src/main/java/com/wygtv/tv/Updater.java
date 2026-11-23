@@ -27,7 +27,7 @@ import java.net.URL;
  * (playlists, favourites and settings are kept).
  */
 final class Updater {
-    static final String RELEASE = "https://github.com/wyglaf01/WygIPTV-AndroidTV/releases/download/wygiptv-latest/";
+    static final String RELEASE = "https://github.com/wyglaf01/WygTV-AndroidTV/releases/download/wygiptv-latest/";
     static final String PREF_AUTO = "update_check_startup";
 
     private Updater() { }
