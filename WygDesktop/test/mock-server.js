@@ -12,7 +12,8 @@ const zlib = require('zlib');
 
 const port = +(process.argv[2] || 8765);
 const media = process.argv[3] || process.env.MOCK_MEDIA || path.join(__dirname, 'media');
-const base = `http://127.0.0.1:${port}`;
+// MOCK_HOST=0.0.0.0 MOCK_BASE=http://<this computer's address>:<port> lets a phone or simulator on the network use it.
+const base = process.env.MOCK_BASE || `http://127.0.0.1:${port}`;
 
 const liveCats = [['1', 'News'], ['2', 'Sports'], ['3', 'Entertainment'], ['4', 'Kids'], ['5', 'Antenna-style (MPEG-2)']];
 const names = ['WYG News', 'Bronze Sports', 'Royal Movies', 'Gearworks Kids', 'Steam Channel', 'Copper Cinema', 'Brass Band TV', 'Airship Weather',
@@ -111,4 +112,4 @@ http.createServer((req, res) => {
   m = /^\/(movie|series)\/demo\/demo\/(\d+)\.(\w+)$/.exec(p);
   if (m) return m[2] === '501' ? file(req, res, path.join(media, 'movie_ac3.mkv'), 'video/x-matroska') : file(req, res, path.join(media, 'movie.mp4'), 'video/mp4');
   send(res, 404, 'not found', 'text/plain');
-}).listen(port, '127.0.0.1', () => console.log(`Mock Xtream provider on ${base} (demo / demo), media from ${media}`));
+}).listen(port, process.env.MOCK_HOST || '127.0.0.1', () => console.log(`Mock Xtream provider on ${base} (demo / demo), media from ${media}`));
