@@ -58,6 +58,7 @@ final class LiveMenu {
         a.button("⌕ Search", a.side, a::searchLive);
         a.button("▦ Full TV guide", a.side, () -> a.openGuide(null));
         Antenna.addMenuEntries(a);
+        if (AirTv.isOn(a.prefs)) a.button("📡 " + AirTv.nameOf(a.prefs), a.side, () -> AirTv.open(a)); // opens Sling (AirTV has no open channel list)
         JSONArray mine = VirtualCategories.all(a);
         for (int i = 0; i < mine.length(); i++) {
             JSONObject c = mine.optJSONObject(i);
@@ -179,6 +180,7 @@ final class LiveMenu {
             String id = Antenna.PREFIX + t.optString("id");
             compact(a, "📡", Antenna.nameOf(t), false, () -> a.showGuide(id, null, true));
         }
+        if (AirTv.isOn(a.prefs)) compact(a, "📡", AirTv.nameOf(a.prefs), false, () -> AirTv.open(a));
         JSONArray mine = VirtualCategories.all(a);
         for (int i = 0; i < mine.length(); i++) {
             JSONObject c = mine.optJSONObject(i);
