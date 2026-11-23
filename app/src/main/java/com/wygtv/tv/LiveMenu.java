@@ -380,47 +380,21 @@ final class LiveMenu {
             Full f = FULL.get(v);
             String text = String.valueOf(f != null ? f.text : v.getText());
             fulls.add(text);
-            String icon = iconOf(text);
+            String icon = MenuIcons.iconOf(text);
             if (!icon.isEmpty()) uses.merge(icon, 1, Integer::sum);
         }
         for (int i = 0; i < entries.size(); i++) {
             android.widget.TextView v = entries.get(i);
             if (!FULL.containsKey(v)) FULL.put(v, new Full(v));
-            String icon = iconOf(fulls.get(i));
+            String icon = MenuIcons.iconOf(fulls.get(i));
             Integer n = uses.get(icon);
-            v.setText(iconLabel(fulls.get(i), n != null && n > 1));
+            v.setText(MenuIcons.iconLabel(fulls.get(i), n != null && n > 1));
             v.setTextSize(19);
             v.setGravity(android.view.Gravity.CENTER);
             v.setMaxLines(1);
             v.setEllipsize(null);
             v.setPadding(0, a.dp(10), 0, a.dp(10));
         }
-    }
-
-    /** The icon a menu label starts with ("★ Favorites" → "★"), or "" when it starts with a word. */
-    static String iconOf(String label) {
-        String s = label.trim();
-        if (s.isEmpty() || Character.isLetterOrDigit(s.codePointAt(0))) return "";
-        int end = 0;
-        while (end < s.length() && !Character.isWhitespace(s.charAt(end))) end++;
-        return s.substring(0, end);
-    }
-
-    /**
-     * What a menu entry shows in the icon strip: its icon, plus the first letter of its name when the icon is
-     * shared with other entries; just that letter when it has no icon ("All categories" → "A").
-     */
-    static String iconLabel(String label, boolean shared) {
-        String s = label.trim(), icon = iconOf(s);
-        String name = s.substring(icon.length());
-        String initial = "";
-        for (int i = 0; i < name.length(); ) {
-            int cp = name.codePointAt(i);
-            if (Character.isLetterOrDigit(cp)) { initial = new String(Character.toChars(Character.toUpperCase(cp))); break; }
-            i += Character.charCount(cp);
-        }
-        if (icon.isEmpty()) return initial.isEmpty() ? s : initial;
-        return shared && !initial.isEmpty() ? icon + initial : icon;
     }
 
     /** Entries added while a menu is shrunk (the menu was rebuilt) get the icon look too. */
