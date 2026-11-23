@@ -114,6 +114,7 @@ jobs:
           (cd dist && zip -qry WygTV-iOS.ipa Payload && rm -rf Payload)
           stat -f '%z bytes' dist/WygTV-iOS.ipa
           cp ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png dist/WygTV-iOS-icon.png
+          (cd "$RUNNER_TEMP/shots" && zip -q "$GITHUB_WORKSPACE/WygTV-iOS/dist/simulator-screenshots.zip" *.png) || true
 
       - name: Upload
         uses: actions/upload-artifact@v4
@@ -122,6 +123,7 @@ jobs:
           path: |
             WygTV-iOS/dist/WygTV-iOS.ipa
             WygTV-iOS/dist/WygTV-iOS-icon.png
+            WygTV-iOS/dist/simulator-screenshots.zip
           if-no-files-found: error
 
   # Fixed download links:
@@ -168,3 +170,5 @@ jobs:
             gh release create "$TAG" --title "$TITLE" --notes "$NOTES" --prerelease --latest=false
           fi
           gh release upload "$TAG" dist/WygTV-iOS.ipa dist/WygTV-iOS-icon.png dist/ios-version.json dist/altstore-source.json --clobber
+          # iPad Simulator screenshots from the self-test, kept with test builds for a quick look.
+          if [ "$TAG" = wygtv-ios-test ] && [ -f dist/simulator-screenshots.zip ]; then gh release upload "$TAG" dist/simulator-screenshots.zip --clobber; fi

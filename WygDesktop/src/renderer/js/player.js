@@ -119,6 +119,11 @@
   /** The built-in decoder plays the picture but not the sound (AC-3 etc.): switch to FFmpeg, video copied. */
   function checkAudio() {
     if (!item || opts.convert) return;
+    // iPhone/iPad: an MPEG-2 channel can play its AC-3 sound with no picture; treat that as not playing.
+    if (W.api.noFFmpeg) {
+      if (engine && engine.kind === 'mpegts' && !video.paused && video.currentTime > 1 && !video.videoWidth) fail('video', 'sound but no picture');
+      return;
+    }
     if (video.webkitVideoDecodedByteCount > 0 && video.webkitAudioDecodedByteCount === 0 && !video.paused) {
       convert('copy', 'no sound');
     }

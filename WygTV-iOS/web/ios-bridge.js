@@ -282,13 +282,15 @@
       out.channels = W.data.allChannels().length;
       out.playlistError = (W.data.lists.get('smoke') || {}).error || '';
       W.home(); await step('home');
-      const play = async (key, wait) => {
+      const play = async (key, wait, expectVlc) => {
         W.player.playChannel(W.data.channel(key), { full: true });
         const t0 = Date.now();
         while (Date.now() - t0 < wait) {
           await sleep(500);
           const v = document.querySelector('#player video');
-          if (v && v.currentTime > 3) return { played: v.currentTime, w: v.videoWidth, src: (v.currentSrc || '').slice(0, 80) };
+          const msg = document.querySelector('.player-msg:not([hidden])');
+          if (expectVlc && msg && /VLC/.test(msg.textContent)) return { msg: msg.textContent, w: v ? v.videoWidth : 0 };
+          if (!expectVlc && v && v.currentTime > 3) return { played: v.currentTime, w: v.videoWidth, src: (v.currentSrc || '').slice(0, 80) };
         }
         const v = document.querySelector('#player video');
         return { played: v ? v.currentTime : 0, err: v && v.error ? v.error.code + ' ' + v.error.message : '', msg: (document.querySelector('.player-msg') || {}).textContent || '' };
@@ -296,7 +298,7 @@
       out.hls = await play('smoke|100', 40000);
       await step('player', 500);
       W.player.stop(); await sleep(500);
-      out.mpeg2 = await play('smoke|104', 25000); // expected not to play: it should say to use VLC
+      out.mpeg2 = await play('smoke|104', 30000, true); // expected not to play: it should say to use VLC
       await step('mpeg2-message', 500);
       W.player.stop();
       await W.guide.ensureAll();
@@ -308,7 +310,7 @@
       out.movies = W.data.vodItems('vod').length; out.series = W.data.vodItems('series').length;
       W.go('vod', { kind: 'vod' }); await step('movies', 4000);
       W.go('settings'); await step('settings');
-      out.ok = out.channels > 0 && out.hls.played > 3 && out.guideChannels > 0 && out.movies > 0;
+      out.ok = out.channels > 0 && out.hls.played > 3 && /VLC/.test(out.mpeg2.msg || '') && out.guideChannels > 0 && out.movies > 0;
     } catch (e) { out.error = String(e && e.stack || e); }
     console.log('WYG-SMOKE ' + JSON.stringify(out));
     window.__done = true; // for scripted browser checks
