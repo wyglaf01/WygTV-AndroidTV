@@ -1,0 +1,43 @@
+name: Release WygTV
+
+# Run this when the current WygTV Beta is OK. It promotes that exact beta APK
+# (no rebuild) to a numbered release, e.g. "WygTV 1.0.123" with wygtv-1.0.123.apk.
+# That release becomes "latest", so the in-app updater and the Downloader link
+# (releases/latest/download/wygtv.apk) pick it up; wygtv.apk is the same file
+# under the fixed name those links need.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Promote the beta to a release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p dist
+          gh release download wygtv-beta --pattern 'wygtv-beta-*.apk' --pattern 'version.json' --dir dist
+          VERSION=$(jq -r .versionName dist/version.json)
+          TAG="wygtv-v${VERSION}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::error::$TAG is already released. Push a change to make a new beta first."
+            exit 1
+          fi
+          SHA=$(git rev-parse "wygtv-beta^{commit}")
+          cp dist/wygtv-beta-*.apk "dist/wygtv-${VERSION}.apk"
+          cp "dist/wygtv-${VERSION}.apk" dist/wygtv.apk
+          NOTES="WygTV ${VERSION} (${SHA::7}), released $(date -u '+%Y-%m-%d %H:%M UTC') from the tested beta.
+
+          Download: https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/wygtv-${VERSION}.apk
+          Always-newest link: https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/wygtv.apk"
+          gh release create "$TAG" --target "$SHA" --title "WygTV ${VERSION}" --notes "$NOTES" --latest \
+            "dist/wygtv-${VERSION}.apk" dist/wygtv.apk dist/version.json
