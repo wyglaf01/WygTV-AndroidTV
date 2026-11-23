@@ -29,6 +29,8 @@ import java.net.URL;
 final class Updater {
     static final String RELEASE = "https://github.com/wyglaf01/WygTV-AndroidTV/releases/latest/download/";
     static final String PREF_AUTO = "update_check_startup";
+    /** versionCode WygTV had when it started installing an update; read again on the next start. */
+    static final String PREF_FROM = "update_from";
 
     private Updater() { }
 
@@ -40,6 +42,17 @@ final class Updater {
 
     static String installedName(MainActivity a) {
         try { return a.getPackageManager().getPackageInfo(a.getPackageName(), 0).versionName; } catch (Exception e) { return ""; }
+    }
+
+    /** Called once at start-up, before the update check: says "Updated to …" after an in-app update and tidies up. */
+    static void afterUpdate(MainActivity a) {
+        int from = a.prefs.getInt(PREF_FROM, -1);
+        if (from < 0) return;
+        int now = installedCode(a);
+        if (now <= from) return; // the install was cancelled or failed; the download is kept for next time
+        a.prefs.edit().remove(PREF_FROM).remove("update_downloaded").apply();
+        try { ApkProvider.file(a).delete(); } catch (Exception ignored) { }
+        Toast.makeText(a, "WygTV updated to " + installedName(a) + ". Welcome back!", Toast.LENGTH_LONG).show();
     }
 
     /** Called once at start-up: quietly offers an update when there is one. */
@@ -117,6 +130,18 @@ final class Updater {
     static void install(MainActivity a) {
         if (!canInstall(a)) { askPermission(a); return; }
         waitingForPermission = false;
+        // Android always closes an app while it installs a new version of it, so say so first
+        // instead of WygTV just vanishing from the screen.
+        new Dialogs.Builder(a).setTitle("WygTV will close to update")
+                .setMessage("Android closes WygTV while the new version installs. That's normal, nothing has crashed.\n\n"
+                        + "After you choose Install on the next screen, WygTV reopens by itself when it's done. "
+                        + "If it doesn't, open WygTV again from the Home screen. Your playlists, favourites and settings are kept.")
+                .setPositiveButton("Install now", (d, w) -> startInstall(a))
+                .setNegativeButton("Later", null).show();
+    }
+
+    private static void startInstall(MainActivity a) {
+        a.prefs.edit().putInt(PREF_FROM, installedCode(a)).commit();
         Toast.makeText(a, "Installing the WygTV update…", Toast.LENGTH_SHORT).show();
         new Thread(() -> {
             String error = null;
