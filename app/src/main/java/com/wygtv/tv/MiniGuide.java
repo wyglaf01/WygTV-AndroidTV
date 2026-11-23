@@ -73,6 +73,7 @@ final class MiniGuide {
             JSONObject item = items.optJSONObject(i);
             if (item == null) continue;
             View row = addRow(a, list, item, it -> { if (!LivePreview.previewOnOk(a, it)) ok.run(it); }, more);
+            OPEN.put(row, ok);
             rows.add(row);
             data.add(item);
         }
@@ -84,6 +85,12 @@ final class MiniGuide {
                 Row r = ROWS.get(row);
                 if (r != null) render(r, f);
                 if (!f) return;
+                if (touched != null && touched != row) {
+                    touched.setBackground(rowBg(a, false));
+                    Row old = ROWS.get(touched);
+                    if (old != null) render(old, false);
+                }
+                touched = null;
                 showDetails(a, data.get(at));
                 LivePreview.show(a, data.get(at));
                 for (int k = Math.max(0, at - 2); k < Math.min(rows.size(), at + AHEAD); k++) request(a, data.get(k));
@@ -91,6 +98,34 @@ final class MiniGuide {
         }
         for (int k = 0; k < Math.min(rows.size(), AHEAD); k++) request(a, data.get(k));
         startTicker();
+    }
+
+    /** The row last tapped by its channel name (touch screens have no focus highlight). */
+    private static View touched;
+    /** What OK on each row does (open full screen), for a tap on a show. */
+    private static final Map<View, ItemAction> OPEN = new WeakHashMap<>();
+
+    private static void openRow(MainActivity a, JSONObject item) {
+        for (Map.Entry<View, Row> e : ROWS.entrySet()) {
+            if (e.getValue().item == item) { ItemAction ok = OPEN.get(e.getKey()); if (ok != null) ok.run(item); return; }
+        }
+    }
+
+    /** Tap on a channel name: highlight the row and preview it straight away. */
+    private static void touchPreview(View row) {
+        Row r = ROWS.get(row);
+        if (r == null) return;
+        if (touched != null && touched != row) {
+            touched.setBackground(rowBg(r.a, false));
+            Row old = ROWS.get(touched);
+            if (old != null) render(old, false);
+        }
+        touched = row;
+        row.setBackground(rowBg(r.a, true));
+        render(r, true);
+        showDetails(r.a, r.item);
+        LivePreview.previewNow(r.a, r.item);
+        request(r.a, r.item);
     }
 
     /** The channel a guide row shows, or null for any other view. */
@@ -139,6 +174,8 @@ final class MiniGuide {
         row.setTag(item.optString("stream_id"));
         row.setOnClickListener(v -> ok.run(item));
         row.setOnLongClickListener(v -> { more.run(item); return true; });
+        // Touch: tapping the channel name previews it; tapping a show opens it full screen. Hold either for options.
+        View.OnLongClickListener hold = v -> { more.run(item); return true; };
         // The channel's logo, its name and (small, underneath) its category.
         boolean hiddenCh = GuideOptions.isHidden(a, item);
         String top = starred(a, item) + title, sub = hiddenCh ? "Hidden" : categoryOf(a, item);
@@ -156,8 +193,14 @@ final class MiniGuide {
         name.setTypeface(null, Typeface.BOLD);
         ChannelIcons.attach(name, item.optString("stream_icon"), title, 28);
         if (hiddenCh) name.setAlpha(.45f);
+        name.setClickable(true);
+        name.setOnClickListener(v -> touchPreview(row));
+        name.setOnLongClickListener(hold);
         row.addView(name, new LinearLayout.LayoutParams(a.dp(CHANNEL_DP - 6), -1));
         LinearLayout cells = new LinearLayout(a);
+        cells.setClickable(true);
+        cells.setOnClickListener(v -> openRow(a, item));
+        cells.setOnLongClickListener(hold);
         row.addView(cells, new LinearLayout.LayoutParams(0, -1, 1));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, a.dp(ROW_DP));
         lp.setMargins(a.dp(5), a.dp(2), a.dp(5), a.dp(2));
@@ -221,7 +264,7 @@ final class MiniGuide {
                 CACHE.put(id, new Entry(clean, System.currentTimeMillis()));
                 for (Map.Entry<View, Row> r : new ArrayList<>(ROWS.entrySet())) {
                     if (!id.equals(r.getValue().key) || !r.getKey().isAttachedToWindow()) continue;
-                    render(r.getValue(), r.getKey().hasFocus());
+                    render(r.getValue(), r.getKey().hasFocus() || r.getKey() == touched);
                     if (r.getKey().hasFocus()) showDetails(r.getValue().a, r.getValue().item);
                 }
             });
@@ -311,7 +354,7 @@ final class MiniGuide {
                     if (!r.getKey().isAttachedToWindow()) continue;
                     if (!any && moved && header != null && header.isAttachedToWindow()) drawHeader(r.getValue().a);
                     any = true;
-                    render(r.getValue(), r.getKey().hasFocus());
+                    render(r.getValue(), r.getKey().hasFocus() || r.getKey() == touched);
                     Entry e = CACHE.get(r.getValue().key);
                     if (e != null && runOut(e, System.currentTimeMillis()) && r.getKey().hasFocus()) request(r.getValue().a, r.getValue().item);
                 }

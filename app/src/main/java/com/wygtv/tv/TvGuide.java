@@ -328,6 +328,10 @@ final class TvGuide {
         name.setEllipsize(TextUtils.TruncateAt.END);
         name.setPadding(a.dp(12), 0, a.dp(8), 0);
         name.setBackground(rowBg(false));
+        // Touch: tapping the channel name previews it; tapping a show opens it full screen. Hold for options.
+        name.setClickable(true);
+        name.setOnClickListener(v -> previewRow(i));
+        name.setOnLongClickListener(v -> { options(i); return true; });
         ChannelIcons.attach(name, ch.optString("stream_icon"), ch.optString("name", "Channel"), 24);
         if (hiddenCh) name.setAlpha(.45f);
         LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(chanW, -1);
@@ -402,6 +406,8 @@ final class TvGuide {
             if (focused && !rebuilding) onCellFocused(row, c);
         });
         v.setOnClickListener(view -> {
+            // A tap on a show opens it full screen (tap the channel name to preview instead).
+            if (view.isInTouchMode()) { playFullScreen(row); return; }
             // "OK only" preview: the first OK previews this channel, OK again opens it full screen.
             if (PreviewDelay.okOnly(a.prefs) && !(preview != null && key(row).equals(previewId)) && !streamId(row).isEmpty()) {
                 if (pendingPreview != null) ui.removeCallbacks(pendingPreview);
@@ -479,6 +485,28 @@ final class TvGuide {
         focusTime = c.contains(focusTime) ? focusTime : c.contains(n) ? n : c.start;
         showInfo(row, c);
         schedulePreview(row);
+    }
+
+    /** Tap on a channel name: highlight that row and preview it straight away. */
+    private void previewRow(int row) {
+        if (row != focusRow) {
+            TextView old = rowNames.get(focusRow);
+            if (old != null) old.setBackground(rowBg(false));
+        }
+        TextView name = rowNames.get(row);
+        if (name != null) name.setBackground(rowBg(true));
+        focusRow = row;
+        long n = now();
+        focusTime = n;
+        LinearLayout cells = rowCells.get(row);
+        if (cells != null && cells.getChildCount() > 0) {
+            List<EpgGrid.Cell> list = new ArrayList<>();
+            for (int k = 0; k < cells.getChildCount(); k++) list.add((EpgGrid.Cell) cells.getChildAt(k).getTag());
+            showInfo(row, list.get(Math.max(0, EpgGrid.indexAt(list, n))));
+        }
+        if (pendingPreview != null) ui.removeCallbacks(pendingPreview);
+        pendingPreview = null;
+        startPreview(row);
     }
 
     private void drawTimeHeader() {
@@ -687,7 +715,7 @@ final class TvGuide {
     private void syncPreviewLabel() {
         if (previewLabel == null || PreviewDelay.DEFAULT.equals(PreviewDelay.key(a.prefs))) return;
         if (preview != null && previewName != null) previewLabel.setText(previewName + " · live preview");
-        else previewLabel.setText(PreviewDelay.okOnly(a.prefs) ? "Press OK to preview" : "Rest on a channel to preview it");
+        else previewLabel.setText(previewLabel.isInTouchMode() ? "Tap a channel name to preview it" : PreviewDelay.okOnly(a.prefs) ? "Press OK to preview" : "Rest on a channel to preview it");
     }
 
     private void startPreview(int row) {
