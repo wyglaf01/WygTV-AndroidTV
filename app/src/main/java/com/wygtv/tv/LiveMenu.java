@@ -153,6 +153,7 @@ final class LiveMenu {
         parentScroll.setVisibility(android.view.View.GONE);
         parentCurrent = null;
         lastCategory = null;
+        parentCollapsed = false;
         return parentScroll;
     }
 
@@ -200,6 +201,10 @@ final class LiveMenu {
             if (on) parentCurrent = v;
         }
         parentScroll.setVisibility(android.view.View.VISIBLE);
+        // Focus goes on into the categories, so this column starts as a strip of icons (it opens when you move into it).
+        boolean wasCollapsed = parentCollapsed;
+        setParentCollapsed(a, true);
+        if (wasCollapsed) iconize(a, parentCol, true);
         if (parentCurrent != null) {
             android.widget.TextView cur = parentCurrent;
             parentScroll.post(() -> parentScroll.requestChildRectangleOnScreen(parentCol,
@@ -268,32 +273,47 @@ final class LiveMenu {
         return false;
     }
 
-    // ---------------------------------------------------------------- menu shrinks while you are in the guide
+    // ---------------------------------------------------------------- menus shrink to icons, like the main menu
 
-    /** Width of a collapsed menu column (the compact first tier, and the menu while focus is in the guide). */
+    /** Width of the compact first-tier column while it has the focus. */
     static final int NARROW_DP = 150;
+    /** Width of a menu column that doesn't have the focus: icons only, like the main menu on the far left. */
+    static final int ICON_DP = 72;
     private static android.view.View menuScroll;
-    private static boolean collapsed;
+    /** Whether the category menu / the compact first-tier column are showing icons only right now. */
+    private static boolean collapsed, parentCollapsed;
 
     /**
-     * Called by browse() (Live TV, Movies and Series) with the menu column. Once you pick something and focus moves into the guide or the
-     * preview, the menu shrinks to a narrow column on the left (short one-line labels); moving back into it opens
-     * it to full width again.
+     * Called by browse() (Live TV, Movies and Series) with the menu column. Each menu column works like the main
+     * menu: while it has the focus it shows full labels; once focus moves on (into the next menu, the guide or the
+     * preview) it shrinks to a strip of icons, and moving back into it opens it again. Focus on the main menu
+     * itself leaves them as they are, since that menu opens over the screen.
      */
     static void watchFocus(MainActivity a, android.view.View categoryScroll) {
         menuScroll = categoryScroll;
         collapsed = false;
         String screen = a.mode; // Live TV, Movies or Series
+        android.view.View content = a.root;
         android.view.ViewTreeObserver.OnGlobalFocusChangeListener track = (oldFocus, newFocus) -> {
             if (newFocus == null || menuScroll != categoryScroll || !screen.equals(a.mode)) return;
-            if (inside(newFocus, categoryScroll)) setCollapsed(a, false);
-            else if (parentScroll == null || !inside(newFocus, parentScroll)) setCollapsed(a, true);
+            if (content != null && !inside(newFocus, content)) return; // the main menu, a dialog…
+            boolean inParent = parentScroll != null && parentScroll.isShown() && inside(newFocus, parentScroll);
+            setCollapsed(a, !inside(newFocus, categoryScroll));
+            setParentCollapsed(a, !inParent);
         };
-        categoryScroll.addOnAttachStateChangeListener(new android.view.View.OnAttachStateChangeListener() {
+        android.view.View.OnAttachStateChangeListener attach = new android.view.View.OnAttachStateChangeListener() {
             android.view.ViewTreeObserver observer;
-            @Override public void onViewAttachedToWindow(android.view.View v) { observer = v.getViewTreeObserver(); observer.addOnGlobalFocusChangeListener(track); }
+            @Override public void onViewAttachedToWindow(android.view.View v) {
+                if (observer != null && observer.isAlive()) return;
+                observer = v.getViewTreeObserver();
+                observer.addOnGlobalFocusChangeListener(track);
+            }
             @Override public void onViewDetachedFromWindow(android.view.View v) { if (observer != null && observer.isAlive()) observer.removeOnGlobalFocusChangeListener(track); observer = null; }
-        });
+        };
+        categoryScroll.addOnAttachStateChangeListener(attach);
+        // The column is usually on screen already by now (the window was showing another screen), and then the
+        // attach callback above never comes: start watching straight away.
+        if (categoryScroll.isAttachedToWindow()) attach.onViewAttachedToWindow(categoryScroll);
     }
 
     private static boolean inside(android.view.View v, android.view.View group) {
@@ -301,35 +321,112 @@ final class LiveMenu {
         return v == group;
     }
 
-    /** Shrinks the menu column to {@link #NARROW_DP} with short labels, or opens it back to its full width. */
+    /** Shrinks the category menu to a strip of icons, or opens it back to its full width and labels. */
     private static void setCollapsed(MainActivity a, boolean on) {
         if (collapsed == on || menuScroll == null) return;
         collapsed = on;
         android.widget.LinearLayout.LayoutParams lp = (android.widget.LinearLayout.LayoutParams) menuScroll.getLayoutParams();
-        lp.width = on ? a.dp(NARROW_DP) : 0;
+        lp.width = on ? a.dp(ICON_DP) : 0;
         lp.weight = on ? 0 : 1;
         menuScroll.setLayoutParams(lp);
-        for (int i = 0; i < a.side.getChildCount(); i++) {
-            if (!(a.side.getChildAt(i) instanceof android.widget.TextView)) continue;
-            android.widget.TextView v = (android.widget.TextView) a.side.getChildAt(i);
-            narrow(a, v, on);
+        iconize(a, a.side, on);
+    }
+
+    /** The same for the compact first-tier column (Live TV, while a playlist's categories are open). */
+    private static void setParentCollapsed(MainActivity a, boolean on) {
+        if (parentCollapsed == on || parentScroll == null) return;
+        parentCollapsed = on;
+        android.view.ViewGroup.LayoutParams lp = parentScroll.getLayoutParams();
+        if (lp != null) {
+            lp.width = a.dp(on ? ICON_DP : NARROW_DP);
+            parentScroll.setLayoutParams(lp);
+        }
+        if (parentCol != null) iconize(a, parentCol, on);
+    }
+
+    /** How a menu entry looked before it was shrunk to its icon, so it can be put back exactly. */
+    private static final class Full {
+        final CharSequence text; final float size; final int l, t, r, b, gravity, maxLines;
+        final android.text.TextUtils.TruncateAt ellipsize;
+        Full(android.widget.TextView v) {
+            text = v.getText(); size = v.getTextSize(); gravity = v.getGravity(); maxLines = v.getMaxLines(); ellipsize = v.getEllipsize();
+            l = v.getPaddingLeft(); t = v.getPaddingTop(); r = v.getPaddingRight(); b = v.getPaddingBottom();
+        }
+        void restore(android.widget.TextView v) {
+            v.setText(text);
+            v.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, size);
+            v.setGravity(gravity);
+            v.setMaxLines(maxLines);
+            v.setEllipsize(ellipsize);
+            v.setPadding(l, t, r, b);
+        }
+    }
+    private static final java.util.WeakHashMap<android.widget.TextView, Full> FULL = new java.util.WeakHashMap<>();
+
+    /** Every entry of a menu column as just its icon (on), or with its full label back (off). */
+    private static void iconize(MainActivity a, android.view.ViewGroup col, boolean on) {
+        java.util.List<android.widget.TextView> entries = new java.util.ArrayList<>();
+        for (int i = 0; i < col.getChildCount(); i++)
+            if (col.getChildAt(i) instanceof android.widget.TextView) entries.add((android.widget.TextView) col.getChildAt(i));
+        if (!on) {
+            for (android.widget.TextView v : entries) { Full f = FULL.remove(v); if (f != null) f.restore(v); }
+            return;
+        }
+        // Icons used by more than one entry (◆ for each of your categories, › for each provider category)
+        // get the name's first letter too, so the strip still tells them apart.
+        java.util.Map<String, Integer> uses = new java.util.HashMap<>();
+        java.util.List<String> fulls = new java.util.ArrayList<>();
+        for (android.widget.TextView v : entries) {
+            Full f = FULL.get(v);
+            String text = String.valueOf(f != null ? f.text : v.getText());
+            fulls.add(text);
+            String icon = iconOf(text);
+            if (!icon.isEmpty()) uses.merge(icon, 1, Integer::sum);
+        }
+        for (int i = 0; i < entries.size(); i++) {
+            android.widget.TextView v = entries.get(i);
+            if (!FULL.containsKey(v)) FULL.put(v, new Full(v));
+            String icon = iconOf(fulls.get(i));
+            Integer n = uses.get(icon);
+            v.setText(iconLabel(fulls.get(i), n != null && n > 1));
+            v.setTextSize(19);
+            v.setGravity(android.view.Gravity.CENTER);
+            v.setMaxLines(1);
+            v.setEllipsize(null);
+            v.setPadding(0, a.dp(10), 0, a.dp(10));
         }
     }
 
-    /** One menu entry in its narrow (one short line) or full look. */
-    private static void narrow(MainActivity a, android.widget.TextView v, boolean on) {
-        v.setTextSize(on ? 16 : 21);
-        v.setMaxLines(on ? 1 : Integer.MAX_VALUE);
-        v.setEllipsize(on ? android.text.TextUtils.TruncateAt.END : null);
-        if (on) v.setPadding(a.dp(10), a.dp(9), a.dp(6), a.dp(9));
-        else v.setPadding(a.dp(18), a.dp(13), a.dp(12), a.dp(13));
+    /** The icon a menu label starts with ("★ Favorites" → "★"), or "" when it starts with a word. */
+    static String iconOf(String label) {
+        String s = label.trim();
+        if (s.isEmpty() || Character.isLetterOrDigit(s.codePointAt(0))) return "";
+        int end = 0;
+        while (end < s.length() && !Character.isWhitespace(s.charAt(end))) end++;
+        return s.substring(0, end);
     }
 
-    /** New entries added while the menu is narrow (the menu was rebuilt) get the narrow look too. */
+    /**
+     * What a menu entry shows in the icon strip: its icon, plus the first letter of its name when the icon is
+     * shared with other entries; just that letter when it has no icon ("All categories" → "A").
+     */
+    static String iconLabel(String label, boolean shared) {
+        String s = label.trim(), icon = iconOf(s);
+        String name = s.substring(icon.length());
+        String initial = "";
+        for (int i = 0; i < name.length(); ) {
+            int cp = name.codePointAt(i);
+            if (Character.isLetterOrDigit(cp)) { initial = new String(Character.toChars(Character.toUpperCase(cp))); break; }
+            i += Character.charCount(cp);
+        }
+        if (icon.isEmpty()) return initial.isEmpty() ? s : initial;
+        return shared && !initial.isEmpty() ? icon + initial : icon;
+    }
+
+    /** Entries added while a menu is shrunk (the menu was rebuilt) get the icon look too. */
     static void restyle(MainActivity a) {
-        if (!collapsed) return;
-        for (int i = 0; i < a.side.getChildCount(); i++)
-            if (a.side.getChildAt(i) instanceof android.widget.TextView) narrow(a, (android.widget.TextView) a.side.getChildAt(i), true);
+        if (collapsed && a.side != null) iconize(a, a.side, true);
+        if (parentCollapsed && parentCol != null) iconize(a, parentCol, true);
     }
 
     /** Back in Live TV: from the categories tier go up to the first tier. False when already at the top. */
