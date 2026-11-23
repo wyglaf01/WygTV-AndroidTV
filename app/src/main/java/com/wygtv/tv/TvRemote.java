@@ -85,7 +85,7 @@ final class TvRemote {
         ui.removeCallbacksAndMessages(null);
         playerView.setKeepScreenOn(true); // stop the TV screensaver from starting while something plays
         playerView.setControllerShowTimeoutMs(4000);
-        playerView.setShowSubtitleButton(true); // CC button in the on-screen controls
+        playerView.setShowSubtitleButton(true); // Media3 CC button; Subtitles.useView swaps it for WygTV's own always-on CC button
         if (a.subs != null) a.subs.useView(playerView, type, title);
 
         zapList = null;
