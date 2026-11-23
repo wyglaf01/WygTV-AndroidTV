@@ -26,7 +26,8 @@ final class LiveMenu {
         a.request("get_live_categories", o -> {
             a.categories = o.optJSONArray("list");
             if (a.categories == null) a.categories = new JSONArray();
-            if (tier.equals(CATEGORIES)) a.showCategories(); else top(a);
+            tier = TOP; // categories now open under their playlist in the one menu
+            top(a);
         }, "Unable to load categories");
     }
 
@@ -73,24 +74,93 @@ final class LiveMenu {
                 return true;
             });
         }
-        JSONArray pls = a.library.inUse();
+        String resume = a.resumeCategory;
+        a.resumeCategory = null;
         String active = a.library.activeId();
+        boolean resumeHere = resume != null && isActiveCategory(a, resume);
+        if (resumeHere) open.add(active); // coming back to one of its categories: show it open
+        JSONArray pls = a.library.inUse();
+        android.widget.TextView header = null;
         for (int i = 0; i < pls.length(); i++) {
             JSONObject p = pls.optJSONObject(i);
             if (p == null || Library.isHdhr(p)) continue; // tuners show as Antenna TV above
-            boolean on = p.optString("id").equals(active);
-            a.button((on ? "▤ " : "▢ ") + Library.nameOf(p) + "  ›", a.side, () -> openPlaylist(a, p));
+            String pid = p.optString("id");
+            boolean on = pid.equals(active);
+            boolean expanded = on && open.contains(pid);
+            // OK on a playlist opens its categories right under it; OK again closes them.
+            android.widget.TextView head = a.button((expanded ? "▼  " : "▶  ") + Library.nameOf(p) + (on ? "  ●" : ""), a.side, () -> togglePlaylist(a, p));
+            head.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+            head.setTextColor(Theme.ACCENT);
+            if (pid.equals(focusHeader)) header = head;
+            if (expanded) categoriesUnder(a);
         }
-        String resume = a.resumeCategory;
-        a.resumeCategory = null;
         // Start in the menu (Favorites highlighted) unless coming back from a channel, which re-focuses that channel.
         a.previewOnly = a.resumeStreamId == null;
         if (a.previewOnly && a.side.getChildCount() > 1) a.side.getChildAt(1).requestFocus();
-        a.loadItems(resume != null && (VirtualCategories.isVirtual(resume) || Antenna.isAntenna(resume)) ? resume : "fav");
+        a.loadItems(resume != null && (VirtualCategories.isVirtual(resume) || Antenna.isAntenna(resume) || resumeHere) ? resume : "fav");
         android.widget.TextView want = focusOnOpen == null ? null : picks.get(focusOnOpen);
         focusOnOpen = null;
         if (want != null && a.resumeStreamId == null) want.requestFocus();
+        if (header != null && a.resumeStreamId == null) header.requestFocus();
+        focusHeader = null;
         restyle(a);
+    }
+
+    /** Playlists whose categories are open under them in the menu; kept while the app runs. */
+    private static final java.util.Set<String> open = new java.util.HashSet<>();
+    /** Playlist heading to highlight once the menu is rebuilt (after opening or closing it). */
+    private static String focusHeader;
+
+    /** True for "All categories" ("") or one of the playing playlist's provider categories. */
+    private static boolean isActiveCategory(MainActivity a, String id) {
+        if (id.isEmpty()) return open.contains(a.library.activeId());
+        if (a.categories == null) return false;
+        for (int i = 0; i < a.categories.length(); i++) {
+            JSONObject c = a.categories.optJSONObject(i);
+            if (c != null && id.equals(c.optString("category_id"))) return true;
+        }
+        return false;
+    }
+
+    /** OK on a playlist heading: open or close its categories in place (switching to that playlist first if needed). */
+    private static void togglePlaylist(MainActivity a, JSONObject p) {
+        String pid = p.optString("id");
+        focusHeader = pid;
+        if (!pid.equals(a.library.activeId())) {
+            open.add(pid);
+            tier = TOP;
+            a.switchPlaylist(p);
+            a.browse("live");
+            return;
+        }
+        if (!open.remove(pid)) open.add(pid);
+        a.resumeCategory = a.category; // keep the guide on whatever it shows now
+        top(a);
+    }
+
+    /** The playing playlist's categories, indented under its heading. */
+    private static void categoriesUnder(MainActivity a) {
+        java.util.Set<String> hidden = a.hiddenCategories();
+        int hiddenCount = 0;
+        pick(a, "      All categories", "");
+        for (int i = 0; i < a.categories.length(); i++) {
+            JSONObject c = a.categories.optJSONObject(i);
+            if (c == null) continue;
+            String id = c.optString("category_id"), title = c.optString("category_name", "Category");
+            if (hidden.contains(id)) { hiddenCount++; continue; }
+            pick(a, "      › " + title, id).setOnLongClickListener(w -> {
+                new Dialogs.Builder(a).setTitle(title).setItems(new String[]{"Hide this category", "Cancel"}, (d, which) -> {
+                    if (which != 0) return;
+                    java.util.Set<String> h = a.hiddenCategories();
+                    h.add(id);
+                    a.saveHiddenCategories(h);
+                    a.resumeCategory = a.category;
+                    top(a);
+                }).show();
+                return true;
+            });
+        }
+        a.button(hiddenCount == 0 ? "      ◐ Hide / show categories" : "      ◐ Hide / show categories (" + hiddenCount + " hidden)", a.side, a::manageCategories);
     }
 
     private static final android.os.Handler UI = new android.os.Handler(android.os.Looper.getMainLooper());
