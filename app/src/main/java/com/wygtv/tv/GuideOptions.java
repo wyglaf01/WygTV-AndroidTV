@@ -9,7 +9,7 @@ import java.util.Set;
 
 /**
  * Hold OK on a channel in a guide (TV Guide or the Live TV guide): Favorites, Hide / Unhide and Add to channel group;
- * OK while a channel plays: Restart, Favorites and channel groups (no Hide),
+ * OK while a channel plays: Resume, Favorites and channel groups (no Hide),
  * saved in the channel's own playlist so channels from other playlists work too.
  */
 final class GuideOptions {
@@ -28,7 +28,7 @@ final class GuideOptions {
         return show(a, ch, group, changed, null);
     }
 
-    /** OK while a channel plays: Restart at the top, and no Hidden switch. */
+    /** OK while a channel plays: Resume at the top, and no Hidden switch. */
     static android.app.AlertDialog showInPlayer(MainActivity a, JSONObject ch, Runnable restart) {
         return show(a, ch, null, null, restart);
     }
@@ -49,7 +49,7 @@ final class GuideOptions {
         final boolean inPlayer = restart != null;
         java.util.List<String> items = new java.util.ArrayList<>();
         final java.util.List<Integer> acts = new java.util.ArrayList<>();
-        if (inPlayer) { items.add("⟲  Restart"); acts.add(RESTART); }
+        if (inPlayer) { items.add("⟲  Resume"); acts.add(RESTART); }
         items.add(fav ? "★  Remove from Favorites" : "☆  Add to Favorites"); acts.add(FAV);
         if (!inPlayer) { items.add(hideLabel(hidden)); acts.add(HIDE); }
         items.add("◆  Add to channel group…"); acts.add(ADD);

@@ -144,7 +144,7 @@ final class TvRemote {
         bannerNext.setSingleLine(true);
         banner.addView(bannerNext);
         TextView hints = text(isLive()
-                ? "▲ / CH± change channel    ▼ controls    0-9 channel number    OK restart / favorites / groups    INFO channel info    GUIDE TV guide    MENU options / subtitles    BACK exit"
+                ? "▲ / CH± change channel    ▼ controls    0-9 channel number    OK resume / favorites / groups    INFO channel info    GUIDE TV guide    MENU options / subtitles    BACK exit"
                 : "series".equals(type) && Episodes.next(a) != null ? "◀▶ seek    ▶❚❚ play / pause    MENU next episode / options / subtitles    BACK exit"
                 : "◀▶ seek    ▶❚❚ play / pause    MENU options / subtitles    BACK exit", 14, Theme.MUTED, false);
         hints.setPadding(0, a.dp(8), 0, 0);
@@ -448,7 +448,7 @@ final class TvRemote {
     }
 
     /**
-     * OK on a live channel: Restart, Favorites, Add to channel group and New channel group (the guide pop-up
+     * OK on a live channel: Resume, Favorites, Add to channel group and New channel group (the guide pop-up
      * without Hidden), with the channel banner shown under it for the logo, source and what's on.
      */
     private void channelOptions() {
@@ -467,7 +467,7 @@ final class TvRemote {
         a.player.setMediaItem(MediaItem.fromUri(a.streamUrl("live", id, ext)));
         a.player.prepare();
         a.player.play();
-        Toast.makeText(a, "Restarting " + title + "…", Toast.LENGTH_SHORT).show();
+        Toast.makeText(a, "Resuming " + title + "…", Toast.LENGTH_SHORT).show();
     }
 
     private static String[] numbers(JSONArray list) {
