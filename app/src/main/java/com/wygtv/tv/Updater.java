@@ -21,7 +21,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 
 /**
- * In-app updates. Every CI build on `app` publishes wygtv.apk plus version.json to the
+ * In-app updates. Each promoted release (Release WygTV workflow) publishes wygtv.apk plus version.json to the
  * "latest" GitHub release. WygTV compares that versionCode with its own and, when newer,
  * downloads the APK and hands it to the system installer, which installs it over the old one
  * (playlists, favourites and settings are kept).
