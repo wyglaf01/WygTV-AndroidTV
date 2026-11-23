@@ -42,12 +42,6 @@
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
-		<key>NSAllowsArbitraryLoadsForMedia</key>
-		<true/>
-		<key>NSAllowsArbitraryLoadsInWebContent</key>
-		<true/>
-		<key>NSAllowsLocalNetworking</key>
-		<true/>
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>WygTV-iOS looks for HDHomeRun antenna tuners and plays TV from your own network.</string>
@@ -98,3 +92,4 @@
 	<false/>
 </dict>
 </plist>
+

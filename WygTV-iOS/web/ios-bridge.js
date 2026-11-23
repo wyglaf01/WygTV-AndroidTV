@@ -31,8 +31,22 @@
   const isGzip = (b) => b.length > 2 && b[0] === 0x1f && b[1] === 0x8b;
 
   async function getBytes(url, timeout = 60000) {
-    if (!/^https?:\/\//i.test(url)) throw new Error('Only http(s) links are supported: ' + url);
-    const r = await Http.get({ url, headers: { 'User-Agent': userAgent, Accept: '*/*' }, responseType: 'arraybuffer', connectTimeout: Math.min(timeout, 20000), readTimeout: timeout });
+    if (!/^https?:\/\//i.test(url)) throw new Error('Only HTTP or HTTPS links are supported.');
+    let r;
+    try {
+      r = await Http.get({ url, headers: { 'User-Agent': userAgent, Accept: '*/*' }, responseType: 'arraybuffer', connectTimeout: Math.min(timeout, 20000), readTimeout: timeout });
+    } catch (error) {
+      const message = String(error && error.message || error);
+      const code = String(error && error.code || '');
+      const server = new URL(url).origin;
+      if (/App Transport Security|-1022/i.test(message + ' ' + code)) {
+        throw new Error('iOS blocked the HTTP connection to ' + server + '. Install the latest WygTV-iOS update, then reload this playlist.');
+      }
+      if (/TLS|SSL|certificate|secure connection|-120[0-6]/i.test(message + ' ' + code)) {
+        throw new Error('The secure connection to ' + server + ' failed. Check the exact http:// or https:// address and port supplied by your provider. If HTTPS is correct, ask the provider to repair its TLS/certificate configuration.');
+      }
+      throw new Error('Could not connect to ' + server + '. Check the server address, network and provider, then reload the playlist.');
+    }
     if (r.status < 200 || r.status >= 300) throw new Error(`HTTP ${r.status} from ${new URL(url).host}`);
     if (typeof r.data !== 'string') return new TextEncoder().encode(typeof r.data === 'object' ? JSON.stringify(r.data) : String(r.data ?? ''));
     return b64ToBytes(r.data);
@@ -316,3 +330,4 @@
     window.__done = true; // for scripted browser checks
   });
 })();
+
