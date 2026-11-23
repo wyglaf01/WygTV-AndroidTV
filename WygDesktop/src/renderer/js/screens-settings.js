@@ -179,7 +179,7 @@
       label: '▶ Player',
       render() {
         return [
-          btn({ class: 'set-row', onclick: () => { W.settings.alwaysConvert = !W.settings.alwaysConvert; W.saveSettings(); W.refresh(); } },
+          W.isIOS ? null : btn({ class: 'set-row', onclick: () => { W.settings.alwaysConvert = !W.settings.alwaysConvert; W.saveSettings(); W.refresh(); } },
             h('div', { class: 'set-label' }, 'Convert every live channel with FFmpeg'), h('div', { class: 'set-sub' }, W.settings.alwaysConvert ? 'On: steadier sound on some services, uses more CPU' : 'Off: only when a channel won’t play directly (recommended)')),
           btn({ class: 'set-row', onclick: async () => {
             const opts = [['auto', 'Automatic'], ['hls', 'HLS (.m3u8)'], ['ts', 'MPEG-TS (.ts)']];
@@ -189,7 +189,7 @@
           btn({ class: 'set-row', onclick: async () => {
             const p = await W.api.ext.pick();
             if (p) { W.settings.extPlayer = p; W.saveSettings(); W.refresh(); }
-          } }, h('div', { class: 'set-label' }, 'External player (VLC or mpv)'), h('div', { class: 'set-sub' }, W.settings.extPlayer || (W.isMac ? 'Not set: VLC (in Applications) is used when installed' : 'Not set: VLC is found automatically when installed'))),
+          } }, h('div', { class: 'set-label' }, W.isIOS ? 'External player' : 'External player (VLC or mpv)'), h('div', { class: 'set-sub' }, W.settings.extPlayer || (W.isIOS ? 'VLC' : W.isMac ? 'Not set: VLC (in Applications) is used when installed' : 'Not set: VLC is found automatically when installed'))),
           btn({ class: 'set-row', onclick: async () => {
             const r = await W.form('User agent', [{ key: 'ua', label: 'Sent to your provider (leave empty for the default)', value: W.settings.userAgent, placeholder: W.brand + '/1.0' }]);
             if (r) { W.settings.userAgent = r.ua.trim(); W.saveSettings(); W.api.net.setUserAgent(W.settings.userAgent || W.brand + '/1.0'); W.refresh(); }
@@ -221,7 +221,7 @@
         return [
           h('div', { class: 'set-text' }, 'Save playlists, guides, favorites, My List, watch progress and settings to a file, or bring them back.'),
           h('div', { class: 'set-buttons' },
-            btn({ class: 'button', onclick: async () => { const p = await W.api.file.save('wygdesktop-backup.json', W.backupText()); if (p) W.toast('Saved to ' + p); } }, '⤒ Save a backup'),
+            btn({ class: 'button', onclick: async () => { const p = await W.api.file.save(W.isIOS ? 'wygtv-ios-backup.json' : 'wygdesktop-backup.json', W.backupText()); if (p) W.toast('Saved to ' + p); } }, '⤒ Save a backup'),
             btn({ class: 'button', onclick: () => W.restoreBackup() }, '⤓ Restore a backup')),
           h('div', { class: 'set-group' }, 'Hidden categories'),
           btn({ class: 'set-row', onclick: () => { W.hidden = {}; W.save('hidden', W.hidden); W.toast('All categories are showing again'); W.refresh(); } },
@@ -235,12 +235,12 @@
       label: 'ℹ About & updates',
       render() {
         const ver = h('div', { class: 'set-sub' }, '…');
-        W.api.app.info().then((i) => { ver.textContent = 'Version ' + i.version + ' · ' + (i.platform === 'win32' ? 'Windows' : i.platform === 'linux' ? 'Linux' : i.platform === 'darwin' ? 'macOS' : i.platform); });
+        W.api.app.info().then((i) => { ver.textContent = 'Version ' + i.version + ' · ' + (i.platform === 'win32' ? 'Windows' : i.platform === 'linux' ? 'Linux' : i.platform === 'darwin' ? 'macOS' : i.platform === 'ios' ? i.device : i.platform); });
         return [
-          h('div', { class: 'about' }, h('img', { src: 'assets/icon.png', alt: '' }), h('div', null, h('div', { class: 'brand' }, W.brand), ver, h('div', { class: 'set-sub' }, 'The desktop copy of WygTV.'))),
+          h('div', { class: 'about' }, h('img', { src: 'assets/icon.png', alt: '' }), h('div', null, h('div', { class: 'brand' }, W.brand), ver, h('div', { class: 'set-sub' }, W.isIOS ? 'WygTV for iPhone and iPad.' : 'The desktop copy of WygTV.'))),
           h('div', { class: 'set-buttons' },
             btn({ class: 'button primary', onclick: () => W.checkUpdates(true) }, '⟳ Check for updates'),
-            btn({ class: 'button', onclick: () => W.api.win.quit() }, '⏻ Quit')),
+            W.isIOS ? null : btn({ class: 'button', onclick: () => W.api.win.quit() }, '⏻ Quit')),
         ];
       },
     },
@@ -263,7 +263,7 @@
     try {
       const r = await W.api.update.check();
       if (!r.available) { if (manual) W.alert('Up to date', 'You have the newest ' + W.brand + ' (' + r.current + ').'); return; }
-      const go = await W.confirm('Update available', r.kind === 'mac' ? `${W.brand} ${r.latest} is ready (you have ${r.current}). Download it now? Open the downloaded file and drag ${W.brand} into Applications to replace this one.` : `${W.brand} ${r.latest} is ready (you have ${r.current}). Install it now?`, r.kind === 'deb' || r.kind === 'mac' ? 'Download' : 'Install', 'Later');
+      const go = await W.confirm('Update available', r.kind === 'ios' ? `${W.brand} ${r.latest} is ready (you have ${r.current}). Open AltStore to update?` : r.kind === 'mac' ? `${W.brand} ${r.latest} is ready (you have ${r.current}). Download it now? Open the downloaded file and drag ${W.brand} into Applications to replace this one.` : `${W.brand} ${r.latest} is ready (you have ${r.current}). Install it now?`, r.kind === 'ios' ? 'Open AltStore' : r.kind === 'deb' || r.kind === 'mac' ? 'Download' : 'Install', 'Later');
       if (!go) return;
       const b = W.busy('Downloading the update…');
       W.api.onUpdateProgress((p) => b.set('Downloading the update… ' + p + '%'));
@@ -279,7 +279,7 @@
       const show = (k) => {
         sec = k; W.save('setSec', k); entry.args = { section: k };
         W.$$('.item', menuCol).forEach((x) => x.classList.toggle('active', x.dataset.k === 's:' + k));
-        body.replaceChildren(h('div', { class: 'col-title' }, sections[k].label), ...sections[k].render());
+        body.replaceChildren(h('div', { class: 'col-title' }, sections[k].label), ...sections[k].render().filter(Boolean));
       };
       menuCol.append(...Object.entries(sections).map(([k, s]) => {
         const el = btn({ class: 'item' + (k === sec ? ' active' : ''), 'data-k': 's:' + k, 'data-autofocus': k === sec ? '' : null, onclick: () => { show(k); W.focusFirst(body); } }, h('span', { class: 'item-label' }, s.label));
