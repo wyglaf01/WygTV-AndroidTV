@@ -51,6 +51,7 @@ final class Subtitles {
     private String waitingFor;   // label of a subtitle file just added, picked once the player lists it
     private final List<MediaItem.SubtitleConfiguration> added = new ArrayList<>();
     private SubSources.Query lastQuery;
+    private android.widget.ImageButton ccButton; // CC in the on-screen playback controls
 
     private Subtitles(MainActivity a, ExoPlayer player, boolean live, boolean on) {
         this.a = a;
@@ -74,6 +75,36 @@ final class Subtitles {
         this.type = type == null ? "" : type;
         this.title = title == null ? "" : title;
         applySize();
+        addCcButton(v);
+    }
+
+    /**
+     * A CC button in the playback controls (D-pad Down while watching) that is always there, even when the stream has
+     * no subtitles yet. OK opens the same Subtitles pop-up as MENU: on / off, the stream's tracks, and for movies and
+     * episodes online search, a file or a link. Replaces Media3's own CC button, which greys out with no tracks.
+     */
+    private void addCcButton(PlayerView v) {
+        ccButton = null;
+        if (v == null) return;
+        v.setShowSubtitleButton(false);
+        android.view.View settings = v.findViewById(androidx.media3.ui.R.id.exo_settings);
+        if (settings == null || !(settings.getParent() instanceof android.view.ViewGroup)) return;
+        android.view.ViewGroup row = (android.view.ViewGroup) settings.getParent();
+        android.widget.ImageButton cc = new android.widget.ImageButton(a);
+        if (settings.getBackground() != null && settings.getBackground().getConstantState() != null)
+            cc.setBackground(settings.getBackground().getConstantState().newDrawable().mutate());
+        cc.setPadding(settings.getPaddingLeft(), settings.getPaddingTop(), settings.getPaddingRight(), settings.getPaddingBottom());
+        cc.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+        cc.setFocusable(true);
+        cc.setContentDescription("Subtitles / CC");
+        cc.setOnClickListener(x -> choose());
+        row.addView(cc, row.indexOfChild(settings), settings.getLayoutParams());
+        ccButton = cc;
+        refreshCc();
+    }
+
+    private void refreshCc() {
+        if (ccButton != null) ccButton.setImageResource(wanted ? androidx.media3.ui.R.drawable.exo_ic_subtitle_on : androidx.media3.ui.R.drawable.exo_ic_subtitle_off);
     }
 
     /** Text size from Settings, the same for every stream (embedded sizes are ignored so it always applies). */
@@ -102,6 +133,7 @@ final class Subtitles {
         else b.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true);
         player.setTrackSelectionParameters(b.build());
         ensureShown(player.getCurrentTracks());
+        refreshCc();
     }
 
     /** When subtitles are wanted but the language rules picked nothing, show the first track the stream has. */
@@ -167,6 +199,7 @@ final class Subtitles {
             Tracks.Group g = groups.get(w - 1);
             wanted = true;
             forcedHere = true;
+            refreshCc();
             player.setTrackSelectionParameters(player.getTrackSelectionParameters().buildUpon()
                     .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
                     .setOverrideForType(new TrackSelectionOverride(g.getMediaTrackGroup(), index.get(w - 1))).build());
@@ -323,6 +356,7 @@ final class Subtitles {
         boolean playing = player.getPlayWhenReady();
         waitingFor = name;
         wanted = true;
+        refreshCc();
         player.setTrackSelectionParameters(player.getTrackSelectionParameters().buildUpon()
                 .clearOverridesOfType(C.TRACK_TYPE_TEXT).setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false).build());
         player.setMediaItem(item.buildUpon().setSubtitleConfigurations(new ArrayList<>(added)).build(), at);
