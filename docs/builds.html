@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>WygTV Builds · every download and its address</title>
-<meta name="description" content="Newest WygTV builds for Android TV, Fire TV, Windows, Ubuntu and Mac, with the direct address of every file.">
+<meta name="description" content="Newest WygTV builds for Android TV, Fire TV, Windows, Ubuntu, Mac, iPhone and iPad, with the direct address of every file.">
 <link rel="icon" href="img/favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -84,7 +84,7 @@
 
 <footer>
   <div class="wrap">
-    <span>WygTV · free for Android TV, Fire TV, Windows, Ubuntu and Mac</span>
+    <span>WygTV · free for Android TV, Fire TV, Windows, Ubuntu, Mac, iPhone and iPad</span>
     <span><a href="./">Home</a> · <a href="help.html">Help guide</a> · <a href="https://github.com/wyglaf01/WygTV-AndroidTV">Source on GitHub</a></span>
     <span>WygTV plays the content you bring. It doesn't come with any channels or subscriptions.</span>
   </div>
@@ -114,6 +114,11 @@
       files: [
         ["Apple Silicon (M1 and newer)", DL + "wygdesktop-latest/WygTV-Mac-AppleSilicon.dmg", "WygTV-Mac-AppleSilicon.dmg"],
         ["Intel Mac", DL + "wygdesktop-latest/WygTV-Mac-Intel.dmg", "WygTV-Mac-Intel.dmg"]] },
+    { tag: "wygtv-ios-latest", title: "📱 WygTV-iOS for iPhone & iPad", workflow: "ios.yml",
+      text: "For iPhone and iPad with iOS 15 or newer. It isn't on the App Store: install it with AltStore, which signs it with your own Apple ID. Add the AltStore source below in AltStore (Browse → Sources → +) and new builds show up as updates.",
+      files: [
+        ["AltStore source", DL + "wygtv-ios-latest/altstore-source.json", "altstore-source.json"],
+        ["iPhone & iPad app (.ipa)", DL + "wygtv-ios-latest/WygTV-iOS.ipa", "WygTV-iOS.ipa"]] },
     { tag: "wygdesktop-test", title: "🧪 WygDesktop and WygTV-Mac test build", test: true,
       text: "Built from a change that hasn't been merged yet, for trying it out before it goes to everyone. May be older or newer than the build above.",
       files: [
@@ -122,7 +127,10 @@
         ["Ubuntu .deb", DL + "wygdesktop-test/WygDesktop-linux.deb", "WygDesktop-linux.deb"],
         ["Ubuntu AppImage", DL + "wygdesktop-test/WygDesktop-linux.AppImage", "WygDesktop-linux.AppImage"],
         ["Mac, Apple Silicon", DL + "wygdesktop-test/WygTV-Mac-AppleSilicon.dmg", "WygTV-Mac-AppleSilicon.dmg"],
-        ["Mac, Intel", DL + "wygdesktop-test/WygTV-Mac-Intel.dmg", "WygTV-Mac-Intel.dmg"]] }
+        ["Mac, Intel", DL + "wygdesktop-test/WygTV-Mac-Intel.dmg", "WygTV-Mac-Intel.dmg"]] },
+    { tag: "wygtv-ios-test", title: "🧪 WygTV-iOS test build", test: true,
+      text: "Built from a change that hasn't been merged yet. Open the .ipa in AltStore to try it.",
+      files: [["iPhone & iPad app (.ipa)", DL + "wygtv-ios-test/WygTV-iOS.ipa", "WygTV-iOS.ipa"]] }
   ];
 
   var ADDRESSES = [
@@ -133,7 +141,8 @@
     ["All releases", GH + "/releases"],
     ["Build history (GitHub Actions)", GH + "/actions"],
     ["Android version file", GH + "/releases/latest/download/version.json"],
-    ["Desktop version file", DL + "wygdesktop-latest/desktop-version.json"]
+    ["Desktop version file", DL + "wygdesktop-latest/desktop-version.json"],
+    ["iOS version file", DL + "wygtv-ios-latest/ios-version.json"]
   ];
 
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
