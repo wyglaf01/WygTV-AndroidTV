@@ -4,7 +4,10 @@ import android.os.Handler;
 import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.view.Gravity;
 import android.view.KeyEvent;
+import android.view.View;
+import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
@@ -17,8 +20,9 @@ import org.json.JSONObject;
 
 
 /**
- * Movies / Series → Search: a search bar above the poster grid, ready to type in right away. Every movie (or series)
- * of the playlist loads once something is typed, is kept for the session and filtered as you type; results open the details page on OK, and holding OK adds them to My List.
+ * Movies / Series → Search: a search bar at the top of the screen, beside the MOVIES / SERIES title, over the poster grid,
+ * ready to type in right away. Every movie (or series) of the playlist loads once something is typed, is kept for the session
+ * and filtered as you type; results open the details page on OK, and holding OK adds them to My List.
  */
 final class VodSearch {
     static final String CATEGORY = "search";
@@ -40,9 +44,7 @@ final class VodSearch {
         a.detail.removeAllViews();
         final int list = a.listGeneration;
 
-        LinearLayout bar = new LinearLayout(a);
-        bar.setPadding(a.dp(6), a.dp(2), a.dp(6), a.dp(6));
-        a.detail.addView(bar, new LinearLayout.LayoutParams(-1, -2));
+        LinearLayout bar = headerSlot(a);
         EditText field = new EditText(a);
         field.setSingleLine(true);
         field.setHint(type.equals("series") ? "⌕  Type a series name" : "⌕  Type a movie name");
@@ -52,11 +54,17 @@ final class VodSearch {
         field.setPadding(a.dp(18), a.dp(10), a.dp(18), a.dp(10));
         field.setBackground(a.bg(a.PANEL));
         field.setImeOptions(EditorInfo.IME_ACTION_SEARCH | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
+        field.setTag(NavRail.TOP_TARGET); // Right from the top of the side menu lands on the bar.
         field.setOnFocusChangeListener((v, f) -> field.setBackground(a.bg(f ? Theme.FOCUS : a.PANEL)));
         bar.addView(field, new LinearLayout.LayoutParams(0, -2, 1));
         LinearLayout results = new LinearLayout(a);
         results.setOrientation(LinearLayout.VERTICAL);
         a.detail.addView(results, new LinearLayout.LayoutParams(-1, 0, 1));
+        // The bar sits in the title row; take it away again as soon as the results leave the screen (another category, My List…).
+        results.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+            public void onViewAttachedToWindow(View v) { }
+            public void onViewDetachedFromWindow(View v) { if (field.getParent() == bar) bar.removeView(field); }
+        });
 
         Runnable[] render = new Runnable[1];
         render[0] = () -> {
@@ -132,6 +140,37 @@ final class VodSearch {
         indexKey = key;
         render.run();
     }
+
+    /**
+     * The row at the very top of the screen holding the screen title ("MOVIES" / "SERIES"): the search bar goes there,
+     * to the right of the title and lined up with it. The title is wrapped in that row the first time; the row is
+     * emptied of any older search bar.
+     */
+    private static LinearLayout headerSlot(MainActivity a) {
+        View top = a.root.getChildAt(0);
+        LinearLayout row;
+        if (top instanceof LinearLayout && HEADER.equals(top.getTag())) {
+            row = (LinearLayout) top;
+            while (row.getChildCount() > 1) row.removeViewAt(1);
+        } else {
+            ViewGroup.LayoutParams lp = top.getLayoutParams();
+            a.root.removeViewAt(0);
+            row = new LinearLayout(a);
+            row.setTag(HEADER);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.addView(top, new LinearLayout.LayoutParams(-2, -1));
+            a.root.addView(row, 0, lp);
+        }
+        LinearLayout slot = new LinearLayout(a);
+        slot.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(0, -2, 1);
+        sp.leftMargin = a.dp(28);
+        row.addView(slot, sp);
+        return slot;
+    }
+
+    private static final String HEADER = "vodsearch_header";
 
     private static void note(MainActivity a, LinearLayout box, String text) {
         TextView t = a.label(text, 17);
