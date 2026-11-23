@@ -5,9 +5,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
-import android.graphics.Rect;
 import android.graphics.RectF;
-import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Handler;
@@ -27,8 +25,8 @@ import java.util.concurrent.Executors;
 
 /**
  * Channel logos (Xtream stream_icon / M3U tvg-logo) shown at the left of channel rows. Logos are downloaded on a
- * small thread pool, shrunk, kept in memory and on disk; until one arrives (or when there is none) the row shows a
- * themed badge with the channel's first letter, so names stay lined up.
+ * small thread pool, shrunk, kept in memory and on disk; until one arrives (or when there is none) the row shows an
+ * empty space the size of a logo, so names stay lined up.
  */
 final class ChannelIcons {
     private static final int MAX_PX = 160;
@@ -44,7 +42,7 @@ final class ChannelIcons {
 
     private ChannelIcons() { }
 
-    /** Puts the channel's logo (or a letter badge) at the start of the row. */
+    /** Puts the channel's logo (or an empty space) at the start of the row. */
     static void attach(TextView row, String url, String name, int heightDp) {
         Context c = row.getContext();
         int h = dp(c, heightDp), w = h * 4 / 3;
@@ -110,38 +108,14 @@ final class ChannelIcons {
         return d;
     }
 
-    /** A rounded themed tile with the channel's first letter, for channels without a logo. */
-    private static final Map<String, Bitmap> BADGES = new java.util.HashMap<>();
-
+    /**
+     * No logo (or not loaded yet): an empty space the size of a logo, so channel names stay lined up.
+     * Eddie asked for the logo or nothing, never a box with a letter or number in it.
+     */
     private static Drawable badge(Context c, String name, int w, int h) {
-        String letter = "?";
-        if (name != null) for (int i = 0; i < name.length(); i++) {
-            char ch = name.charAt(i);
-            if (Character.isLetterOrDigit(ch)) { letter = String.valueOf(Character.toUpperCase(ch)); break; }
-        }
-        String cacheKey = Theme.key + "|" + letter + "|" + w + "x" + h;
-        Bitmap made = BADGES.get(cacheKey);
-        if (made == null) { made = drawBadge(letter, w, h); BADGES.put(cacheKey, made); }
-        BitmapDrawable d = new BitmapDrawable(c.getResources(), made);
+        android.graphics.drawable.ColorDrawable d = new android.graphics.drawable.ColorDrawable(0);
         d.setBounds(0, 0, w, h);
         return d;
-    }
-
-    private static Bitmap drawBadge(String letter, int w, int h) {
-        Bitmap box = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
-        Canvas cv = new Canvas(box);
-        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        p.setColor(Theme.alpha(Theme.FOCUS, 0x90));
-        float r = h * .2f;
-        cv.drawRoundRect(new RectF(0, 0, w, h), r, r, p);
-        p.setColor(Theme.TEXT);
-        p.setTextSize(h * .55f);
-        p.setTypeface(Typeface.DEFAULT_BOLD);
-        p.setTextAlign(Paint.Align.CENTER);
-        Rect bounds = new Rect();
-        p.getTextBounds(letter, 0, letter.length(), bounds);
-        cv.drawText(letter, w / 2f, h / 2f + bounds.height() / 2f, p);
-        return box;
     }
 
     private static int dp(Context c, int n) { return (int) (c.getResources().getDisplayMetrics().density * n + .5f); }
