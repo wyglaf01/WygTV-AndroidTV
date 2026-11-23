@@ -27,7 +27,7 @@ import java.net.URL;
  * (playlists, favourites and settings are kept).
  */
 final class Updater {
-    static final String RELEASE = "https://github.com/wyglaf01/WygTV-AndroidTV/releases/latest/download/";
+    static final String RELEASE = "https://github.com/wyglaf01/WygTV-AndroidTV/releases/download/wygtvorg-latest/";
     static final String PREF_AUTO = "update_check_startup";
     /** versionCode WygTV had when it started installing an update; read again on the next start. */
     static final String PREF_FROM = "update_from";
@@ -52,7 +52,7 @@ final class Updater {
         if (now <= from) return; // the install was cancelled or failed; the download is kept for next time
         a.prefs.edit().remove(PREF_FROM).remove("update_downloaded").apply();
         try { ApkProvider.file(a).delete(); } catch (Exception ignored) { }
-        Toast.makeText(a, "WygTV updated to " + installedName(a) + ". Welcome back!", Toast.LENGTH_LONG).show();
+        Toast.makeText(a, "WygTVorg updated to " + installedName(a) + ". Welcome back!", Toast.LENGTH_LONG).show();
     }
 
     /** Called once at start-up: quietly offers an update when there is one. */
@@ -62,18 +62,18 @@ final class Updater {
 
     /** Looks for a newer WygTV. When {@code manual}, also says so when it is already up to date or the check fails. */
     static void check(MainActivity a, boolean manual) {
-        if (manual) Toast.makeText(a, "Checking for a WygTV update…", Toast.LENGTH_SHORT).show();
+        if (manual) Toast.makeText(a, "Checking for a WygTVorg update…", Toast.LENGTH_SHORT).show();
         new Thread(() -> {
             JSONObject info = null;
             try { info = new JSONObject(new String(fetch(RELEASE + "version.json"), "UTF-8")); } catch (Exception ignored) { }
             final JSONObject latest = info;
             a.runOnUiThread(() -> {
                 if (a.isFinishing()) return;
-                if (latest == null) { if (manual) Menus.alert(a, "Couldn't reach the WygTV update page. Check the internet connection and try again."); return; }
+                if (latest == null) { if (manual) Menus.alert(a, "Couldn't reach the WygTVorg update page. Check the internet connection and try again."); return; }
                 int code = latest.optInt("versionCode", -1), mine = installedCode(a);
                 String name = latest.optString("versionName", String.valueOf(code));
-                if (!isNewer(code, mine)) { if (manual) Toast.makeText(a, "WygTV " + installedName(a) + " is the latest version.", Toast.LENGTH_LONG).show(); return; }
-                new Dialogs.Builder(a).setTitle("WygTV update available")
+                if (!isNewer(code, mine)) { if (manual) Toast.makeText(a, "WygTVorg " + installedName(a) + " is the latest version.", Toast.LENGTH_LONG).show(); return; }
+                new Dialogs.Builder(a).setTitle("WygTVorg update available")
                         .setMessage("Version " + name + " is ready (you have " + installedName(a) + ").\n\nIt installs over this one, and your playlists, favourites and settings are kept.")
                         .setPositiveButton("Update now", (d, w) -> download(a, name, code))
                         .setNegativeButton("Later", null).show();
@@ -85,13 +85,13 @@ final class Updater {
         // Already downloaded (e.g. the person went to allow installs first): go straight to installing.
         if (ApkProvider.file(a).exists() && a.prefs.getInt("update_downloaded", -1) == code) { install(a); return; }
         a.prefs.edit().remove("update_downloaded").apply();
-        AlertDialog progress = new Dialogs.Builder(a).setTitle("Downloading WygTV " + name).setMessage("Starting…").setCancelable(false).show();
+        AlertDialog progress = new Dialogs.Builder(a).setTitle("Downloading WygTVorg " + name).setMessage("Starting…").setCancelable(false).show();
         new Thread(() -> {
             File apk = ApkProvider.file(a);
             String error = null;
             try {
                 apk.getParentFile().mkdirs();
-                HttpURLConnection c = open(RELEASE + "wygtv.apk");
+                HttpURLConnection c = open(RELEASE + "wygtvorg.apk");
                 int total = c.getContentLength();
                 try (InputStream in = c.getInputStream(); OutputStream out = new FileOutputStream(apk)) {
                     byte[] buf = new byte[64 * 1024];
@@ -132,17 +132,17 @@ final class Updater {
         waitingForPermission = false;
         // Android always closes an app while it installs a new version of it, so say so first
         // instead of WygTV just vanishing from the screen.
-        new Dialogs.Builder(a).setTitle("WygTV will close to update")
-                .setMessage("Android closes WygTV while the new version installs. That's normal, nothing has crashed.\n\n"
-                        + "After you choose Install on the next screen, WygTV reopens by itself when it's done. "
-                        + "If it doesn't, open WygTV again from the Home screen. Your playlists, favourites and settings are kept.")
+        new Dialogs.Builder(a).setTitle("WygTVorg will close to update")
+                .setMessage("Android closes WygTVorg while the new version installs. That's normal, nothing has crashed.\n\n"
+                        + "After you choose Install on the next screen, WygTVorg reopens by itself when it's done. "
+                        + "If it doesn't, open WygTVorg again from the Home screen. Your playlists, favourites and settings are kept.")
                 .setPositiveButton("Install now", (d, w) -> startInstall(a))
                 .setNegativeButton("Later", null).show();
     }
 
     private static void startInstall(MainActivity a) {
         a.prefs.edit().putInt(PREF_FROM, installedCode(a)).commit();
-        Toast.makeText(a, "Installing the WygTV update…", Toast.LENGTH_SHORT).show();
+        Toast.makeText(a, "Installing the WygTVorg update…", Toast.LENGTH_SHORT).show();
         new Thread(() -> {
             String error = null;
             try { installWithSession(a); } catch (Exception e) { error = e.getMessage(); }
@@ -157,8 +157,8 @@ final class Updater {
         if (!waitingForPermission || !ApkProvider.file(a).exists()) return;
         if (canInstall(a)) { install(a); return; }
         waitingForPermission = false;
-        new Dialogs.Builder(a).setTitle("WygTV still can't install updates")
-                .setMessage("The update is downloaded. Allow WygTV to install apps, then press Back and it installs straight away.")
+        new Dialogs.Builder(a).setTitle("WygTVorg still can't install updates")
+                .setMessage("The update is downloaded. Allow WygTVorg to install apps, then press Back and it installs straight away.")
                 .setPositiveButton("Open setting", (d, w) -> askPermission(a))
                 .setNegativeButton("Cancel", null).show();
     }
@@ -167,10 +167,10 @@ final class Updater {
         waitingForPermission = true;
         try {
             a.startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + a.getPackageName())));
-            Toast.makeText(a, "Turn on \"Allow from this source\" for WygTV, then press Back. The update installs right away.", Toast.LENGTH_LONG).show();
+            Toast.makeText(a, "Turn on \"Allow from this source\" for WygTVorg, then press Back. The update installs right away.", Toast.LENGTH_LONG).show();
         } catch (Exception e) {
             waitingForPermission = false;
-            Menus.alert(a, "Allow WygTV to install apps: Settings > Apps > Special app access > Install unknown apps (on Fire TV: Settings > My Fire TV > Developer options > Install unknown apps). Then choose Update again; the download is kept.");
+            Menus.alert(a, "Allow WygTVorg to install apps: Settings > Apps > Special app access > Install unknown apps (on Fire TV: Settings > My Fire TV > Developer options > Install unknown apps). Then choose Update again; the download is kept.");
         }
     }
 
@@ -211,7 +211,7 @@ final class Updater {
         switch (status) {
             case PackageInstaller.STATUS_FAILURE_CONFLICT:
             case PackageInstaller.STATUS_FAILURE_INCOMPATIBLE:
-                return "This update can't install over the WygTV you have, because it was signed differently. Back up in Settings, uninstall WygTV once, install it again from the Downloader code, then restore.";
+                return "This update can't install over the WygTVorg you have, because it was signed differently. Back up in Settings, uninstall WygTVorg once, install it again from the Downloader code, then restore.";
             case PackageInstaller.STATUS_FAILURE_STORAGE:
                 return "There isn't enough space on this TV for the update.";
             case PackageInstaller.STATUS_FAILURE_ABORTED:
@@ -226,7 +226,7 @@ final class Updater {
         c.setConnectTimeout(15000);
         c.setReadTimeout(30000);
         c.setInstanceFollowRedirects(true);
-        c.setRequestProperty("User-Agent", "WygTV");
+        c.setRequestProperty("User-Agent", "WygTVorg");
         if (c.getResponseCode() != 200) { c.disconnect(); throw new Exception("HTTP " + c.getResponseCode()); }
         return c;
     }

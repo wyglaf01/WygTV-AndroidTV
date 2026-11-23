@@ -98,7 +98,7 @@ final class NavRail {
             entries.get(keys.get(i)).run();
         }
         if (gap >= keys.size()) rail.addView(new View(a), new LinearLayout.LayoutParams(-1, 0, 1));
-        // Small Exit at the very bottom: asks "Quit WygTV?" first.
+        // Small Exit at the very bottom: asks "Quit WygTVorg?" first.
         add("⏻", "Exit", "exit", current, () -> a.confirmExit());
         TextView exit = items.get(items.size() - 1);
         exit.setTextSize(16);

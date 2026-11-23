@@ -90,7 +90,7 @@ final class AirTv {
         new Dialogs.Builder(a).setTitle("📡 " + nameOf(a.prefs) + " added")
                 .setMessage("It's now in the side menu, on Home and in Live TV, in the same places as an HDHomeRun tuner.\n\n"
                         + "AirTV boxes don't share their channels with other apps the way HDHomeRun does: they only play in the free Sling TV app "
-                        + "(no subscription needed for antenna channels). So pressing 📡 " + nameOf(a.prefs) + " opens Sling, and Back returns to WygTV."
+                        + "(no subscription needed for antenna channels). So pressing 📡 " + nameOf(a.prefs) + " opens Sling, and Back returns to WygTVorg."
                         + (slingInstalled(a) ? "" : "\n\nSling TV isn't installed on this TV yet: the first press offers to install it."))
                 .setPositiveButton("OK", null).show();
     }

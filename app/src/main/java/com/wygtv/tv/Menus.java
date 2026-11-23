@@ -57,7 +57,7 @@ final class Menus {
         heading.setTypeface(null, Typeface.BOLD);
         heading.setGravity(Gravity.CENTER);
         center.addView(heading, new LinearLayout.LayoutParams(-1, a.dp(56)));
-        TextView hint = a.label("Pick how your provider gave you access, or restore a WygTV backup. You can add more playlists later from the menu.", 16);
+        TextView hint = a.label("Pick how your provider gave you access, or restore a WygTVorg backup. You can add more playlists later from the menu.", 16);
         hint.setTextColor(Theme.MUTED);
         hint.setGravity(Gravity.CENTER);
         center.addView(hint, new LinearLayout.LayoutParams(-1, a.dp(40)));
@@ -450,7 +450,7 @@ final class Menus {
             row(a, list, groupIcon(GROUP_PLAYLISTS) + "  " + groupTitle(GROUP_PLAYLISTS), "playlists, HDHomeRun, AirTV, manage categories, hide and show channels, channel groups, TV guides (EPG)", () -> settingsGroup(a, GROUP_PLAYLISTS));
             row(a, list, groupIcon(GROUP_PLAYER) + "  " + groupTitle(GROUP_PLAYER), "built-in or external player, live stream format, buffer, video decoder, subtitles, watched series, play next", () -> settingsGroup(a, GROUP_PLAYER));
             row(a, list, groupIcon(GROUP_APPEARANCE) + "  " + groupTitle(GROUP_APPEARANCE), "theme, glass effect, app mode, start-up screen, side menu order, Exit button, guide rows, channel order, live preview, movie and series info, IMDb ratings", () -> settingsGroup(a, GROUP_APPEARANCE));
-            row(a, list, groupIcon(GROUP_BACKUP) + "  " + groupTitle(GROUP_BACKUP), "back up, restore, check for updates  •  WygTV " + Updater.installedName(a), () -> settingsGroup(a, GROUP_BACKUP));
+            row(a, list, groupIcon(GROUP_BACKUP) + "  " + groupTitle(GROUP_BACKUP), "back up, restore, check for updates  •  WygTVorg " + Updater.installedName(a), () -> settingsGroup(a, GROUP_BACKUP));
         } else if (g.equals(GROUP_PLAYLISTS)) {
             row(a, list, "Manage playlists", Manage.playlistSummary(a) + "  •  press OK to add, edit, refresh, delete or turn playlists on and off", () -> { playlistsFromSettings = true; playlists(a); });
             final int onOffRow = list.getChildCount();
@@ -505,10 +505,10 @@ final class Menus {
             });
         } else if (g.equals(GROUP_PLAYER)) {
             final int playerRow = list.getChildCount();
-            row(a, list, "Player", ExternalPlayer.label(a) + "  •  press OK to keep WygTV's own player or use another video app such as VLC or MX Player", () -> choosePlayer(a, playerRow));
+            row(a, list, "Player", ExternalPlayer.label(a) + "  •  press OK to keep WygTVorg's own player or use another video app such as VLC or MX Player", () -> choosePlayer(a, playerRow));
             if (!ExternalPlayer.choice(a.prefs).isEmpty()) {
                 final int forRow = list.getChildCount();
-                row(a, list, "Use the external player for", ExternalPlayer.FOR_LABELS[ExternalPlayer.forIndex(ExternalPlayer.forKey(a.prefs))] + "  •  everything else plays in WygTV's own player", () ->
+                row(a, list, "Use the external player for", ExternalPlayer.FOR_LABELS[ExternalPlayer.forIndex(ExternalPlayer.forKey(a.prefs))] + "  •  everything else plays in WygTVorg's own player", () ->
                         choose(a, "Use the external player for", ExternalPlayer.FOR_LABELS, ExternalPlayer.forIndex(ExternalPlayer.forKey(a.prefs)), i -> {
                             a.prefs.edit().putString(ExternalPlayer.PREF_FOR, ExternalPlayer.FOR_KEYS[i]).apply();
                             settings(a, forRow);
@@ -642,17 +642,17 @@ final class Menus {
             final int omdbRow = list.getChildCount();
             keyRow(a, list, "IMDb ratings (OMDb)", Omdb.PREF_KEY, Omdb.builtInKey(), "OMDb", "IMDb, Rotten Tomatoes and Metacritic ratings, plus plots and cast", omdbRow);
         } else {
-            row(a, list, "Back up playlists", "save playlists, favorites, your categories, My List, hidden items and all settings to a dated WygTV backup file", () -> Backup.backup(a));
-            row(a, list, "Restore from a backup", "reload everything from a WygTV backup file", () -> Backup.restore(a));
-            row(a, list, "Check for updates", "WygTV " + Updater.installedName(a) + "  •  press OK to look for a newer version and install it over this one", () -> Updater.check(a, true));
+            row(a, list, "Back up playlists", "save playlists, favorites, your categories, My List, hidden items and all settings to a dated WygTVorg backup file", () -> Backup.backup(a));
+            row(a, list, "Restore from a backup", "reload everything from a WygTVorg backup file", () -> Backup.restore(a));
+            row(a, list, "Check for updates", "WygTVorg " + Updater.installedName(a) + "  •  press OK to look for a newer version and install it over this one", () -> Updater.check(a, true));
             final int autoRow = list.getChildCount();
             boolean auto = a.prefs.getBoolean(Updater.PREF_AUTO, true);
-            row(a, list, "Look for updates at start-up", auto ? "On  •  offers new versions when WygTV opens" : "Off", () -> {
+            row(a, list, "Look for updates at start-up", auto ? "On  •  offers new versions when WygTVorg opens" : "Off", () -> {
                 a.prefs.edit().putBoolean(Updater.PREF_AUTO, !a.prefs.getBoolean(Updater.PREF_AUTO, true)).apply();
                 settings(a, autoRow);
             });
             String version = Updater.installedName(a);
-            final String about = "WygTV " + version + " for Android TV";
+            final String about = "WygTVorg " + version + " for Android TV";
             row(a, list, "About", about, () -> Toast.makeText(a, about, Toast.LENGTH_SHORT).show());
         }
         int i = Math.max(0, Math.min(focusIndex, list.getChildCount() - 1));
@@ -715,7 +715,7 @@ final class Menus {
         box.setPadding(a.dp(20), a.dp(8), a.dp(20), 0);
         TextView help = a.label(tmdb
                 ? "Get a free key at themoviedb.org → Settings → API, then type the \"API Key\" here. Movie and series pages then show TMDb posters, plots, cast, ratings and age ratings."
-                : "Get a free key at omdbapi.com → API Key (the free plan allows 1,000 lookups a day; WygTV saves each answer for two weeks). Movie and series pages then show IMDb, Rotten Tomatoes and Metacritic ratings.", 15);
+                : "Get a free key at omdbapi.com → API Key (the free plan allows 1,000 lookups a day; WygTVorg saves each answer for two weeks). Movie and series pages then show IMDb, Rotten Tomatoes and Metacritic ratings.", 15);
         help.setTextColor(Theme.MUTED);
         box.addView(help, new LinearLayout.LayoutParams(-1, -2));
         EditText field = new EditText(a);
@@ -870,7 +870,7 @@ final class Menus {
         java.util.List<android.content.pm.ResolveInfo> apps = ExternalPlayer.apps(a);
         java.util.List<String> keys = new java.util.ArrayList<>();
         java.util.List<String> labels = new java.util.ArrayList<>();
-        keys.add(""); labels.add("WygTV built-in player (default)");
+        keys.add(""); labels.add("WygTVorg built-in player (default)");
         for (android.content.pm.ResolveInfo r : apps) {
             keys.add(r.activityInfo.packageName);
             labels.add(r.loadLabel(a.getPackageManager()) + "  (external)");

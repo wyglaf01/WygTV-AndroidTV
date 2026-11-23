@@ -28,7 +28,7 @@ final class AutoRefresh {
     /** How often: "start" (every start-up), "6" / "12" / "24" hours, or "manual" (only when asked). */
     static final String PREF_EVERY = "refresh_every";
     static final String[] EVERY_KEYS = {"start", "6", "12", "24", "manual"};
-    static final String[] EVERY_LABELS = {"Every time WygTV starts", "Every 6 hours", "Every 12 hours", "Every 24 hours", "Only when I press Update now"};
+    static final String[] EVERY_LABELS = {"Every time WygTVorg starts", "Every 6 hours", "Every 12 hours", "Every 24 hours", "Only when I press Update now"};
     static final String EVERY_DEFAULT = "12";
     /** true (default): a new playlist or guide link loads right away. false: it loads the first time it is opened. */
     static final String PREF_ON_ADD = "refresh_on_add";

@@ -286,7 +286,7 @@ final class Subtitles {
 
     void pickFile() {
         if (Build.VERSION.SDK_INT >= 23 && a.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            toast("Allow WygTV to read files, then choose this again.");
+            toast("Allow WygTVorg to read files, then choose this again.");
             a.requestPermissions(new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, REQ_FILES);
             return;
         }

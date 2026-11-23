@@ -1,3 +1,13 @@
+# WygTVorg (Android only)
+
+WygTVorg is a separate app made from WygTV, with the **built-in Free TV playlist** (public iptv-org US channels) turned on out of the box. It installs next to WygTV (app ID `com.wygtv.org`), has its own name and TV banner, and updates itself from its own release:
+
+**Download:** https://github.com/wyglaf01/WygTV-AndroidTV/releases/download/wygtvorg-latest/wygtvorg.apk
+
+This branch is Android only (no WygDesktop, Mac or iOS builds). Backups use the same file format and folder as WygTV, so a WygTV backup restores into WygTVorg.
+
+---
+
 # WygTv v2.0 — Four-option opening screen
 
 Opens directly to a glass-themed Home dashboard with Manage / Login to Playlist, Live TV, Movies and Series. Live TV, Movies and Series use the selected saved playlist or offer a playlist picker; credentials are not requested on every startup. Existing cascading menus, themes and launcher icon remain.

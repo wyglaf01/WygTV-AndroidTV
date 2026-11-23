@@ -74,7 +74,7 @@ final class ExternalPlayer {
     /** What the Settings row shows. */
     static String label(MainActivity a) {
         String c = choice(a.prefs);
-        if (c.isEmpty()) return "WygTV built-in player (default)";
+        if (c.isEmpty()) return "WygTVorg built-in player (default)";
         String who = ASK.equals(c) ? "an external app (Android asks which)" : appName(a, c) + " (external)";
         return who + "  •  for " + FOR_LABELS[forIndex(forKey(a.prefs))].toLowerCase(java.util.Locale.ROOT);
     }
@@ -97,7 +97,7 @@ final class ExternalPlayer {
             }
             return true;
         } catch (ActivityNotFoundException | SecurityException e) {
-            Toast.makeText(a, "The external player isn't installed any more. Playing in WygTV. Settings > Manage player > Player changes it.", Toast.LENGTH_LONG).show();
+            Toast.makeText(a, "The external player isn't installed any more. Playing in WygTVorg. Settings > Manage player > Player changes it.", Toast.LENGTH_LONG).show();
             return false;
         }
     }
