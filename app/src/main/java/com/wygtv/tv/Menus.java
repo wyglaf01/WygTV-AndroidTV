@@ -156,8 +156,9 @@ final class Menus {
             else if (which == 3) Manage.categories(a, p, () -> playlists(a));
             else if (which == 4) guideSource(a, p, () -> playlists(a));
             else new Dialogs.Builder(a).setTitle("Delete “" + p.optString("title", "Playlist") + "”?")
-                        .setMessage("Its favorites stay saved, so they come back if you add the same playlist again.")
+                        .setMessage(FreeTv.is(p) ? "You can add it back any time in Settings > Manage playlists > Free TV channels." : "Its favorites stay saved, so they come back if you add the same playlist again.")
                         .setPositiveButton("Delete", (d2, w2) -> {
+                            if (FreeTv.is(p)) a.prefs.edit().putBoolean(FreeTv.REMOVED, true).apply();
                             a.library.remove(p.optString("id"));
                             a.forgetPlaylistData();
                             if (a.library.isEmpty()) setup(a); else playlists(a);
@@ -462,6 +463,8 @@ final class Menus {
                     () -> { if (tuners.isEmpty()) hdhrForm(a, null); else tunerList(a); });
             final int airRow = list.getChildCount();
             row(a, list, "AirTV antenna TV", AirTv.summary(a), () -> AirTv.settings(a, () -> settings(a, airRow)));
+            final int freeRow = list.getChildCount();
+            row(a, list, "Free TV channels", FreeTv.summary(a), () -> FreeTv.toggle(a, () -> settings(a, freeRow)));
             final int catsRow = list.getChildCount();
             row(a, list, "Manage categories", Manage.categorySummary(a) + "  •  press OK to tick the categories to show, playlist by playlist",
                     () -> Manage.categories(a, () -> settings(a, catsRow)));
