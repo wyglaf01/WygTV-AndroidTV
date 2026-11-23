@@ -80,19 +80,19 @@
       return h('div', { class: 'home' },
         h('div', { class: 'home-top' },
           h('img', { class: 'home-logo', src: 'assets/icon.png', alt: '' }),
-          h('div', { class: 'home-brand' }, h('div', { class: 'brand' }, 'WygDesktop'), h('div', { class: 'brand-sub' }, 'Live TV · Movies · Series · Antenna')),
+          h('div', { class: 'home-brand' }, h('div', { class: 'brand' }, W.brand), h('div', { class: 'brand-sub' }, 'Live TV · Movies · Series · Antenna')),
           h('div', { class: 'clock big' }, W.fmtTime(Date.now()))),
         h('div', { class: 'tiles' }, tiles.map(([k, icon, label, fn], i) => btn({ class: 'tile', 'data-k': k, 'data-autofocus': i === 0 ? '' : null, onclick: fn },
           h('div', { class: 'tile-icon' }, icon), h('div', { class: 'tile-label' }, label)))),
         h('div', { class: 'tiles small' }, row2.map(([k, icon, label, fn]) => btn({ class: 'tile small', 'data-k': k, onclick: fn },
           h('div', { class: 'tile-icon' }, icon), h('div', { class: 'tile-label' }, label)))),
         recentRow, contRow, status,
-        h('div', { class: 'keys-hint' }, 'Arrows move · Enter plays · hold Enter or right-click for options · Esc goes back · S searches · F11 full screen'));
+        h('div', { class: 'keys-hint' }, W.isIOS ? 'Tap to open or play · touch and hold for options · ‹ or swipe from the left edge goes back' : 'Arrows move · Enter plays · hold Enter or right-click for options · Esc goes back · S searches · F11 full screen'));
     },
     welcome() {
       return h('div', { class: 'home welcome' },
         h('img', { class: 'welcome-logo', src: 'assets/icon.png', alt: '' }),
-        h('div', { class: 'brand' }, 'Welcome to WygDesktop'),
+        h('div', { class: 'brand' }, 'Welcome to ' + W.brand),
         h('div', { class: 'welcome-text' }, 'Add your IPTV service or antenna tuner to get started.'),
         h('div', { class: 'tiles' },
           btn({ class: 'tile', 'data-autofocus': '', onclick: () => W.addPlaylist('xtream') }, h('div', { class: 'tile-icon' }, '🔑'), h('div', { class: 'tile-label' }, 'Xtream login')),
@@ -132,7 +132,7 @@
       { label: fav ? '★ Remove from Favorites' : '☆ Add to Favorites', action: () => { const on = W.toggleFav(ch.key); W.toast(on ? 'Added to Favorites' : 'Removed from Favorites'); ctx.changed && ctx.changed(); } },
       { label: '▦ Show in TV Guide', action: () => W.go('guide', { sel: ctx.sel, focus: ch.key }) },
       { label: '⚙ Play converted with FFmpeg', sub: 'For channels with no sound or no picture', action: () => W.player.play({ kind: 'live', key: ch.key, name: ch.name, url: ch.url, num: ch.num, convert: 'x264', ch }, { full: true, list: ctx.list, sel: ctx.sel }) },
-      { label: '↗ Open in VLC / mpv', action: () => W.api.ext.play(W.settings.extPlayer, ch.url, ch.name).catch((e) => W.alert('External player', e.message)) },
+      { label: '↗ Open in ' + W.extLabel, action: () => W.api.ext.play(W.settings.extPlayer, ch.url, ch.name).catch((e) => W.alert('External player', e.message)) },
     ]);
   };
 

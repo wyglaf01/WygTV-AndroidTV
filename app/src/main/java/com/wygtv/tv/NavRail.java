@@ -78,14 +78,16 @@ final class NavRail {
                 entries.put("series", () -> add("▤", "Series", "series", current, () -> a.browseVod("series")));
             }
             java.util.List<org.json.JSONObject> tuners = Antenna.tuners(a);
-            if (!tuners.isEmpty()) entries.put("antenna", () -> {
+            boolean airTv = AirTv.isOn(a.prefs);
+            if (!tuners.isEmpty() || airTv) entries.put("antenna", () -> {
                 for (org.json.JSONObject t : tuners) { // each HDHomeRun tuner
                     String id = Antenna.PREFIX + t.optString("id");
                     add("📡", Antenna.nameOf(t), id, current, () -> a.showGuide(id, null, true)); // full TV guide of its channels
                 }
+                if (airTv) add("📡", AirTv.nameOf(a.prefs), "airtv", current, () -> AirTv.open(a)); // opens the Sling app
             });
             entries.put("msearch", () -> add("⌕", "Search", "msearch", current, () -> MasterSearch.show(a)));
-            entries.put("playlists", () -> add("☰", "Playlists", "playlists", current, () -> a.playlists()));
+            entries.put("playlists", () -> add("☰", "Playlists", "playlists", current, () -> { Menus.playlistsFromSettings = false; a.playlists(); }));
             entries.put("settings", () -> add("⚙", "Settings", "settings", current, () -> a.settings()));
         }
         java.util.List<String> keys = new ArrayList<>();

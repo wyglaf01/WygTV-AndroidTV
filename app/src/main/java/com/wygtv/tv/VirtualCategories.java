@@ -173,6 +173,12 @@ final class VirtualCategories {
                 .setNegativeButton("Cancel", null).show();
     }
 
+    /** Makes a new channel group (asks its name) with this channel in it. */
+    static void addToNew(MainActivity a, JSONObject item) {
+        String playlist = item.optString("playlist", "").isEmpty() ? a.library.activeId() : item.optString("playlist");
+        create(a, cat -> toggle(a, cat, item, playlist));
+    }
+
     private static void toggle(MainActivity a, JSONObject cat, JSONObject item, String playlist) {
         String sid = item.optString("stream_id");
         boolean had = contains(cat, playlist, sid);

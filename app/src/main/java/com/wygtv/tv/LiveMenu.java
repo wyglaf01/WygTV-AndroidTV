@@ -58,6 +58,7 @@ final class LiveMenu {
         a.button("⌕ Search", a.side, a::searchLive);
         a.button("▦ Full TV guide", a.side, () -> a.openGuide(null));
         Antenna.addMenuEntries(a);
+        if (AirTv.isOn(a.prefs)) a.button("📡 " + AirTv.nameOf(a.prefs), a.side, () -> AirTv.open(a)); // opens Sling (AirTV has no open channel list)
         JSONArray mine = VirtualCategories.all(a);
         for (int i = 0; i < mine.length(); i++) {
             JSONObject c = mine.optJSONObject(i);
@@ -89,6 +90,7 @@ final class LiveMenu {
         android.widget.TextView want = focusOnOpen == null ? null : picks.get(focusOnOpen);
         focusOnOpen = null;
         if (want != null && a.resumeStreamId == null) want.requestFocus();
+        restyle(a);
     }
 
     private static final android.os.Handler UI = new android.os.Handler(android.os.Looper.getMainLooper());
@@ -178,6 +180,7 @@ final class LiveMenu {
             String id = Antenna.PREFIX + t.optString("id");
             compact(a, "📡", Antenna.nameOf(t), false, () -> a.showGuide(id, null, true));
         }
+        if (AirTv.isOn(a.prefs)) compact(a, "📡", AirTv.nameOf(a.prefs), false, () -> AirTv.open(a));
         JSONArray mine = VirtualCategories.all(a);
         for (int i = 0; i < mine.length(); i++) {
             JSONObject c = mine.optJSONObject(i);
@@ -263,6 +266,70 @@ final class LiveMenu {
             return true;
         }
         return false;
+    }
+
+    // ---------------------------------------------------------------- menu shrinks while you are in the guide
+
+    /** Width of a collapsed menu column (the compact first tier, and the menu while focus is in the guide). */
+    static final int NARROW_DP = 150;
+    private static android.view.View menuScroll;
+    private static boolean collapsed;
+
+    /**
+     * Called by browse() (Live TV, Movies and Series) with the menu column. Once you pick something and focus moves into the guide or the
+     * preview, the menu shrinks to a narrow column on the left (short one-line labels); moving back into it opens
+     * it to full width again.
+     */
+    static void watchFocus(MainActivity a, android.view.View categoryScroll) {
+        menuScroll = categoryScroll;
+        collapsed = false;
+        String screen = a.mode; // Live TV, Movies or Series
+        android.view.ViewTreeObserver.OnGlobalFocusChangeListener track = (oldFocus, newFocus) -> {
+            if (newFocus == null || menuScroll != categoryScroll || !screen.equals(a.mode)) return;
+            if (inside(newFocus, categoryScroll)) setCollapsed(a, false);
+            else if (parentScroll == null || !inside(newFocus, parentScroll)) setCollapsed(a, true);
+        };
+        categoryScroll.addOnAttachStateChangeListener(new android.view.View.OnAttachStateChangeListener() {
+            android.view.ViewTreeObserver observer;
+            @Override public void onViewAttachedToWindow(android.view.View v) { observer = v.getViewTreeObserver(); observer.addOnGlobalFocusChangeListener(track); }
+            @Override public void onViewDetachedFromWindow(android.view.View v) { if (observer != null && observer.isAlive()) observer.removeOnGlobalFocusChangeListener(track); observer = null; }
+        });
+    }
+
+    private static boolean inside(android.view.View v, android.view.View group) {
+        for (android.view.ViewParent p = v.getParent(); p != null; p = p.getParent()) if (p == group) return true;
+        return v == group;
+    }
+
+    /** Shrinks the menu column to {@link #NARROW_DP} with short labels, or opens it back to its full width. */
+    private static void setCollapsed(MainActivity a, boolean on) {
+        if (collapsed == on || menuScroll == null) return;
+        collapsed = on;
+        android.widget.LinearLayout.LayoutParams lp = (android.widget.LinearLayout.LayoutParams) menuScroll.getLayoutParams();
+        lp.width = on ? a.dp(NARROW_DP) : 0;
+        lp.weight = on ? 0 : 1;
+        menuScroll.setLayoutParams(lp);
+        for (int i = 0; i < a.side.getChildCount(); i++) {
+            if (!(a.side.getChildAt(i) instanceof android.widget.TextView)) continue;
+            android.widget.TextView v = (android.widget.TextView) a.side.getChildAt(i);
+            narrow(a, v, on);
+        }
+    }
+
+    /** One menu entry in its narrow (one short line) or full look. */
+    private static void narrow(MainActivity a, android.widget.TextView v, boolean on) {
+        v.setTextSize(on ? 16 : 21);
+        v.setMaxLines(on ? 1 : Integer.MAX_VALUE);
+        v.setEllipsize(on ? android.text.TextUtils.TruncateAt.END : null);
+        if (on) v.setPadding(a.dp(10), a.dp(9), a.dp(6), a.dp(9));
+        else v.setPadding(a.dp(18), a.dp(13), a.dp(12), a.dp(13));
+    }
+
+    /** New entries added while the menu is narrow (the menu was rebuilt) get the narrow look too. */
+    static void restyle(MainActivity a) {
+        if (!collapsed) return;
+        for (int i = 0; i < a.side.getChildCount(); i++)
+            if (a.side.getChildAt(i) instanceof android.widget.TextView) narrow(a, (android.widget.TextView) a.side.getChildAt(i), true);
     }
 
     /** Back in Live TV: from the categories tier go up to the first tier. False when already at the top. */

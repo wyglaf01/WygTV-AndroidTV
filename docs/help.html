@@ -18,6 +18,7 @@
     <nav class="links">
       <a href="./#features">Features</a>
       <a href="./#download">Download</a>
+      <a href="builds.html">Builds</a>
       <a href="./#firetv">Fire TV</a>
       <a class="on" href="help.html">Help guide</a>
     </nav>
@@ -31,10 +32,12 @@
     <a class="l2" href="#install-firetv">Fire TV (Downloader)</a>
     <a class="l2" href="#install-androidtv">Android / Google TV</a>
     <a class="l2" href="#install-desktop">Windows &amp; Ubuntu</a>
+    <a class="l2" href="#install-mac">Mac</a>
     <a href="#setup">2. First-time setup</a>
     <a class="l2" href="#setup-xtream">Xtream Codes</a>
     <a class="l2" href="#setup-m3u">M3U link</a>
     <a class="l2" href="#setup-hdhr">HDHomeRun antenna</a>
+    <a class="l2" href="#setup-airtv">AirTV antenna</a>
     <a class="l2" href="#setup-restore">Restore a backup</a>
     <a href="#remote">3. Remote basics</a>
     <a href="#home">4. Home &amp; side menu</a>
@@ -82,6 +85,16 @@
     <p><b>Ubuntu 22.04 and newer:</b> download the <code>.deb</code> and run <code>sudo apt install ./WygDesktop-linux.deb</code>, or download the AppImage, run <code>chmod +x WygDesktop-linux.AppImage</code> and open it.</p>
     <p>WygDesktop has the same playlists, Live TV, TV Guide, Movies and Series. Keys: arrows move, <kbd>Enter</kbd> plays, hold <kbd>Enter</kbd> / right-click / <kbd>M</kbd> for options, <kbd>Esc</kbd> or <kbd>Backspace</kbd> goes back, <kbd>S</kbd> searches, <kbd>F11</kbd> full screen. In the player, <kbd>↑</kbd><kbd>↓</kbd> or <kbd>PgUp</kbd><kbd>PgDn</kbd> change channel, number keys jump to a channel, <kbd>Space</kbd> pauses, <kbd>I</kbd> shows info.</p>
 
+    <h3 id="install-mac">Mac (WygTV-Mac)</h3>
+    <p>WygTV-Mac is the same desktop app for macOS 11 Big Sur and newer. Check  → <b>About This Mac</b>: if it says <b>Chip: Apple M…</b>, download <code>WygTV-Mac-AppleSilicon.dmg</code>; if it says <b>Processor: Intel</b>, download <code>WygTV-Mac-Intel.dmg</code>.</p>
+    <ol>
+      <li>Open the downloaded <code>.dmg</code> and drag <b>WygTV-Mac</b> onto the <b>Applications</b> folder.</li>
+      <li>Open WygTV-Mac from Applications. Because it isn't signed by Apple yet, macOS says it can't check it for malicious software. Click <b>Done</b> (or <b>OK</b>).</li>
+      <li>Open <b>System Settings → Privacy &amp; Security</b>, scroll down to the message about WygTV-Mac and click <b>Open Anyway</b>, then confirm with your password. On macOS 14 and older you can instead right-click WygTV-Mac in Applications, choose <b>Open</b>, then <b>Open</b> again.</li>
+      <li>If macOS ever says the app "is damaged", open Terminal and run <code>xattr -cr /Applications/WygTV-Mac.app</code>, then open it again.</li>
+    </ol>
+    <p>The first time you add an HDHomeRun tuner, allow WygTV-Mac to find devices on your local network. <kbd>⌘</kbd><kbd>Q</kbd> quits, <kbd>⌘</kbd><kbd>V</kbd> pastes playlist addresses and <kbd>F</kbd> toggles full screen in the player. Settings → About &amp; updates → Check for updates downloads newer builds; drag the new one into Applications to replace the old one. External player: install VLC in Applications and WygTV-Mac uses it.</p>
+
     <!-- ============================================================ SETUP -->
     <h2 id="setup">2. First-time setup</h2>
     <p>The first time WygTV opens it shows <b>Welcome to WygTV · Add your first playlist</b> with four choices. Pick the one that matches what your provider gave you. You can add more later from <a href="#playlists">Playlists</a>.</p>
@@ -109,6 +122,14 @@
       <li>The channels appear in Live TV, on Home and in the TV Guide as <b>Antenna TV</b> (or the name you gave the tuner). The guide comes free from the tuner.</li>
     </ol>
     <p>If the tuner has no channels yet, run a channel scan in the HDHomeRun app first, then come back and choose <b>Refresh channels</b> (see <a href="#set-playlists">Manage playlists</a>).</p>
+
+    <h3 id="setup-airtv">📡 AirTV (antenna TV box)</h3>
+    <p>AirTV boxes (AirTV 2, AirTV Anywhere) don't share their channels with other apps the way HDHomeRun does: their channels only play in the free Sling TV app (no subscription needed for antenna channels). WygTV gives your AirTV a button that opens Sling.</p>
+    <ol class="steps">
+      <li>Set up your AirTV in the Sling TV app first.</li>
+      <li>In WygTV, go to Settings → Manage playlists → <b>AirTV antenna TV</b> and choose <b>Turn on</b>.</li>
+      <li><b>📡 AirTV</b> now shows in the side menu, on Home and in Live TV. Press it to open Sling's local channels; Back returns to WygTV. You can rename it there too.</li>
+    </ol>
 
     <h3 id="setup-restore">↺ Restore from a backup</h3>
     <p>Moving to a new TV or reinstalling? Pick a <code>WygTV-backup-….json</code> file and everything comes back: playlists, favorites, channel groups, My List, hidden items and settings. See <a href="#set-backup">Manage app</a> for how to make one.</p>
@@ -145,7 +166,7 @@
       <tr><td>★ Favorites</td><td>Your favorite channels. Highlighted when you open Live TV.</td></tr>
       <tr><td>⌕ Search</td><td>Type part of a channel name. Results come from every visible category.</td></tr>
       <tr><td>▦ Full TV guide</td><td>Opens the full-screen <a href="#guide">TV Guide</a>.</td></tr>
-      <tr><td>📡 Antenna TV</td><td>One entry per HDHomeRun tuner.</td></tr>
+      <tr><td>📡 Antenna TV</td><td>One entry per HDHomeRun tuner, plus 📡 AirTV (opens Sling) when it's turned on.</td></tr>
       <tr><td>◆ Your groups</td><td>Channel groups you made (e.g. "◆ Sports"). Hold OK to rename or delete.</td></tr>
       <tr><td>▤ / ▢ Playlists ›</td><td>Each saved playlist (▤ is the one you're watching). OK opens its categories as a second level.</td></tr>
     </table>
@@ -177,9 +198,11 @@
     <h3>Live channels</h3>
     <table>
       <tr><th>Button</th><th>What it does</th></tr>
-      <tr><td><kbd>CH+</kbd> <kbd>CH−</kbd> or <kbd>▲</kbd> <kbd>▼</kbd></td><td>Next / previous channel in the list you started from (Favorites, a category, a group…).</td></tr>
+      <tr><td><kbd>CH+</kbd> <kbd>CH−</kbd> or <kbd>▲</kbd></td><td>Next / previous channel in the list you started from (Favorites, a category, a group…). ▲ goes to the next channel.</td></tr>
+      <tr><td><kbd>▼</kbd></td><td>Shows the playback controls. They include a <b>CC</b> button: OK on it turns subtitles on or off, picks a subtitle track, and for movies and episodes searches online for subtitles (or loads a file or link). ▼ no longer changes channel; use CH− for that.</td></tr>
       <tr><td>Number keys</td><td>Type a channel number; it switches after a short pause, or press OK to go now.</td></tr>
-      <tr><td><kbd>OK</kbd> / <kbd>Info</kbd></td><td>Channel banner with what's on now and next. OK again shows the playback controls.</td></tr>
+      <tr><td><kbd>OK</kbd></td><td>Channel options: <b>Restart</b> (starts the channel again, handy if it froze), Add to / Remove from Favorites, Add to channel group, New channel group. The channel banner (logo, source, what's on) shows underneath.</td></tr>
+      <tr><td><kbd>Info</kbd></td><td>Channel banner with the channel's logo and what's on now and next.</td></tr>
       <tr><td><kbd>Last</kbd></td><td>Back to the previous channel.</td></tr>
       <tr><td><kbd>Guide</kbd></td><td>Opens the TV Guide.</td></tr>
       <tr><td><kbd>☰ Menu</kbd></td><td>Add/Remove Favorite, Subtitles / CC, What's on (program guide), TV guide, Channel list (jump without leaving), Exit player.</td></tr>
@@ -193,7 +216,7 @@
       <tr><td><kbd>⏪</kbd> <kbd>⏩</kbd></td><td>Skip back / forward 30 seconds.</td></tr>
       <tr><td><kbd>⏯</kbd></td><td>Play / pause.</td></tr>
       <tr><td><kbd>OK</kbd></td><td>Show the playback controls.</td></tr>
-      <tr><td><kbd>☰ Menu</kbd></td><td>Add to My List, Subtitles (pick a language), Exit player.</td></tr>
+      <tr><td><kbd>☰ Menu</kbd></td><td>Add to My List, Subtitles (pick a track, search online, load a file from the TV or a USB drive, load a link, text size), Exit player.</td></tr>
     </table>
     <p>If the connection drops, WygTV shows "Connection dropped. Reconnecting…" and tries again by itself, picking a live channel up at the newest point and a movie where it left off.</p>
 
@@ -214,7 +237,7 @@
     <!-- ============================================================ MINE -->
     <h2 id="mine">9. Favorites, channel groups and hiding</h2>
     <h3>★ Favorites</h3>
-    <p>Hold OK on any channel (or use the player's Menu) and choose <b>Add Favorite</b>. In the TV Guide and the Live TV guide, hold OK on a channel to get the same choices plus Hide channel. The Favorites screen collects favorites from <b>all</b> your playlists, grouped by playlist. Playing one from another playlist switches to it automatically. Deleting a playlist keeps its favorites, so they return if you add it again.</p>
+    <p>Hold OK on any channel (or press OK while watching) and choose <b>Add Favorite</b>. Channels show their playlist logo; a channel without a logo shows just its name. In the TV Guide and the Live TV guide, hold OK on a channel to get the same choices plus Hide channel. The Favorites screen collects favorites from <b>all</b> your playlists, grouped by playlist. Playing one from another playlist switches to it automatically. Deleting a playlist keeps its favorites, so they return if you add it again.</p>
     <h3>◆ Channel groups</h3>
     <p>Your own categories that can mix channels from any playlist, like "Sports" or "Kids". Hold OK on a channel → <b>Add to channel group…</b> → pick a group or <b>New category…</b>. Groups appear in the Live TV menu and the TV Guide's ☰ Showing list. Rename or delete them by holding OK on the group, or in <a href="#set-playlists">Settings → Manage playlists → Channel groups</a>. Deleting a group never deletes the channels.</p>
     <h3>⊘ Hiding</h3>
@@ -223,11 +246,11 @@
     <!-- ============================================================ PLAYLISTS -->
     <h2 id="playlists">10. Playlists</h2>
     <p>Open <b>☰ Playlists</b> from Home or the side menu (also Settings → Manage playlists → Manage playlists). Each row shows the name, type, server, and for Xtream the username and expiry date. Every playlist that is on (☑) is ready to watch at once in Live TV, Movies, Series, the TV guide, Favorites and Search, so there is no single playlist to pick. ☐ marks one that is off.</p>
-    <p>Press OK on a playlist for: <b>Turn off</b> / <b>Turn on</b>, <b>Edit</b>, <b>Refresh now</b> (re-downloads an M3U, or re-checks an Xtream account and its expiry), and <b>Delete</b>. At the bottom: <b>+ Add an Xtream Codes login</b> and <b>+ Add an M3U playlist link</b>. HDHomeRun tuners are managed in Settings.</p>
+    <p>Press OK on a playlist for: <b>Turn off</b> / <b>Turn on</b>, <b>Edit</b>, <b>Refresh now</b> (re-downloads an M3U, or re-checks an Xtream account and its expiry, then downloads its TV guide again), and <b>Delete</b>. Each playlist shows when it was last updated, or ⚠ and the problem if its last update failed. <b>⟳ Update playlists and guides now</b> updates everything at once. At the bottom: <b>+ Add an Xtream Codes login</b> and <b>+ Add an M3U playlist link</b>. HDHomeRun tuners are managed in Settings.</p>
 
     <!-- ============================================================ SETTINGS -->
     <h2 id="settings">11. Settings</h2>
-    <p>Settings opens on four groups. Press OK on one to open its page; <kbd>Back</kbd> returns to the four groups.</p>
+    <p>Settings opens on four groups. Press OK on one to open its page. The menu works like a tree: the four groups fold up into a narrow column on the left with the one you are in marked, and the group's page fills the rest. Press ◀ to step into that column and OK on another group to jump straight to it, or ▶ to go back to the page. <kbd>Back</kbd> returns to the four groups. Playlists opened from Settings keeps the same column, and Back returns to Manage playlists. Movies and Series work the same way: once you move into the posters, the category menu shrinks to a narrow column, and opens again when you go back into it.</p>
 
     <h3 id="set-playlists">▤ Manage playlists</h3>
     <table>
@@ -238,9 +261,16 @@
       <tr><td>Hidden categories and channels</td><td>Shows how many are hidden; OK shows them all again.</td></tr>
       <tr><td>Channel groups</td><td>Make a <b>New Channel Group</b>, or rename or delete one.</td></tr>
       <tr><td>TV guide source</td><td>Shows where the guide comes from. OK lets you type your own XMLTV link (<code>.xml</code> or <code>.xml.gz</code>) for this playlist, or <b>Use default</b> to go back to the provider's / playlist's own.</td></tr>
-      <tr><td>Reload TV guide</td><td>Appears for M3U playlists or your own link: downloads the guide again.</td></tr>
+      <tr><td>Reload TV guide</td><td>Appears for M3U playlists or your own link: downloads the playlist and its guide again now.</td></tr>
       <tr><td>Extra TV guides (XMLTV)</td><td>Extra guide links used for <b>every</b> playlist, to fill in channels with no program info. <b>+ Add a guide link</b>, or <b>+ Add a free guide by country</b> (USA, Canada, UK, Ireland, Australia, Mexico, Spain, Germany, France, Italy, Portugal, Brazil, India). Choose the <b>Order</b>: playlist's guide first, or extra guides first. Pick a link to Reload, Move up or Remove. Channels are matched by guide id, then by name.</td></tr>
       <tr><td>Recently watched</td><td>Shows how many items; OK clears the list.</td></tr>
+    </table>
+    <p><b>Keeping playlists and guides up to date</b> (also in Manage playlists):</p>
+    <table>
+      <tr><td>Update playlists and guides now</td><td>Downloads every playlist that is on, and every TV guide, again. Shows when the last update finished, or what went wrong.</td></tr>
+      <tr><td>Automatic updates</td><td><b>Every time WygTV starts</b>, <b>Every 6 / 12 / 24 hours</b> (default 12, checked at start-up and while WygTV is open), or <b>Only when I press Update now</b>.</td></tr>
+      <tr><td>New playlists and guides</td><td><b>Load right away</b> (default): a playlist's TV guide and any extra guide link load as soon as you add them. Or <b>Load the first time they're opened</b>.</td></tr>
+      <tr><td>While updating</td><td><b>In the background</b> (default): keep watching while it updates. Or <b>Show a progress screen and wait</b>, with a <b>Continue in the background</b> button. Either way, the status line at the bottom of the screen shows <i>⟳ Updating 2 of 5…</i>, <i>Updated 3:14 PM</i> or <i>⚠ Update problem</i>.</td></tr>
     </table>
 
     <h3 id="set-player">▶ Manage player</h3>
@@ -251,6 +281,9 @@
       <tr><td>Video decoder</td><td><b>Software first</b> (recommended, default), <b>Hardware first</b>, or <b>Automatic</b>. Switch if a channel freezes, shows green blocks or won't play.</td></tr>
       <tr><td>Subtitles for Live TV</td><td>On/Off. When on, closed captions start for every channel that sends them.</td></tr>
       <tr><td>Subtitles for Movies and Series</td><td>On/Off. In the player, Menu → Subtitles picks a language.</td></tr>
+      <tr><td>Subtitle language</td><td>Picked first when a stream has several, and used when searching online. Default: the TV's language.</td></tr>
+      <tr><td>Subtitle text size</td><td>Small, Normal, Large or Extra large.</td></tr>
+      <tr><td>Online subtitles: OpenSubtitles / SubDL</td><td>Add a free API key to search these too. Podnapisi works without a key. In the player, Menu → Subtitles → Search online.</td></tr>
     </table>
 
     <h3 id="set-appearance">◐ Appearance</h3>
@@ -301,5 +334,7 @@
     <span><a href="./">WygTV home</a> · <a href="./#download">Downloads</a> · <a href="https://github.com/wyglaf01/WygTV-AndroidTV">GitHub</a></span>
   </div>
 </footer>
+<!-- Buy Me a Coffee button (bottom right) -->
+<script data-name="BMC-Widget" data-cfasync="false" src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js" data-id="wyglaf" data-description="Support me on Buy me a coffee!" data-message="" data-color="#5F7FFF" data-position="Right" data-x_margin="18" data-y_margin="18"></script>
 </body>
 </html>

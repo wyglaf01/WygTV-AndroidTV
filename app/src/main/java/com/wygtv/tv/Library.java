@@ -284,9 +284,8 @@ final class Library {
             M3u.Playlist pl = m3uOf(p);
             for (int i = 0; i < pl.channels.size(); i++) raw.put(channelJson(pl.channels.get(i), i));
         } else {
-            String body = download(p.optString("host") + "/player_api.php?username=" + java.net.URLEncoder.encode(p.optString("user"), "UTF-8")
-                    + "&password=" + java.net.URLEncoder.encode(p.optString("pass"), "UTF-8") + "&action=get_live_streams", 60000);
-            raw = new JSONArray(body.trim());
+            raw = downloadList(p.optString("host") + "/player_api.php?username=" + java.net.URLEncoder.encode(p.optString("user"), "UTF-8")
+                    + "&password=" + java.net.URLEncoder.encode(p.optString("pass"), "UTF-8") + "&action=get_live_streams", 60000, null);
         }
         String pre = prefixOf(p), id = p.optString("id");
         java.util.Set<String> hiddenCats = prefs.getStringSet(pre + "hidden_categories_live", java.util.Collections.<String>emptySet());
@@ -308,10 +307,9 @@ final class Library {
     JSONArray vodOf(JSONObject p, String type) throws Exception {
         JSONArray out = new JSONArray();
         if (M3U.equals(p.optString("type"))) return out;
-        String body = download(p.optString("host") + "/player_api.php?username=" + java.net.URLEncoder.encode(p.optString("user"), "UTF-8")
+        JSONArray raw = downloadList(p.optString("host") + "/player_api.php?username=" + java.net.URLEncoder.encode(p.optString("user"), "UTF-8")
                 + "&password=" + java.net.URLEncoder.encode(p.optString("pass"), "UTF-8")
-                + "&action=" + (type.equals("series") ? "get_series" : "get_vod_streams"), 90000);
-        JSONArray raw = new JSONArray(body.trim());
+                + "&action=" + (type.equals("series") ? "get_series" : "get_vod_streams"), 90000, VOD_FIELDS);
         java.util.Set<String> hiddenCats = prefs.getStringSet(prefixOf(p) + "hidden_categories_" + type, java.util.Collections.<String>emptySet());
         String id = p.optString("id");
         for (int i = 0; i < raw.length(); i++) {
@@ -437,16 +435,8 @@ final class Library {
         guideLoadedAt = now;
         try {
             File f = new File(a.getCacheDir(), guideCacheName(url));
-            if (!f.exists() || now - f.lastModified() > GUIDE_MAX_AGE) {
-                File tmp = new File(a.getCacheDir(), f.getName() + ".part");
-                HttpURLConnection c = open(url, 120000);
-                try (InputStream in = c.getInputStream(); OutputStream out = new FileOutputStream(tmp)) {
-                    byte[] buf = new byte[65536];
-                    int n;
-                    while ((n = in.read(buf)) != -1) out.write(buf, 0, n);
-                } finally { c.disconnect(); }
-                if (!tmp.renameTo(f)) throw new IllegalStateException("could not save guide");
-            }
+            // Kept as long as Settings > Update playlists and guides says (AutoRefresh does the scheduled updates).
+            if (!f.exists() || now - f.lastModified() > AutoRefresh.maxAge(prefs)) fetchTo(url, f);
             try (InputStream in = new FileInputStream(f)) { guide = Xmltv.parse(in, now - 3 * 3600_000L, now + 30 * 3600_000L); }
             guideError = "";
             return guide;
@@ -455,6 +445,51 @@ final class Library {
             guideError = "could not load (" + e.getClass().getSimpleName() + ")";
             return null;
         }
+    }
+
+    /**
+     * Downloads the active playlist's own guide again now (its XMLTV link, the M3U's guide, or the HDHomeRun
+     * guide). The old guide stays in use if the download fails. Returns "" when fine, else the problem.
+     * Call off the UI thread.
+     */
+    String reloadGuide() {
+        synchronized (hdhrGuideLock) { hdhrGuides.clear(); }
+        if (activeIsM3u()) try { m3uBlocking(); } catch (Exception ignored) { } // an M3U names its guide inside
+        String url = guideUrl();
+        if (url.isEmpty()) return "";
+        synchronized (guideLock) {
+            long now = System.currentTimeMillis();
+            try {
+                File f = new File(a.getCacheDir(), guideCacheName(url));
+                fetchTo(url, f);
+                Xmltv.Guide g;
+                try (InputStream in = new FileInputStream(f)) { g = Xmltv.parse(in, now - 3 * 3600_000L, now + 30 * 3600_000L); }
+                guide = g;
+                guideKey = url;
+                guideLoadedAt = now;
+                guideError = "";
+                return "";
+            } catch (Throwable e) {
+                String err = "could not load (" + e.getClass().getSimpleName() + ")";
+                if (guide == null || !url.equals(guideKey)) { guide = null; guideKey = url; guideLoadedAt = now; guideError = err; }
+                return err;
+            }
+        }
+    }
+
+    /** Downloads a link into a file, through a ".part" file so a failed download never replaces a good copy. */
+    static void fetchTo(String url, File f) throws Exception {
+        File tmp = new File(f.getParentFile(), f.getName() + ".part");
+        HttpURLConnection c = open(url, 120000);
+        try (InputStream in = c.getInputStream(); OutputStream out = new FileOutputStream(tmp)) {
+            byte[] buf = new byte[65536];
+            int n;
+            while ((n = in.read(buf)) != -1) {
+                if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+                out.write(buf, 0, n);
+            }
+        } finally { c.disconnect(); }
+        if (!tmp.renameTo(f)) { tmp.delete(); throw new IllegalStateException("could not save guide"); }
     }
 
     /**
@@ -679,6 +714,69 @@ final class Library {
         c.setInstanceFollowRedirects(true);
         c.setRequestProperty("User-Agent", "WygTV/1.0 (Android TV)");
         return c;
+    }
+
+    /**
+     * What a movie or series row in a search list needs (title, ids, poster, year, rating, TMDb id). Long fields such
+     * as plot and cast are left out: the details page fetches them again, and a big provider's full list would
+     * otherwise not fit in a TV box's memory.
+     */
+    static final java.util.Set<String> VOD_FIELDS = new java.util.HashSet<>(java.util.Arrays.asList(
+            "name", "title", "stream_id", "series_id", "stream_type", "stream_icon", "cover", "container_extension",
+            "category_id", "rating", "rating_5based", "year", "releaseDate", "release_date", "tmdb", "tmdb_id", "added", "last_modified", "num"));
+
+    /**
+     * Downloads a player_api list (a JSON array of objects) and reads it item by item instead of as one big string,
+     * keeping only {@code keep} fields of each item (all of them when null). An answer that isn't a list gives an
+     * empty list. Call off the UI thread.
+     */
+    static JSONArray downloadList(String url, int readTimeout, java.util.Set<String> keep) throws Exception {
+        HttpURLConnection c = open(url, readTimeout);
+        JSONArray out = new JSONArray();
+        try (InputStream in = new java.io.BufferedInputStream(c.getInputStream(), 65536);
+             android.util.JsonReader r = new android.util.JsonReader(new java.io.InputStreamReader(in, StandardCharsets.UTF_8))) {
+            r.setLenient(true);
+            if (r.peek() != android.util.JsonToken.BEGIN_ARRAY) return out;
+            r.beginArray();
+            while (r.hasNext()) {
+                if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+                if (r.peek() != android.util.JsonToken.BEGIN_OBJECT) { r.skipValue(); continue; }
+                JSONObject o = new JSONObject();
+                r.beginObject();
+                while (r.hasNext()) {
+                    String name = r.nextName();
+                    if (keep != null && !keep.contains(name)) { r.skipValue(); continue; }
+                    Object v = readJson(r);
+                    if (v != null) o.put(name, v);
+                }
+                r.endObject();
+                out.put(o);
+            }
+        } finally { c.disconnect(); }
+        return out;
+    }
+
+    /** One JSON value from the reader: numbers come back as text, null as null. */
+    private static Object readJson(android.util.JsonReader r) throws Exception {
+        switch (r.peek()) {
+            case BEGIN_ARRAY: {
+                JSONArray a = new JSONArray();
+                r.beginArray();
+                while (r.hasNext()) { Object v = readJson(r); a.put(v == null ? JSONObject.NULL : v); }
+                r.endArray();
+                return a;
+            }
+            case BEGIN_OBJECT: {
+                JSONObject o = new JSONObject();
+                r.beginObject();
+                while (r.hasNext()) { String n = r.nextName(); Object v = readJson(r); if (v != null) o.put(n, v); }
+                r.endObject();
+                return o;
+            }
+            case BOOLEAN: return r.nextBoolean();
+            case NULL: r.nextNull(); return null;
+            default: return r.nextString();
+        }
     }
 
     static String download(String url, int readTimeout) throws Exception {

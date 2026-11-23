@@ -76,7 +76,11 @@
     destroyEngine();
     const isHls = kindHint === 'hls' || (!kindHint && /\.m3u8(\?|$)|\/hls\//i.test(url));
     const isTs = kindHint === 'ts' || (!kindHint && (/\.ts(\?|$)/i.test(url) || (isLiveItem() && !/\.(mp4|mkv|webm|mov|m4v)(\?|$)/i.test(url))));
-    if (isHls && window.Hls && Hls.isSupported()) {
+    if (isHls && W.isIOS && video.canPlayType('application/vnd.apple.mpegurl')) {
+      // iPhone/iPad: Apple's own player plays HLS best (and needs no CORS from the provider).
+      video.src = url;
+      engine = { kind: 'native', obj: null };
+    } else if (isHls && window.Hls && Hls.isSupported()) {
       const hls = new Hls({ maxBufferLength: 30, backBufferLength: 30, liveSyncDurationCount: 3, enableWorker: true, manifestLoadingMaxRetry: 3, levelLoadingMaxRetry: 4 });
       hls.on(Hls.Events.ERROR, (_e, d) => {
         if (!d.fatal) return;
@@ -115,6 +119,11 @@
   /** The built-in decoder plays the picture but not the sound (AC-3 etc.): switch to FFmpeg, video copied. */
   function checkAudio() {
     if (!item || opts.convert) return;
+    // iPhone/iPad: an MPEG-2 channel can play its AC-3 sound with no picture; treat that as not playing.
+    if (W.api.noFFmpeg) {
+      if (engine && engine.kind === 'mpegts' && !video.paused && video.currentTime > 1 && !video.videoWidth) fail('video', 'sound but no picture');
+      return;
+    }
     if (video.webkitVideoDecodedByteCount > 0 && video.webkitAudioDecodedByteCount === 0 && !video.paused) {
       convert('copy', 'no sound');
     }
@@ -139,6 +148,13 @@
         opts.triedAlt = true; attempt = 0;
         showMsg('Trying the other stream format…');
         startEngine(item.alt);
+        return;
+      }
+      // iPhone/iPad have no FFmpeg: reconnect a live channel that was playing, else offer VLC.
+      if (W.api.noFFmpeg) {
+        if (isLiveItem() && attempt < 6 && opts.wasPlaying) { reconnect(where); return; }
+        destroyEngine(); spinner.hidden = true;
+        showError('This stream will not play in ' + W.brand + ' (' + String(detail || where).slice(0, 60) + '). VLC for iPhone and iPad plays more kinds of video.');
         return;
       }
       attempt = 1;
@@ -177,7 +193,7 @@
   function showError(t) {
     msgEl.replaceChildren(h('div', null, t), h('div', { class: 'player-msg-actions' },
       W.btn({ class: 'button', onclick: () => P.retry() }, 'Try again'),
-      W.btn({ class: 'button', onclick: () => P.external() }, 'Open in VLC / mpv')));
+      W.btn({ class: 'button', onclick: () => P.external() }, 'Open in ' + W.extLabel)));
     msgEl.hidden = false;
     if (full) { clearTimeout(showMsg.t); W.focusFirst(msgEl); }
   }
@@ -197,7 +213,8 @@
     if (it.kind === 'live') { W.addRecent(it.key); W.api.net.setUserAgent(W.settings.userAgent || ''); }
     renderOsd();
     if (it.kind === 'live') {
-      if (it.convert || W.settings.alwaysConvert) { attempt = 1; convert(it.convert || 'copy'); }
+      if (W.api.noFFmpeg && it.convert) { spinner.hidden = true; showError('Antenna channels need converting, which ' + W.brand + ' can’t do. Open them in VLC instead.'); }
+      else if (!W.api.noFFmpeg && (it.convert || W.settings.alwaysConvert)) { attempt = 1; convert(it.convert || 'copy'); }
       else startEngine(it.url);
     } else {
       // Files: look inside first, so unsupported sound or containers go straight to FFmpeg.
@@ -331,7 +348,7 @@
       );
     }
     if (probeInfo && probeInfo.audio.length > 1) osdButtons.append(b('🔊 Sound', pickAudio));
-    osdButtons.append(b('🔉 Volume', pickVolume), b('⛶ Window', () => W.api.win.fullscreen()), b('↗ VLC / mpv', P.external), b('✕ Close', () => W.back()));
+    osdButtons.append(...[b('🔉 Volume', pickVolume), W.isIOS ? null : b('⛶ Window', () => W.api.win.fullscreen()), b('↗ ' + W.extLabel, P.external), b('✕ Close', () => W.back())].filter(Boolean));
     updateNow();
   }
 
