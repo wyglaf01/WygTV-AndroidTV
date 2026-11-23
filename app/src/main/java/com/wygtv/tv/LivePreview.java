@@ -54,7 +54,7 @@ final class LivePreview {
             @Override public void onViewAttachedToWindow(View v) { }
             @Override public void onViewDetachedFromWindow(View v) { if (view == mine) release(); }
         });
-        label = a.label("Highlight a channel to preview it", 14);
+        label = a.label(frame.isInTouchMode() ? "Tap a channel name to preview it" : "Highlight a channel to preview it", 14);
         label.setTextColor(Theme.MUTED);
         label.setGravity(Gravity.CENTER);
         frame.addView(label, new FrameLayout.LayoutParams(-1, -1));
@@ -87,6 +87,15 @@ final class LivePreview {
         wanted = item;
         start(a, item);
         return true;
+    }
+
+    /** Tap on a channel name (touch screens): preview it now, whatever the Settings delay. */
+    static void previewNow(MainActivity a, JSONObject item) {
+        if (view == null || !view.isAttachedToWindow()) return;
+        if (pending != null) UI.removeCallbacks(pending);
+        pending = null;
+        wanted = item;
+        start(a, item);
     }
 
     private static String keyOf(MainActivity a, JSONObject item) {
