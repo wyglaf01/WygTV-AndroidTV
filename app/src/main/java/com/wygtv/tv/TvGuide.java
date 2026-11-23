@@ -578,6 +578,9 @@ final class TvGuide {
                 JSONObject c = a.categories.optJSONObject(k);
                 if (c != null && cid.equals(c.optString("category_id"))) return c.optString("category_name");
             }
+        } else {
+            String other = GuideSources.categoryName(ch.optString("playlist"), ch.optString("category_id"));
+            if (!other.isEmpty()) return other;
         }
         if (!mixed) return categoryTitle;
         JSONObject p = otherPlaylist(row);
