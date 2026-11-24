@@ -45,9 +45,8 @@ final class NavRail {
         if (r.rail.hasFocus()) return true;
         View f = a.getCurrentFocus();
         if (f != null && !r.inRail(f)) r.lastContentFocus = f;
-        TextView target = r.items.get(0);
-        for (int i = 0; i < r.items.size(); i++) if (r.keys.get(i).equals(r.current)) { target = r.items.get(i); break; }
-        return target.requestFocus();
+        TextView target = r.hereItem();
+        return (target != null ? target : r.items.get(0)).requestFocus();
     }
 
     /** Wraps {@code content} in a frame with the rail on its left and returns the frame to show. */
@@ -64,7 +63,13 @@ final class NavRail {
         // Remember where focus was in the screen, so Right (or OK on the current screen) goes back there.
         // Registered on the window while this screen is showing, and removed when it goes, so old screens don't pile up.
         android.view.ViewTreeObserver.OnGlobalFocusChangeListener track = (oldFocus, newFocus) -> {
-            if (oldFocus != null && newFocus != null && r.inRail(newFocus) && !r.inRail(oldFocus)) r.lastContentFocus = oldFocus;
+            if (oldFocus != null && newFocus != null && r.inRail(newFocus) && !r.inRail(oldFocus)) {
+                r.lastContentFocus = oldFocus;
+                // Coming in from the screen (◀): land on the entry for this screen, the one picked to get here,
+                // not whichever entry happens to be level with where the focus was.
+                TextView here = r.hereItem();
+                if (here != null && newFocus != here) r.rail.post(here::requestFocus);
+            }
         };
         frame.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
             android.view.ViewTreeObserver observer;
@@ -207,6 +212,12 @@ final class NavRail {
         items.add(v);
         keys.add(key);
         labels.add(new String[]{icon, label});
+    }
+
+    /** This screen's entry in the menu (e.g. ▣ Live TV on the Live TV screen), or null when it has none. */
+    private TextView hereItem() {
+        for (int i = 0; i < items.size() && i < keys.size(); i++) if (keys.get(i).equals(current)) return items.get(i);
+        return null;
     }
 
     private boolean inRail(View v) {

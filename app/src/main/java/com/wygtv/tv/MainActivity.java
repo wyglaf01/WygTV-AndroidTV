@@ -44,7 +44,7 @@ public class MainActivity extends Activity {
  @Override protected void onActivityResult(int code,int result,Intent data){super.onActivityResult(code,result,data);if(code==Backup.REQ_PICK&&result==RESULT_OK&&data!=null)Backup.onPicked(this,data.getData());}
  void updateStatus(){String s=saved("host");if(s.isEmpty()){status.setText("No playlist connected");return;}String exp=Menus.expiryText(saved("expiry"));/* AutoRefresh adds "⟳ Updating 2 of 5…", "Updated 3:14 PM" or an update problem. */AutoRefresh.show(this,"Playlist: "+saved("title")+"  •  "+(library.activeIsHdhr()?"HDHomeRun":library.activeIsM3u()?"M3U":"Xtream Codes")+"  •  "+Menus.hostOf(s)+(exp.isEmpty()?"":"  •  "+exp));}
  /** Which side-menu entry the current screen belongs to. */
- String railKey(){if(mode.equals("guide")&&Antenna.isAntenna(category))return category;/* a tuner's guide lights its 📡 entry */return mode.equals("search")&&liveOnly()?"search":mode.equals("search")||mode.equals("favorites")?"live":mode.equals("episodes")?"series":mode.equals("details")?detailsType:mode.equals("login")?"playlists":mode.equals("hdhr")?"settings":mode;}
+ String railKey(){if(mode.equals("guide")&&Antenna.isAntenna(category))return category;/* a tuner's guide lights its 📡 entry */return mode.equals("search")&&liveOnly()?"search":mode.equals("search")||mode.equals("favorites")?"live":mode.equals("episodes")?"series":mode.equals("details")?detailsType:mode.equals("login")?"playlists":mode.equals("hdhr")||mode.equals("manage")?"settings":mode;}
  /** Settings → App mode: "Live TV only" hides Movies, Series and the Home screen; the TV guide is the main screen. */
  boolean liveOnly(){return prefs.getBoolean("live_only",false);}
  void home(){Antenna.restoreMain(this);
