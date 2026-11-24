@@ -309,6 +309,40 @@ final class Tmdb {
         return out;
     }
 
+    /**
+     * A title's trailer and where it can be watched, for the main screen's titles that aren't in a playlist:
+     * {"trailer": YouTube key, "stream"/"rent"/"buy"/"free": service names, "link": TMDb's watch page}. The services
+     * are for this device's country (US when unknown); TMDb gets them from JustWatch. Call off the UI thread.
+     */
+    static JSONObject extras(Context c, boolean tv, String tmdbId) throws Exception {
+        JSONObject out = new JSONObject();
+        String key = key(c);
+        if (key.isEmpty() || tmdbId == null || tmdbId.isEmpty()) return out;
+        JSONObject t = get(key, (tv ? "tv/" : "movie/") + tmdbId + "?append_to_response=videos,watch/providers");
+        out.put("trailer", trailerFrom(t.optJSONObject("videos")));
+        JSONObject all = t.optJSONObject("watch/providers");
+        all = all == null ? null : all.optJSONObject("results");
+        String country = java.util.Locale.getDefault().getCountry();
+        JSONObject here = all == null ? null : all.optJSONObject(country == null || country.isEmpty() ? "US" : country);
+        if (here == null && all != null) here = all.optJSONObject("US");
+        if (here != null) {
+            out.put("link", here.optString("link"));
+            String[][] kinds = {{"flatrate", "stream"}, {"free", "free"}, {"ads", "free"}, {"rent", "rent"}, {"buy", "buy"}};
+            for (String[] k : kinds) {
+                JSONArray list = here.optJSONArray(k[0]);
+                StringBuilder b = new StringBuilder(out.optString(k[1]));
+                for (int i = 0; list != null && i < list.length(); i++) {
+                    String name = list.optJSONObject(i) == null ? "" : list.optJSONObject(i).optString("provider_name");
+                    if (name.isEmpty() || b.indexOf(name) >= 0) continue;
+                    if (b.length() > 0) b.append(", ");
+                    b.append(name);
+                }
+                if (b.length() > 0) out.put(k[1], b.toString());
+            }
+        }
+        return out;
+    }
+
     /** A TMDb image address at the given size (e.g. "w342", "w780"), or "" for none. */
     static String image(String path, String size) {
         return path == null || path.isEmpty() || "null".equals(path) ? "" : IMAGES + size + path;

@@ -11,6 +11,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -299,23 +300,74 @@ final class Showcase {
             a.runOnUiThread(() -> {
                 if (a.isFinishing() || a.isDestroyed() || !wait.isShowing() || generation != a.screenGeneration) return;
                 wait.dismiss();
-                String trouble = problems.isEmpty() ? "" : "\n\nCouldn't check: " + TextUtils.join(", ", problems) + ".";
-                if (found.isEmpty()) {
-                    new Dialogs.Builder(a).setTitle(title)
-                            .setMessage("This " + (series ? "series" : "movie") + " isn't in your playlists right now." + trouble)
-                            .setPositiveButton("OK", null).show();
-                    return;
+                String trouble = problems.isEmpty() ? "" : "  (couldn't check " + TextUtils.join(", ", problems) + ")";
+                // Each copy found, then the trailer and where else it can be watched (offered even when it's in no playlist).
+                java.util.List<String> labels = new java.util.ArrayList<>();
+                boolean inActive = false;
+                for (JSONObject o : found) {
+                    if (o.optString("playlist").equals(active)) inActive = true;
+                    labels.add("▶  " + Library.nameOf(a.library.find(o.optString("playlist"))) + "  •  " + o.optString("name", o.optString("title", title)));
                 }
-                String[] labels = new String[found.size()];
-                for (int i = 0; i < found.size(); i++) {
-                    JSONObject o = found.get(i);
-                    labels[i] = Library.nameOf(a.library.find(o.optString("playlist"))) + "  •  " + o.optString("name", o.optString("title", title));
-                }
-                new Dialogs.Builder(a).setTitle(title + "  •  available in")
-                        .setItems(labels, (d, w) -> play(a, type, found.get(w), poster))
-                        .setNegativeButton("Cancel", null).show();
+                final int trailerRow = labels.size();
+                labels.add("▷  Watch the trailer");
+                labels.add("◎  Where else to watch it");
+                labels.add("Close");
+                JSONObject act = a.library.find(active);
+                String head = found.isEmpty() ? title + "  •  not in your playlists" + trouble
+                        : inActive || act == null ? title + "  •  available in" + trouble
+                        : title + "  •  not in " + Library.nameOf(act) + ", but in" + trouble;
+                new Dialogs.Builder(a).setTitle(head)
+                        .setItems(labels.toArray(new String[0]), (d, w) -> {
+                            if (w < trailerRow) play(a, type, found.get(w), poster);
+                            else if (w == trailerRow) trailer(a, series, poster);
+                            else if (w == trailerRow + 1) whereToWatch(a, series, poster);
+                        }).show();
             });
         }, "showcase-find").start();
+    }
+
+    /** Plays the title's trailer from TMDb (in YouTube); without one it opens a YouTube search for it. */
+    private static void trailer(MainActivity a, boolean series, JSONObject poster) {
+        Toast.makeText(a, "Finding the trailer…", Toast.LENGTH_SHORT).show();
+        new Thread(() -> {
+            String key = "";
+            try { key = Tmdb.extras(a, series, poster.optString("_tmdb")).optString("trailer"); } catch (Throwable ignored) { }
+            final String k = key;
+            a.runOnUiThread(() -> {
+                if (a.isFinishing() || a.isDestroyed()) return;
+                JSONObject m = new JSONObject();
+                try { m.put("trailer", k).put("title", poster.optString("_title")).put("year", poster.optString("_year")); } catch (org.json.JSONException ignored) { }
+                Details.trailer(a, m, poster.optString("_title"));
+            });
+        }, "showcase-trailer").start();
+    }
+
+    /** Lists the streaming services that have the title in this country (from TMDb / JustWatch). */
+    private static void whereToWatch(MainActivity a, boolean series, JSONObject poster) {
+        String title = poster.optString("_title");
+        android.app.AlertDialog wait = new Dialogs.Builder(a).setTitle(title).setMessage("Looking up where it's available…").setNegativeButton("Cancel", null).show();
+        new Thread(() -> {
+            JSONObject x = null;
+            try { x = Tmdb.extras(a, series, poster.optString("_tmdb")); } catch (Throwable ignored) { }
+            final JSONObject got = x;
+            a.runOnUiThread(() -> {
+                if (a.isFinishing() || a.isDestroyed() || !wait.isShowing()) return;
+                wait.dismiss();
+                StringBuilder b = new StringBuilder();
+                if (got != null) {
+                    if (!got.optString("stream").isEmpty()) b.append("Stream with a subscription:\n").append(got.optString("stream")).append("\n\n");
+                    if (!got.optString("free").isEmpty()) b.append("Free:\n").append(got.optString("free")).append("\n\n");
+                    if (!got.optString("rent").isEmpty()) b.append("Rent:\n").append(got.optString("rent")).append("\n\n");
+                    if (!got.optString("buy").isEmpty()) b.append("Buy:\n").append(got.optString("buy")).append("\n\n");
+                }
+                String msg = got == null ? "Couldn't look it up right now. Check the internet connection."
+                        : b.length() == 0 ? "No streaming services are listed for it in your country yet." + (series ? "" : " New movies often reach rental and streaming services a few weeks after the cinema.")
+                        : b.append("Availability from JustWatch, via TMDb.").toString();
+                new Dialogs.Builder(a).setTitle(title + "  •  where to watch").setMessage(msg)
+                        .setPositiveButton("▷  Trailer", (d, w) -> trailer(a, series, poster))
+                        .setNegativeButton("Close", null).show();
+            });
+        }, "showcase-where").start();
     }
 
     /** Opens the chosen copy's details page, switching to its playlist first if needed; Back returns to the main screen. */
