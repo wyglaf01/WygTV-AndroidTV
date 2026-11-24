@@ -137,6 +137,20 @@ final class TvGuide {
         source.setId(View.generateViewId());
         sourceId = source.getId();
         source.setTag(NavRail.TOP_TARGET);
+        // An antenna tuner's guide: hide or show its channels (hidden ones are left out everywhere in the app).
+        if (Antenna.isAntenna(a.category)) {
+            final String src = a.category;
+            final JSONObject tuner = a.library.find(src.substring(Antenna.PREFIX.length()));
+            if (tuner != null) {
+                TextView hide = a.button("⊘  Hide / show channels", bar, () -> Manage.antennaChannels(a, tuner, () -> Antenna.openGuide(a, src, null, true)));
+                hide.setTextSize(15);
+                hide.setSingleLine(true);
+                hide.setPadding(a.dp(14), 0, a.dp(14), 0);
+                LinearLayout.LayoutParams hideLp = new LinearLayout.LayoutParams(-2, a.dp(38));
+                hideLp.setMargins(0, 0, a.dp(12), 0);
+                hide.setLayoutParams(hideLp);
+            }
+        }
         // Channel search (same screen as Live TV → Search): 3+ letters, every playlist, favorites from the results.
         TextView find = a.button("⌕  Search", bar, a::searchLive);
         find.setTextSize(15);

@@ -752,7 +752,7 @@ final class Library {
         String id = p.optString("id"), pre = prefixOf(p);
         boolean active = id.equals(activeId());
         java.util.Set<String> hiddenCats = prefs.getStringSet(pre + "hidden_categories_live", java.util.Collections.<String>emptySet());
-        java.util.Set<String> hiddenChannels = active ? java.util.Collections.<String>emptySet()
+        java.util.Set<String> hiddenChannels = active && !isHdhr(p) ? java.util.Collections.<String>emptySet() // antenna channels hidden stay hidden everywhere
                 : prefs.getStringSet(pre + "hidden_channels_live", java.util.Collections.<String>emptySet());
         JSONArray starts = new JSONArray(), contains = new JSONArray();
         if (M3U.equals(p.optString("type"))) {

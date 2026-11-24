@@ -176,6 +176,36 @@ final class Manage {
         new Page(a, "HIDE AND SHOW CHANNELS  •  " + name.toUpperCase(java.util.Locale.ROOT), "channels", groups, 0, after).open();
     }
 
+    /**
+     * The tick page for one HDHomeRun tuner's channels (from its TV guide): ticked = shown. A hidden antenna channel
+     * is left out everywhere the tuner's channels appear (its guide, Live TV, Search and channel up/down).
+     */
+    static void antennaChannels(MainActivity a, JSONObject tuner, Runnable after) {
+        String key = Library.prefixOf(tuner) + "hidden_channels_live";
+        List<Group> groups = new ArrayList<>();
+        groups.add(new Group("📡  " + Antenna.nameOf(tuner), key, false, got -> new Thread(() -> {
+            List<String> ids = new ArrayList<>(), names = new ArrayList<>();
+            String msg = "This tuner has no channels.";
+            try {
+                JSONArray all = a.library.liveSearchList(tuner); // every channel, hidden ones included
+                Set<String> seen = new HashSet<>();
+                for (int i = 0; i < all.length(); i++) {
+                    JSONObject c = all.optJSONObject(i);
+                    if (c == null) continue;
+                    String id = c.optString("stream_id");
+                    if (id.isEmpty() || !seen.add(id)) continue;
+                    ids.add(id);
+                    String num = c.optString("num");
+                    String name = c.optString("name", "Channel");
+                    names.add(num.isEmpty() || name.startsWith(num) ? name : num + "  " + name);
+                }
+            } catch (Throwable e) { msg = "Couldn't reach the HDHomeRun at " + Menus.hostOf(tuner.optString("url")) + "."; }
+            final String m = msg;
+            a.runOnUiThread(() -> { if (!a.isFinishing()) got.run(ids, names, m); });
+        }).start()));
+        new Page(a, "HIDE AND SHOW CHANNELS  •  " + Antenna.nameOf(tuner).toUpperCase(java.util.Locale.ROOT), "channels", groups, 0, after).open();
+    }
+
     /** Loads a category's channels (or every channel when categoryId is ""); onlyThese keeps just those ids. */
     private static void loadChannels(MainActivity a, String categoryId, Got got, Set<String> onlyThese, String empty) {
         String action = "get_live_streams" + (categoryId.isEmpty() ? "" : "&category_id=" + a.enc(categoryId));
