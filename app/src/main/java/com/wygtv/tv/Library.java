@@ -867,8 +867,34 @@ final class Library {
     void freeSpaceOf(JSONObject p) {
         String id = p.optString("id").replaceAll("[^A-Za-z0-9_-]", "_");
         for (String n : new String[]{"live_search_" + id + ".json", "vod_vod_" + id + ".json", "vod_series_" + id + ".json"}) new File(a.getCacheDir(), n).delete();
-        if (M3U.equals(p.optString("type")) && !isHdhr(p)) m3uFile(p.optString("url")).delete();
+        if (M3U.equals(p.optString("type")) && !isHdhr(p)) {
+            // Its own TV guide: saved under the guide's address, which only an M3U names (in its first line). Deleted
+            // unless something still on uses the same guide: the guide set in Settings, an extra guide, or another
+            // switched-on M3U that names it too.
+            java.util.Set<String> keep = new java.util.HashSet<>(ExtraGuides.urls(prefs));
+            keep.add(prefs.getString("epg_url", ""));
+            JSONArray on = inUse();
+            for (int i = 0; i < on.length(); i++) {
+                JSONObject q = on.optJSONObject(i);
+                if (q != null && M3U.equals(q.optString("type")) && !isHdhr(q)) keep.addAll(advertisedGuides(m3uFile(q.optString("url"))));
+            }
+            for (String g : advertisedGuides(m3uFile(p.optString("url")))) if (!keep.contains(g)) new File(a.getCacheDir(), guideCacheName(g)).delete();
+            m3uFile(p.optString("url")).delete();
+        }
         synchronized (otherM3u) { otherM3u.remove(p.optString("url")); }
+    }
+
+    /** The TV guide addresses an M3U file names in its first line (url-tvg / x-tvg-url / tvg-url), read without loading the rest. */
+    private static java.util.List<String> advertisedGuides(File m3u) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (!m3u.exists()) return out;
+        try (java.io.BufferedReader r = new java.io.BufferedReader(new java.io.InputStreamReader(new FileInputStream(m3u), StandardCharsets.UTF_8))) {
+            String head = r.readLine();
+            if (head == null) return out;
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("(?:url-tvg|x-tvg-url|tvg-url)=\"([^\"]+)\"").matcher(head);
+            while (m.find()) for (String u : m.group(1).split(",")) if (!u.trim().isEmpty()) out.add(u.trim());
+        } catch (Throwable ignored) { }
+        return out;
     }
 
     /** Forgets every saved channel list used by search, so the next search downloads fresh ones. */
