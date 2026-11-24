@@ -198,3 +198,8 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 12px 24px; justify-content: 
   header.top .wrap { height: auto; padding-top: 8px; padding-bottom: 8px; flex-wrap: wrap; }
   nav.links { margin-left: 0; }
 }
+
+/* Release notes on the Builds page */
+.notes { margin: 8px 0 0; padding-left: 20px; color: var(--muted); }
+.notes li { margin: 6px 0; }
+.notes b { color: var(--text); }

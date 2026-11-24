@@ -69,6 +69,29 @@
 
 <div class="divider"></div>
 
+<section id="whatsnew">
+  <div class="wrap">
+    <h2>What's new in WygTV for Android</h2>
+    <p class="sub">Released versions, newest first. Each one was tested as a beta before it was released.</p>
+    <div class="build">
+      <div class="build-head"><h3>WygTV 1.0.297</h3></div>
+      <p class="meta">Released November 23, 2026</p>
+      <ul class="notes">
+        <li><b>Live TV:</b> pressing OK or tapping a playlist (such as Trex) opens its categories right under it; press again to close them.</li>
+        <li><b>Live TV, Movies and Series menus</b> shrink to a strip of icons when you move into the channels or the guide, giving the guide more room.</li>
+        <li><b>Tablets:</b> tap a channel name to preview it straight away; tap a show to open the channel full screen. Long-press for channel options.</li>
+        <li><b>Channel options:</b> "Restart" is now called <b>Resume</b>, and the Hidden switch is gone (hide channels in Settings › Hide and show channels).</li>
+        <li><b>Movies and Series search:</b> the search bar sits in the title row, so the posters get the full height.</li>
+        <li><b>Playlists and TV guides update automatically</b> when added and on a schedule (every start-up, 6, 12 or 24 hours), with the last update time shown in Settings › Manage playlists.</li>
+        <li><b>AirTV antenna TV:</b> a new entry that opens the Sling TV app, where AirTV channels play.</li>
+        <li><b>Menus:</b> two-line rows show a bigger title and a smaller description.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
 <section>
   <div class="wrap">
     <h2>Addresses on GitHub</h2>
@@ -99,9 +122,12 @@
 
   // The builds and their files. Addresses are fixed; dates, sizes and counts are filled in from GitHub.
   var BUILDS = [
-    { tag: "wygtv-latest", title: "📺 WygTV for Android TV & Fire TV", workflow: "build.yml",
-      text: "Google TV, Android TV boxes, NVIDIA Shield, Fire TV Stick and Fire TV Cube. Installed copies update themselves from Settings → Manage app → Check for updates.",
+    { tag: "latest", title: "📺 WygTV for Android TV, Fire TV & tablets", workflow: "release.yml",
+      text: "Google TV, Android TV boxes, NVIDIA Shield, Fire TV Stick and Cube, and Android tablets. This is the released version: installed copies update themselves from Settings → Manage app → Check for updates.",
       files: [["Android app (.apk)", GH + "/releases/latest/download/wygtv.apk", "wygtv.apk"]] },
+    { tag: "wygtv-beta", title: "🧪 WygTV Beta for Android", workflow: "build.yml", test: true,
+      text: "Every change is built here first for testing, then moved to the release above once it's OK. It shows as \"WygTV Beta\" with an orange icon and doesn't update itself. Use the release above unless you want to try new changes early.",
+      files: [["Android beta (.apk)", GH + "/releases/tag/wygtv-beta", "wygtv-beta-*.apk"]] },
     { tag: "wygdesktop-latest", title: "🖥 WygDesktop for Windows & Ubuntu", workflow: "desktop.yml",
       text: "The same app for PCs, with mouse and keyboard. Installed copies update themselves from Settings → About & updates → Check for updates.",
       files: [
@@ -139,6 +165,7 @@
     ["Help guide", SITE + "help.html"],
     ["Source code on GitHub", GH],
     ["All releases", GH + "/releases"],
+    ["Android beta", GH + "/releases/tag/wygtv-beta"],
     ["Build history (GitHub Actions)", GH + "/actions"],
     ["Android version file", GH + "/releases/latest/download/version.json"],
     ["Desktop version file", DL + "wygdesktop-latest/desktop-version.json"],
@@ -182,14 +209,15 @@
     b.files.forEach(function (f) {
       var tr = el("tr");
       tr.appendChild(el("td", "name", f[0]));
-      var ad = el("td", "addr"); ad.appendChild(el("code", null, f[1])); tr.appendChild(ad);
+      var ad = el("td", "addr"); var code = ad.appendChild(el("code", null, f[1])); tr.appendChild(ad);
       var sz = tr.appendChild(el("td", "num", ""));
       var ct = tr.appendChild(el("td", "num", ""));
       var ac = el("td", "acts-cell"); var acts = el("div", "acts");
       var dl = el("a", "btn primary dlbtn", "⬇ Download"); dl.href = f[1];
-      acts.appendChild(dl); acts.appendChild(copyBtn(f[1])); ac.appendChild(acts); tr.appendChild(ac);
+      var cp = copyBtn(f[1]);
+      acts.appendChild(dl); acts.appendChild(cp); ac.appendChild(acts); tr.appendChild(ac);
       tb.appendChild(tr);
-      cells[b.tag + "|" + f[2]] = { size: sz, count: ct };
+      cells[b.tag + "|" + f[2]] = { size: sz, count: ct, link: dl, code: code, copy: cp };
     });
     t.appendChild(tb);
     card.appendChild(t);
@@ -210,13 +238,20 @@
     .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then(function (list) {
       BUILDS.forEach(function (b) {
-        var rel = list.filter(function (r) { return r.tag_name === b.tag; })[0];
+        var rel = b.tag === "latest"
+          ? list.filter(function (r) { return !r.prerelease && !r.draft && /^wygtv-v/.test(r.tag_name); })[0]
+          : list.filter(function (r) { return r.tag_name === b.tag; })[0];
         var m = metas[b.id || b.tag];
         if (!rel) { m.textContent = "No build here right now."; return; }
         var last = rel.assets.reduce(function (t, a) { return a.updated_at > t ? a.updated_at : t; }, rel.published_at || "");
-        m.textContent = "Last built " + when(last);
+        var ver = (rel.name || "").match(/\d+\.\d+\.\d+/);
+        m.textContent = (ver ? "Version " + ver[0] + " · " : "") + (b.tag === "latest" ? "Released " : "Last built ") + when(last);
         rel.assets.forEach(function (a) {
           var c = cells[b.tag + "|" + a.name];
+          if (!c && /^wygtv-beta-.*\.apk$/.test(a.name)) { // the beta file's name carries its version
+            c = cells[b.tag + "|wygtv-beta-*.apk"];
+            if (c) { c.link.href = a.browser_download_url; c.code.textContent = a.browser_download_url; c.copy.replaceWith(copyBtn(a.browser_download_url)); }
+          }
           if (c) { c.size.textContent = size(a.size); c.count.textContent = a.download_count.toLocaleString() + " ⬇"; }
         });
       });
