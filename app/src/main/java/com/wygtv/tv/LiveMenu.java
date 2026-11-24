@@ -167,6 +167,7 @@ final class LiveMenu {
     }
 
     private static void openOther(MainActivity a, JSONObject p, String categoryId) {
+        Switching.show(a, p);
         open.add(p.optString("id"));
         tier = TOP;
         a.switchPlaylist(p);

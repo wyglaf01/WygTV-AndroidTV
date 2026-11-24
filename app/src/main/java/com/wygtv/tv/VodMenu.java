@@ -95,6 +95,7 @@ final class VodMenu {
     private static TextView entry(MainActivity a, JSONObject p, String label, String id, boolean isActive) {
         return a.button("    " + label, a.side, () -> {
             if (isActive) { a.loadItems(id); return; }
+            Switching.show(a, p);
             a.switchPlaylist(p);
             open.add(p.optString("id"));
             a.resumeCategory = id;
