@@ -24,8 +24,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Main screen option 1 (the default): this week's popular movies and series from TMDb, in rows of posters to scroll
- * through. The rows don't depend on any playlist. Choosing a poster looks for that title in your playlists and lists
+ * Main screen option 1 (the default): popular movies and series right now, in rows of posters to scroll through,
+ * from public sources that need no key (Rotten Tomatoes, Apple, TVmaze: see PopularSources). The rows don't depend
+ * on any playlist. Choosing a poster looks for that title in your playlists and lists
  * every playlist (and every copy, e.g. HD or 4K) that has it, to pick one; it then opens the same details page as
  * Movies and Series. Live TV, Movies, Series, Search and antenna TV are in the side menu.
  * Option 2 is the classic Home with its tiles; Settings > Appearance > Main screen picks one.
@@ -123,10 +124,12 @@ final class Showcase {
             title.setText(it.optString("_title", it.optString("name", "")));
             StringBuilder b = new StringBuilder(series ? "Series" : "Movie");
             if (!it.optString("_year").isEmpty()) b.append("  •  ").append(it.optString("_year"));
-            if (!it.optString("_rating").isEmpty()) b.append("  •  ★ ").append(it.optString("_rating"));
+            if (!it.optString("_rating").isEmpty()) b.append("  •  ").append(it.optString("_rating"));
+            if (!it.optString("_source").isEmpty()) b.append("  •  popular on ").append(it.optString("_source"));
             facts.setText(b);
             plot.setText(it.optString("_overview"));
             String art = it.optString("_backdrop");
+            if (art.isEmpty()) art = it.optString("_poster"); // no wide picture from this source: the poster, faded behind
             if (!art.isEmpty()) Details.image(backdrop, art, a.getResources().getDisplayMetrics().widthPixels, generation, a);
         }
     }
@@ -151,40 +154,18 @@ final class Showcase {
         }, "showcase").start();
     }
 
-    /** The popular rows, straight from TMDb's trending lists (no playlist needed). */
+    /** The popular rows, from public sources that need no key (see {@link PopularSources}). */
     private static JSONObject build(MainActivity a) throws Exception {
         JSONObject out = new JSONObject();
         out.put("time", System.currentTimeMillis());
         out.put("for", sourcesKey(a));
-        boolean tmdb = !Tmdb.key(a).isEmpty();
-        out.put("tmdb", tmdb);
-        for (String type : new String[]{"vod", "series"}) {
-            boolean series = type.equals("series");
-            JSONArray row = new JSONArray();
-            JSONArray trend = tmdb ? Tmdb.trending(a, series, 2) : new JSONArray();
-            for (int i = 0; i < trend.length() && row.length() < PER_ROW * 2; i++) {
-                JSONObject t = trend.optJSONObject(i);
-                String poster = Tmdb.image(t.optString("poster_path"), "w342");
-                if (poster.isEmpty()) continue;
-                JSONObject o = new JSONObject();
-                o.put("_tmdb", String.valueOf(t.optLong("id")));
-                o.put("_title", t.optString(series ? "name" : "title"));
-                o.put("_original", t.optString(series ? "original_name" : "original_title"));
-                o.put("_year", Tmdb.yearOf(t.optString(series ? "first_air_date" : "release_date")));
-                double v = t.optDouble("vote_average", 0);
-                if (v > 0) o.put("_rating", String.format(java.util.Locale.US, "%.1f", v));
-                o.put("_overview", t.optString("overview"));
-                o.put("_poster", poster);
-                o.put("_backdrop", Tmdb.image(t.optString("backdrop_path"), "w780"));
-                row.put(o);
-            }
-            out.put(type, row);
-        }
+        out.put("vod", PopularSources.movies(PER_ROW * 2));
+        out.put("series", PopularSources.series(PER_ROW * 2));
         return out;
     }
 
     /** Which playlists the saved rows were made from, so switching playlists on or off looks them up again. */
-    private static String sourcesKey(MainActivity a) { return "tmdb"; }
+    private static String sourcesKey(MainActivity a) { return "public-v1"; }
 
     private static void fill(MainActivity a, LinearLayout rows, JSONObject data, Spot spot) {
         rows.removeAllViews();
@@ -194,8 +175,7 @@ final class Showcase {
         if (movies != null && movies.length() > 0) first = row(a, rows, "Popular movies", "vod", movies, spot);
         if (series != null && series.length() > 0) { View f = row(a, rows, "Popular series", "series", series, spot); if (first == null) first = f; }
         if (rows.getChildCount() == 0) {
-            TextView none = a.label(tmdb ? "Couldn't load this week's popular titles. Check the internet connection; they'll be tried again next time."
-                    : "Popular titles need a TMDb key: add one in Settings > Appearance > movie and series info. Movies and Series are in the side menu.", 16);
+            TextView none = a.label("Couldn't load what's popular right now. Check the internet connection; it's tried again next time. Movies and Series are in the side menu.", 16);
             none.setTextColor(Theme.MUTED);
             none.setPadding(0, a.dp(20), 0, 0);
             rows.addView(none);
@@ -308,25 +288,33 @@ final class Showcase {
                 }
                 final int trailerRow = labels.size();
                 labels.add("▷  Watch the trailer");
-                labels.add("◎  Where else to watch it");
+                boolean where = !Tmdb.key(a).isEmpty(); // needs TMDb (optional): offered only when a key is set
+                if (where) labels.add("◎  Where else to watch it");
                 labels.add("Close");
                 String head = found.isEmpty() ? title + "  •  not in your playlists" + trouble : title + "  •  available in" + trouble;
                 new Dialogs.Builder(a).setTitle(head)
                         .setItems(labels.toArray(new String[0]), (d, w) -> {
                             if (w < trailerRow) play(a, type, found.get(w), poster);
                             else if (w == trailerRow) trailer(a, series, poster);
-                            else if (w == trailerRow + 1) whereToWatch(a, series, poster);
+                            else if (where && w == trailerRow + 1) whereToWatch(a, series, poster);
                         }).show();
             });
         }, "showcase-find").start();
     }
 
-    /** Plays the title's trailer from TMDb (in YouTube); without one it opens a YouTube search for it. */
+    /**
+     * Plays the title's trailer: TMDb's when a TMDb key is set, else (or when none is found) a YouTube search for
+     * "title year trailer", which needs no key.
+     */
     private static void trailer(MainActivity a, boolean series, JSONObject poster) {
         Toast.makeText(a, "Finding the trailer…", Toast.LENGTH_SHORT).show();
         new Thread(() -> {
             String key = "";
-            try { key = Tmdb.extras(a, series, poster.optString("_tmdb")).optString("trailer"); } catch (Throwable ignored) { }
+            try {
+                String id = poster.optString("_tmdb");
+                if (id.isEmpty()) id = Tmdb.findId(a, series, poster.optString("_title"), poster.optString("_year"));
+                if (!id.isEmpty()) key = Tmdb.extras(a, series, id).optString("trailer");
+            } catch (Throwable ignored) { }
             final String k = key;
             a.runOnUiThread(() -> {
                 if (a.isFinishing() || a.isDestroyed()) return;
@@ -343,7 +331,11 @@ final class Showcase {
         android.app.AlertDialog wait = new Dialogs.Builder(a).setTitle(title).setMessage("Looking up where it's available…").setNegativeButton("Cancel", null).show();
         new Thread(() -> {
             JSONObject x = null;
-            try { x = Tmdb.extras(a, series, poster.optString("_tmdb")); } catch (Throwable ignored) { }
+            try {
+                String id = poster.optString("_tmdb");
+                if (id.isEmpty()) id = Tmdb.findId(a, series, poster.optString("_title"), poster.optString("_year"));
+                x = id.isEmpty() ? new JSONObject() : Tmdb.extras(a, series, id);
+            } catch (Throwable ignored) { }
             final JSONObject got = x;
             a.runOnUiThread(() -> {
                 if (a.isFinishing() || a.isDestroyed() || !wait.isShowing()) return;

@@ -343,6 +343,18 @@ final class Tmdb {
         return out;
     }
 
+    /** A title's TMDb id found by name (and year when known), or "" (no key, no match). Call off the UI thread. */
+    static String findId(Context c, boolean tv, String title, String year) {
+        String key = key(c);
+        if (key.isEmpty() || title.isEmpty()) return "";
+        try {
+            String q = (tv ? "search/tv?query=" : "search/movie?query=") + URLEncoder.encode(title, "UTF-8");
+            JSONObject hit = year.isEmpty() ? null : pick(get(key, q + (tv ? "&first_air_date_year=" : "&year=") + year).optJSONArray("results"), title, year, tv);
+            if (hit == null) hit = pick(get(key, q).optJSONArray("results"), title, year, tv);
+            return hit == null ? "" : String.valueOf(hit.optInt("id"));
+        } catch (Throwable e) { return ""; }
+    }
+
     /** A TMDb image address at the given size (e.g. "w342", "w780"), or "" for none. */
     static String image(String path, String size) {
         return path == null || path.isEmpty() || "null".equals(path) ? "" : IMAGES + size + path;
