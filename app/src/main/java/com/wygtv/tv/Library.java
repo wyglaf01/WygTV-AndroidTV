@@ -279,14 +279,7 @@ final class Library {
      * "playlist" = its id. Channels and categories hidden in that playlist are left out. Call off the UI thread.
      */
     JSONArray liveChannelsOf(JSONObject p) throws Exception {
-        JSONArray raw = new JSONArray();
-        if (M3U.equals(p.optString("type"))) {
-            M3u.Playlist pl = m3uOf(p);
-            for (int i = 0; i < pl.channels.size(); i++) raw.put(channelJson(pl.channels.get(i), i));
-        } else {
-            raw = downloadList(p.optString("host") + "/player_api.php?username=" + java.net.URLEncoder.encode(p.optString("user"), "UTF-8")
-                    + "&password=" + java.net.URLEncoder.encode(p.optString("pass"), "UTF-8") + "&action=get_live_streams", 60000, null);
-        }
+        JSONArray raw = liveSearchList(p);
         String pre = prefixOf(p), id = p.optString("id");
         java.util.Set<String> hiddenCats = prefs.getStringSet(pre + "hidden_categories_live", java.util.Collections.<String>emptySet());
         java.util.Set<String> hiddenChannels = prefs.getStringSet(pre + "hidden_channels_live", java.util.Collections.<String>emptySet());
@@ -721,6 +714,38 @@ final class Library {
      * as plot and cast are left out: the details page fetches them again, and a big provider's full list would
      * otherwise not fit in a TV box's memory.
      */
+    /**
+     * What a live channel needs for search, playing, logos, the guide and catch-up. A big provider sends tens of
+     * thousands of channels with many more fields each; keeping only these lets the whole list fit in a TV box's memory.
+     */
+    static final java.util.Set<String> LIVE_FIELDS = new java.util.HashSet<>(java.util.Arrays.asList(
+            "name", "stream_id", "stream_icon", "epg_channel_id", "category_id", "container_extension", "num",
+            "stream_type", "tv_archive", "tv_archive_duration"));
+
+    /**
+     * Every live channel of a saved playlist (hidden ones included), with only {@link #LIVE_FIELDS}, read item by item
+     * from the network instead of as one big text, each tagged with "playlist" = its id. Call off the UI thread.
+     */
+    JSONArray liveSearchList(JSONObject p) throws Exception {
+        JSONArray raw = new JSONArray();
+        if (M3U.equals(p.optString("type"))) {
+            M3u.Playlist pl = m3uOf(p);
+            for (int i = 0; i < pl.channels.size(); i++) raw.put(channelJson(pl.channels.get(i), i));
+        } else {
+            raw = downloadList(p.optString("host") + "/player_api.php?username=" + java.net.URLEncoder.encode(p.optString("user"), "UTF-8")
+                    + "&password=" + java.net.URLEncoder.encode(p.optString("pass"), "UTF-8") + "&action=get_live_streams", 60000, LIVE_FIELDS);
+        }
+        String id = p.optString("id");
+        for (int i = 0; i < raw.length(); i++) { JSONObject o = raw.optJSONObject(i); if (o != null) o.put("playlist", id); }
+        return raw;
+    }
+
+    /** Whether the app still has at least this much memory to spare (for loading another big list). */
+    static boolean memoryLeft(long bytes) {
+        Runtime rt = Runtime.getRuntime();
+        return rt.maxMemory() - (rt.totalMemory() - rt.freeMemory()) > bytes;
+    }
+
     static final java.util.Set<String> VOD_FIELDS = new java.util.HashSet<>(java.util.Arrays.asList(
             "name", "title", "stream_id", "series_id", "stream_type", "stream_icon", "cover", "container_extension",
             "category_id", "rating", "rating_5based", "year", "releaseDate", "release_date", "tmdb", "tmdb_id", "added", "last_modified", "num"));
