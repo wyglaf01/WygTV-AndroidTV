@@ -110,7 +110,7 @@ final class Showcase {
         else a.status.setText("Finding this week's popular movies and series in your playlists…");
         if (saved == null || System.currentTimeMillis() - saved.optLong("time") > KEEP_MS || !saved.optString("for").equals(sourcesKey(a)))
             refresh(a, generation, rows, spot);
-        else AutoRefresh.show(a, "Watching • " + a.saved("title"));
+        else AutoRefresh.show(a, a.playlistsLine());
     }
 
     /** The spotlight texts and picture, updated as posters are highlighted. */
@@ -146,7 +146,7 @@ final class Showcase {
                 if (generation != a.screenGeneration || !"home".equals(a.mode)) return;
                 if (got == null) { a.status.setText("Couldn't load the popular titles right now. They'll be tried again next time."); return; }
                 fill(a, rows, got, spot);
-                AutoRefresh.show(a, "Watching • " + a.saved("title"));
+                AutoRefresh.show(a, a.playlistsLine());
             });
         }, "showcase").start();
     }
@@ -303,19 +303,14 @@ final class Showcase {
                 String trouble = problems.isEmpty() ? "" : "  (couldn't check " + TextUtils.join(", ", problems) + ")";
                 // Each copy found, then the trailer and where else it can be watched (offered even when it's in no playlist).
                 java.util.List<String> labels = new java.util.ArrayList<>();
-                boolean inActive = false;
                 for (JSONObject o : found) {
-                    if (o.optString("playlist").equals(active)) inActive = true;
                     labels.add("▶  " + Library.nameOf(a.library.find(o.optString("playlist"))) + "  •  " + o.optString("name", o.optString("title", title)));
                 }
                 final int trailerRow = labels.size();
                 labels.add("▷  Watch the trailer");
                 labels.add("◎  Where else to watch it");
                 labels.add("Close");
-                JSONObject act = a.library.find(active);
-                String head = found.isEmpty() ? title + "  •  not in your playlists" + trouble
-                        : inActive || act == null ? title + "  •  available in" + trouble
-                        : title + "  •  not in " + Library.nameOf(act) + ", but in" + trouble;
+                String head = found.isEmpty() ? title + "  •  not in your playlists" + trouble : title + "  •  available in" + trouble;
                 new Dialogs.Builder(a).setTitle(head)
                         .setItems(labels.toArray(new String[0]), (d, w) -> {
                             if (w < trailerRow) play(a, type, found.get(w), poster);

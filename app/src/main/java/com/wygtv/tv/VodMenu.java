@@ -43,7 +43,7 @@ final class VodMenu {
             // M3U playlists have no movies or series; show one only while it is the playing playlist.
             if (!isActive && Library.M3U.equals(p.optString("type"))) continue;
             boolean expanded = open.contains(pid);
-            TextView head = a.button((expanded ? "▼  " : "▶  ") + Library.nameOf(p) + (isActive ? "  ●" : ""), a.side, () -> {
+            TextView head = a.button((expanded ? "▼  " : "▶  ") + Library.nameOf(p), a.side, () -> {
                 if (!open.remove(pid)) open.add(pid);
                 render(a, pid);
             });
