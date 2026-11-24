@@ -9,6 +9,13 @@ on:
     branches: [app, main]
     paths-ignore: ["WygDesktop/**", ".github/workflows/desktop.yml"]
 
+# One build at a time per branch, so merges close together publish the beta in order and the
+# newest merge always ends up as the beta. A newer merge replaces any build still waiting; the
+# one already running finishes (stopping it mid-publish could leave the beta without its APK).
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
