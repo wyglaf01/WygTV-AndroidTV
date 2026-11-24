@@ -53,7 +53,7 @@ final class VirtualCategories {
         JSONArray ch = c == null ? null : c.optJSONArray("channels"), out = new JSONArray();
         java.util.Set<String> off = a.library.offIds();
         // Channels from a switched-off playlist stay saved, but don't show until it is switched back on.
-        for (int i = 0; ch != null && i < ch.length(); i++) { JSONObject o = ch.optJSONObject(i); if (o != null && !off.contains(o.optString("playlist"))) out.put(o); }
+        for (int i = 0; ch != null && i < ch.length(); i++) { JSONObject o = ch.optJSONObject(i); if (o != null && !off.contains(o.optString("playlist")) && !a.library.hiddenAntenna(o.optString("playlist"), o.optString("stream_id"))) out.put(o); }
         return out;
     }
 

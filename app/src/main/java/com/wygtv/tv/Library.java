@@ -832,6 +832,16 @@ final class Library {
         if (!tmp.renameTo(f)) { f.delete(); if (!tmp.renameTo(f)) throw new java.io.IOException("couldn't save the list"); }
     }
 
+    /**
+     * Whether a channel is an HDHomeRun antenna channel hidden in its tuner's TV guide (⊘ Hide / show channels).
+     * Those stay out of Favorites and channel groups too, until shown again; nothing is deleted.
+     */
+    boolean hiddenAntenna(String playlistId, String streamId) {
+        JSONObject p = find(playlistId == null || playlistId.isEmpty() ? activeId() : playlistId);
+        if (!isHdhr(p)) return false;
+        return prefs.getStringSet(prefixOf(p) + "hidden_channels_live", java.util.Collections.<String>emptySet()).contains(streamId);
+    }
+
     /** Whether the app still has at least this much memory to spare (for loading another big list). */
     static boolean memoryLeft(long bytes) {
         Runtime rt = Runtime.getRuntime();
