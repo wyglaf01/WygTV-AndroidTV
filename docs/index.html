@@ -183,8 +183,9 @@
     <p class="sub">Free. Each link always points at the newest build, so it never goes stale. Once installed, WygTV updates itself (Settings → Manage app → Check for updates). Every file and its address is listed on the <a href="builds.html">Builds page</a>.</p>
     <div class="downloads">
       <div class="dl">
-        <h3>📺 Android TV &amp; Fire TV</h3>
-        <p>For Google TV, Android TV boxes, NVIDIA Shield, Fire TV Stick and Fire TV Cube.</p>
+        <h3>📺 Android TV, Fire TV &amp; tablets</h3>
+        <p>For Google TV, Android TV boxes, NVIDIA Shield, Fire TV Stick and Fire TV Cube, and Android tablets.</p>
+        <p style="font-size:14px"><span id="android-ver">Newest released version</span> · <a href="builds.html#whatsnew">What's new</a> · <a href="builds.html">Try the beta</a></p>
         <div class="btns"><a class="btn primary" href="https://github.com/wyglaf01/WygTV-AndroidTV/releases/latest/download/wygtv.apk">⬇ wygtv.apk</a></div>
         <p style="margin-top:14px;font-size:14px">Direct link:<br><code style="word-break:break-all">https://github.com/wyglaf01/WygTV-AndroidTV/releases/latest/download/wygtv.apk</code></p>
       </div>
@@ -279,6 +280,13 @@
   // Downloader short code for Fire TV. Make one at https://aftv.news (paste the wygtv.apk link),
   // then put the number here, e.g. "1234567". Leave empty to show only the full link.
   var DOWNLOADER_CODE = "";
+  // Show the released Android version number (newest non-beta WygTV release).
+  fetch("https://api.github.com/repos/wyglaf01/WygTV-AndroidTV/releases/latest")
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (rel) {
+      var v = rel && (rel.name || "").match(/\d+\.\d+\.\d+/);
+      if (v) document.getElementById("android-ver").textContent = "Version " + v[0] + ", released " + new Date(rel.published_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    }).catch(function () {});
   if (DOWNLOADER_CODE) {
     document.getElementById("dl-code").textContent = DOWNLOADER_CODE;
     document.getElementById("dl-code-wrap").hidden = false;
