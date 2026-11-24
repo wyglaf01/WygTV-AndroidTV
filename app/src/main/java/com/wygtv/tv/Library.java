@@ -802,14 +802,11 @@ final class Library {
     }
 
     /**
-     * Movies ("vod") or series of one Xtream playlist that match a popular list, for the main screen (Showcase).
-     * The playlist's list is saved to a file (reused for {@link #LIVE_CACHE_MS}) and read item by item, keeping only
-     * matches, so a big library never has to fit in memory. A title matches by its TMDb id ({@code byTmdb}) or its
-     * cleaned name, with the year when known ({@code byTitle}: "name|year" and "name|"). Each match gets "rank" (its
-     * place in the popular list) and "playlist". With both maps null it keeps the {@code max} newest titles instead.
-     * Hidden categories are left out. Call off the UI thread.
+     * Every copy of one title (e.g. HD and 4K versions) in an Xtream playlist's movies or series, matched by TMDb id or
+     * by cleaned name (and year when both are known). Reads the playlist's saved list item by item (downloading it
+     * first when it's missing or old), so it uses little memory. Each match is tagged with "playlist". Call off the UI thread.
      */
-    JSONArray popularIn(JSONObject p, String type, Map<String, Integer> byTmdb, Map<String, Integer> byTitle, int max) throws Exception {
+    JSONArray findVod(JSONObject p, String type, String tmdbId, String nameKey, String altKey, String year, int max) throws Exception {
         JSONArray out = new JSONArray();
         if (M3U.equals(p.optString("type"))) return out;
         String id = p.optString("id");
@@ -820,15 +817,12 @@ final class Library {
                     + "&password=" + java.net.URLEncoder.encode(p.optString("pass"), "UTF-8")
                     + "&action=" + (type.equals("series") ? "get_series" : "get_vod_streams"), 90000, f);
         }
-        boolean latest = byTmdb == null && byTitle == null;
-        java.util.Map<Integer, JSONObject> byRank = new java.util.TreeMap<>();
-        java.util.List<JSONObject> newest = new java.util.ArrayList<>();
         try (InputStream in = new java.io.BufferedInputStream(new FileInputStream(f), 65536);
              android.util.JsonReader r = new android.util.JsonReader(new java.io.InputStreamReader(in, StandardCharsets.UTF_8))) {
             r.setLenient(true);
             if (r.peek() != android.util.JsonToken.BEGIN_ARRAY) { f.delete(); return out; }
             r.beginArray();
-            while (r.hasNext()) {
+            while (r.hasNext() && out.length() < max) {
                 if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
                 if (r.peek() != android.util.JsonToken.BEGIN_OBJECT) { r.skipValue(); continue; }
                 JSONObject o = new JSONObject();
@@ -841,39 +835,23 @@ final class Library {
                 }
                 r.endObject();
                 if (hiddenCats.contains(o.optString("category_id"))) continue;
-                if (latest) {
-                    newest.add(o);
-                    if (newest.size() > max * 4) { sortNewest(newest); while (newest.size() > max) newest.remove(newest.size() - 1); }
-                    continue;
-                }
-                Integer rank = null;
                 String tmdb = o.optString("tmdb", o.optString("tmdb_id", "")).trim();
-                if (!tmdb.isEmpty() && !tmdb.equals("0") && byTmdb != null) rank = byTmdb.get(tmdb);
-                if (rank == null && byTitle != null) {
+                boolean match = !tmdbId.isEmpty() && tmdb.equals(tmdbId);
+                if (!match) {
                     String[] t = Tmdb.cleanTitle(o.optString("name", o.optString("title", "")));
                     String k = XtreamProtocol.searchKey(t[0]);
-                    String year = t[1].isEmpty() ? o.optString("year", "") : t[1];
-                    if (!year.isEmpty()) rank = byTitle.get(k + "|" + year);
-                    if (rank == null) rank = byTitle.get(k + "|");
+                    String y = t[1].isEmpty() ? o.optString("year", "") : t[1];
+                    boolean sameName = k.equals(nameKey) || (!altKey.isEmpty() && k.equals(altKey));
+                    match = sameName && (year.isEmpty() || y.isEmpty() || y.equals(year));
                 }
-                if (rank == null || byRank.containsKey(rank)) continue; // first copy of each popular title only
-                o.put("rank", rank.intValue());
+                if (!match) continue;
                 o.put("playlist", id);
-                byRank.put(rank, o);
+                out.put(o);
             }
         }
-        if (latest) {
-            sortNewest(newest);
-            for (int i = 0; i < newest.size() && i < max; i++) { JSONObject o = newest.get(i); o.put("rank", i); o.put("playlist", id); out.put(o); }
-            return out;
-        }
-        for (JSONObject o : byRank.values()) out.put(o);
         return out;
     }
 
-    private static void sortNewest(java.util.List<JSONObject> l) {
-        java.util.Collections.sort(l, (x, y) -> Long.compare(y.optLong("added", y.optLong("last_modified", 0)), x.optLong("added", x.optLong("last_modified", 0))));
-    }
 
     /** How long a saved channel list is used for search before it's downloaded again. */
     static final long LIVE_CACHE_MS = 6L * 60 * 60 * 1000;

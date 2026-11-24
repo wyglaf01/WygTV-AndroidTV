@@ -23,10 +23,10 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Main screen option 1 (the default): this week's popular movies and series, in rows of posters to scroll through.
- * The popular titles come from TMDb's trending lists and are matched to the titles your playlists actually have, so
- * every poster opens and plays (the same details page as Movies and Series). Without a TMDb key the rows show the
- * newest titles added to your playlists instead. Live TV, Movies, Series, Search and antenna TV are in the side menu.
+ * Main screen option 1 (the default): this week's popular movies and series from TMDb, in rows of posters to scroll
+ * through. The rows don't depend on any playlist. Choosing a poster looks for that title in your playlists and lists
+ * every playlist (and every copy, e.g. HD or 4K) that has it, to pick one; it then opens the same details page as
+ * Movies and Series. Live TV, Movies, Series, Search and antenna TV are in the side menu.
  * Option 2 is the classic Home with its tiles; Settings > Appearance > Main screen picks one.
  */
 final class Showcase {
@@ -84,7 +84,7 @@ final class Showcase {
         title.setSingleLine(true);
         title.setEllipsize(TextUtils.TruncateAt.END);
         layout.addView(title, new LinearLayout.LayoutParams(-1, -2));
-        TextView facts = a.label("Movies and series people are watching now, from your playlists", 13);
+        TextView facts = a.label("Movies and series people are watching now. Press OK on one to find it in your playlists.", 13);
         facts.setTextColor(Theme.ACCENT);
         facts.setSingleLine(true);
         layout.addView(facts, new LinearLayout.LayoutParams(-1, -2));
@@ -123,8 +123,6 @@ final class Showcase {
             StringBuilder b = new StringBuilder(series ? "Series" : "Movie");
             if (!it.optString("_year").isEmpty()) b.append("  •  ").append(it.optString("_year"));
             if (!it.optString("_rating").isEmpty()) b.append("  •  ★ ").append(it.optString("_rating"));
-            JSONObject p = a.library.find(it.optString("playlist"));
-            if (p != null && a.library.inUse().length() > 1) b.append("  •  ").append(Library.nameOf(p));
             facts.setText(b);
             plot.setText(it.optString("_overview"));
             String art = it.optString("_backdrop");
@@ -152,7 +150,7 @@ final class Showcase {
         }, "showcase").start();
     }
 
-    /** The popular rows: TMDb trending matched to every switched-on playlist with movies and series (playing one first). */
+    /** The popular rows, straight from TMDb's trending lists (no playlist needed). */
     private static JSONObject build(MainActivity a) throws Exception {
         JSONObject out = new JSONObject();
         out.put("time", System.currentTimeMillis());
@@ -161,65 +159,22 @@ final class Showcase {
         out.put("tmdb", tmdb);
         for (String type : new String[]{"vod", "series"}) {
             boolean series = type.equals("series");
-            Map<String, Integer> byTmdb = null, byTitle = null;
-            JSONArray trend = new JSONArray();
-            if (tmdb) {
-                try { trend = Tmdb.trending(a, series, 3); } catch (Throwable ignored) { }
-                byTmdb = new HashMap<>();
-                byTitle = new HashMap<>();
-                for (int i = 0; i < trend.length(); i++) {
-                    JSONObject t = trend.optJSONObject(i);
-                    String name = t.optString(series ? "name" : "title");
-                    String year = Tmdb.yearOf(t.optString(series ? "first_air_date" : "release_date"));
-                    byTmdb.put(String.valueOf(t.optLong("id")), i);
-                    String k = XtreamProtocol.searchKey(name);
-                    if (!year.isEmpty() && !byTitle.containsKey(k + "|" + year)) byTitle.put(k + "|" + year, i);
-                    if (!byTitle.containsKey(k + "|")) byTitle.put(k + "|", i);
-                    String original = XtreamProtocol.searchKey(t.optString(series ? "original_name" : "original_title"));
-                    if (!original.isEmpty() && !byTitle.containsKey(original + "|")) byTitle.put(original + "|", i);
-                }
-                if (trend.length() == 0) { byTmdb = null; byTitle = null; }
-            }
-            // Each popular title once, from the first playlist that has it (the playing one first).
-            Map<Integer, JSONObject> best = new java.util.TreeMap<>();
-            JSONArray pls = a.library.inUse();
-            String active = a.library.activeId();
-            java.util.List<JSONObject> order = new java.util.ArrayList<>();
-            JSONObject act = a.library.find(active);
-            if (act != null && a.library.isOn(act)) order.add(act);
-            for (int i = 0; i < pls.length(); i++) { JSONObject p = pls.optJSONObject(i); if (p != null && !p.optString("id").equals(active)) order.add(p); }
-            for (JSONObject p : order) {
-                if (Library.M3U.equals(p.optString("type"))) continue;
-                JSONArray got;
-                try { got = a.library.popularIn(p, type, byTmdb, byTitle, PER_ROW); } catch (Throwable e) { continue; }
-                for (int i = 0; i < got.length(); i++) {
-                    JSONObject o = got.optJSONObject(i);
-                    int rank = o.optInt("rank");
-                    if (byTmdb == null) rank = best.size(); // newest titles: keep playlist order
-                    if (!best.containsKey(rank)) best.put(rank, o);
-                }
-                if (byTmdb == null && best.size() >= PER_ROW) break;
-            }
             JSONArray row = new JSONArray();
-            for (Map.Entry<Integer, JSONObject> e : best.entrySet()) {
-                if (row.length() >= PER_ROW) break;
-                JSONObject o = e.getValue();
-                JSONObject t = byTmdb != null && e.getKey() < trend.length() ? trend.optJSONObject(e.getKey()) : null;
-                if (t != null) {
-                    o.put("_title", t.optString(series ? "name" : "title"));
-                    o.put("_year", Tmdb.yearOf(t.optString(series ? "first_air_date" : "release_date")));
-                    double v = t.optDouble("vote_average", 0);
-                    if (v > 0) o.put("_rating", String.format(java.util.Locale.US, "%.1f", v));
-                    o.put("_overview", t.optString("overview"));
-                    o.put("_poster", Tmdb.image(t.optString("poster_path"), "w342"));
-                    o.put("_backdrop", Tmdb.image(t.optString("backdrop_path"), "w780"));
-                } else {
-                    JSONObject m = Tmdb.fromProvider(o, null);
-                    o.put("_title", m.optString("title", o.optString("name")));
-                    o.put("_year", m.optString("year"));
-                    o.put("_rating", m.optString("rating"));
-                    o.put("_poster", m.optString("poster"));
-                }
+            JSONArray trend = tmdb ? Tmdb.trending(a, series, 2) : new JSONArray();
+            for (int i = 0; i < trend.length() && row.length() < PER_ROW * 2; i++) {
+                JSONObject t = trend.optJSONObject(i);
+                String poster = Tmdb.image(t.optString("poster_path"), "w342");
+                if (poster.isEmpty()) continue;
+                JSONObject o = new JSONObject();
+                o.put("_tmdb", String.valueOf(t.optLong("id")));
+                o.put("_title", t.optString(series ? "name" : "title"));
+                o.put("_original", t.optString(series ? "original_name" : "original_title"));
+                o.put("_year", Tmdb.yearOf(t.optString(series ? "first_air_date" : "release_date")));
+                double v = t.optDouble("vote_average", 0);
+                if (v > 0) o.put("_rating", String.format(java.util.Locale.US, "%.1f", v));
+                o.put("_overview", t.optString("overview"));
+                o.put("_poster", poster);
+                o.put("_backdrop", Tmdb.image(t.optString("backdrop_path"), "w780"));
                 row.put(o);
             }
             out.put(type, row);
@@ -228,30 +183,21 @@ final class Showcase {
     }
 
     /** Which playlists the saved rows were made from, so switching playlists on or off looks them up again. */
-    private static String sourcesKey(MainActivity a) {
-        StringBuilder b = new StringBuilder();
-        JSONArray pls = a.library.inUse();
-        for (int i = 0; i < pls.length(); i++) { JSONObject p = pls.optJSONObject(i); if (p != null) b.append(p.optString("id")).append(','); }
-        return b.toString();
-    }
+    private static String sourcesKey(MainActivity a) { return "tmdb"; }
 
     private static void fill(MainActivity a, LinearLayout rows, JSONObject data, Spot spot) {
         rows.removeAllViews();
         boolean tmdb = data.optBoolean("tmdb");
         JSONArray movies = data.optJSONArray("vod"), series = data.optJSONArray("series");
         View first = null;
-        if (movies != null && movies.length() > 0) first = row(a, rows, tmdb ? "Popular movies" : "Newest movies", "vod", movies, spot);
-        if (series != null && series.length() > 0) { View f = row(a, rows, tmdb ? "Popular series" : "Newest series", "series", series, spot); if (first == null) first = f; }
+        if (movies != null && movies.length() > 0) first = row(a, rows, "Popular movies", "vod", movies, spot);
+        if (series != null && series.length() > 0) { View f = row(a, rows, "Popular series", "series", series, spot); if (first == null) first = f; }
         if (rows.getChildCount() == 0) {
-            TextView none = a.label(tmdb ? "None of this week's popular titles are in your playlists. Movies and Series are in the side menu."
-                    : "Your playlists have no movies or series yet. Live TV is in the side menu.", 16);
+            TextView none = a.label(tmdb ? "Couldn't load this week's popular titles. Check the internet connection; they'll be tried again next time."
+                    : "Popular titles need a TMDb key: add one in Settings > Appearance > movie and series info. Movies and Series are in the side menu.", 16);
             none.setTextColor(Theme.MUTED);
             none.setPadding(0, a.dp(20), 0, 0);
             rows.addView(none);
-        } else if (!tmdb) {
-            TextView hint = a.label("Showing the newest titles. Add a TMDb key (Settings > Appearance > movie and series info) to see what's popular this week.", 12);
-            hint.setTextColor(Theme.HINT);
-            rows.addView(hint);
         }
         if (first != null && !a.isFinishing()) first.requestFocus();
     }
@@ -320,20 +266,69 @@ final class Showcase {
         return t;
     }
 
-    /** OK on a poster: its details page (play, trailer, My List…), switching to its playlist first if needed. */
-    private static void open(MainActivity a, String type, JSONObject item, JSONArray row) {
+    /**
+     * OK on a poster: looks for the title in every switched-on playlist (one at a time, in the background), then lists
+     * each playlist and copy that has it to choose from. The chosen one opens its details page (play, trailer, My List).
+     */
+    private static void open(MainActivity a, String type, JSONObject poster, JSONArray row) {
+        boolean series = type.equals("series");
+        String title = poster.optString("_title");
+        android.app.AlertDialog wait = new Dialogs.Builder(a).setTitle(title)
+                .setMessage("Looking for it in your playlists…").setNegativeButton("Cancel", null).show();
+        final int generation = a.screenGeneration;
+        String tmdbId = poster.optString("_tmdb"), year = poster.optString("_year");
+        String key = XtreamProtocol.searchKey(title), alt = XtreamProtocol.searchKey(poster.optString("_original"));
+        if (alt.equals(key)) alt = "";
+        final String altKey = alt;
+        new Thread(() -> {
+            java.util.List<JSONObject> found = new java.util.ArrayList<>();
+            java.util.List<String> problems = new java.util.ArrayList<>();
+            JSONArray pls = a.library.inUse();
+            String active = a.library.activeId();
+            java.util.List<JSONObject> order = new java.util.ArrayList<>();
+            for (int i = 0; i < pls.length(); i++) { JSONObject p = pls.optJSONObject(i); if (p != null && p.optString("id").equals(active)) order.add(0, p); else if (p != null) order.add(p); }
+            for (JSONObject p : order) {
+                if (Library.M3U.equals(p.optString("type"))) continue; // M3U playlists have no movie or series lists
+                if (!wait.isShowing()) return; // cancelled
+                try {
+                    JSONArray got = a.library.findVod(p, type, tmdbId, key, altKey, year, 8);
+                    for (int i = 0; i < got.length(); i++) found.add(got.optJSONObject(i));
+                } catch (OutOfMemoryError e) { System.gc(); problems.add(Library.nameOf(p)); }
+                catch (Throwable e) { problems.add(Library.nameOf(p)); }
+            }
+            a.runOnUiThread(() -> {
+                if (a.isFinishing() || a.isDestroyed() || !wait.isShowing() || generation != a.screenGeneration) return;
+                wait.dismiss();
+                String trouble = problems.isEmpty() ? "" : "\n\nCouldn't check: " + TextUtils.join(", ", problems) + ".";
+                if (found.isEmpty()) {
+                    new Dialogs.Builder(a).setTitle(title)
+                            .setMessage("This " + (series ? "series" : "movie") + " isn't in your playlists right now." + trouble)
+                            .setPositiveButton("OK", null).show();
+                    return;
+                }
+                String[] labels = new String[found.size()];
+                for (int i = 0; i < found.size(); i++) {
+                    JSONObject o = found.get(i);
+                    labels[i] = Library.nameOf(a.library.find(o.optString("playlist"))) + "  •  " + o.optString("name", o.optString("title", title));
+                }
+                new Dialogs.Builder(a).setTitle(title + "  •  available in")
+                        .setItems(labels, (d, w) -> play(a, type, found.get(w), poster))
+                        .setNegativeButton("Cancel", null).show();
+            });
+        }, "showcase-find").start();
+    }
+
+    /** Opens the chosen copy's details page, switching to its playlist first if needed; Back returns to the main screen. */
+    private static void play(MainActivity a, String type, JSONObject item, JSONObject poster) {
         String pid = item.optString("playlist");
         if (!pid.isEmpty() && !pid.equals(a.library.activeId())) {
             JSONObject p = a.library.find(pid);
             if (p == null) { Menus.alert(a, "This title's playlist was removed."); return; }
             a.switchPlaylist(p);
         }
-        JSONArray same = new JSONArray();
-        for (int i = 0; i < row.length(); i++) {
-            JSONObject o = row.optJSONObject(i);
-            if (o != null && o.optString("playlist").equals(pid)) same.put(o);
-        }
-        Details.open(a, type, item, "", same, a::home);
+        JSONArray list = new JSONArray();
+        list.put(item);
+        Details.open(a, type, item, "", list, a::home);
     }
 
     private static File file(MainActivity a) { return new File(a.getFilesDir(), "showcase.json"); }
