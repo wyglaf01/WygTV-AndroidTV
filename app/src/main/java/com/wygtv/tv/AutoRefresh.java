@@ -150,6 +150,7 @@ final class AutoRefresh {
      * and run it when done (or when the viewer chooses to continue in the background).
      */
     static void updateAll(MainActivity a, Runnable then) {
+        a.library.dropLiveSearchCache(); // search downloads the fresh channel lists next time
         List<Step> steps = new ArrayList<>();
         JSONArray on = a.library.inUse();
         for (int i = 0; i < on.length(); i++) { JSONObject p = on.optJSONObject(i); if (p != null) addPlaylist(a, steps, p, true); }
@@ -162,6 +163,7 @@ final class AutoRefresh {
      * screen it was started from.
      */
     static void updateOne(MainActivity a, JSONObject p, Runnable after) {
+        a.library.dropLiveSearchCache(); // search downloads the fresh channel lists next time
         List<Step> steps = new ArrayList<>();
         addPlaylist(a, steps, p, true);
         boolean wait = waits(a.prefs);

@@ -740,6 +740,98 @@ final class Library {
         return raw;
     }
 
+    /**
+     * Live TV search in one playlist without holding its whole channel list in memory. An Xtream list is saved to a
+     * file the first time (and again once it's {@link #LIVE_CACHE_MS} old), then read item by item, keeping only the
+     * channels whose name matches {@code queryKey} (a {@link XtreamProtocol#searchKey}). Names starting with the
+     * search come first, then names containing it; at most {@code max} channels. Each is tagged with "playlist".
+     * Hidden categories are left out; hidden channels too, except in the playing playlist (they show there as ⊘).
+     * Call off the UI thread.
+     */
+    JSONArray searchLiveIn(JSONObject p, String queryKey, int max) throws Exception {
+        String id = p.optString("id"), pre = prefixOf(p);
+        boolean active = id.equals(activeId());
+        java.util.Set<String> hiddenCats = prefs.getStringSet(pre + "hidden_categories_live", java.util.Collections.<String>emptySet());
+        java.util.Set<String> hiddenChannels = active ? java.util.Collections.<String>emptySet()
+                : prefs.getStringSet(pre + "hidden_channels_live", java.util.Collections.<String>emptySet());
+        JSONArray starts = new JSONArray(), contains = new JSONArray();
+        if (M3U.equals(p.optString("type"))) {
+            M3u.Playlist pl = active ? m3uBlocking() : m3uOf(p);
+            for (int i = 0; i < pl.channels.size() && starts.length() < max; i++) {
+                M3u.Channel c = pl.channels.get(i);
+                int rank = XtreamProtocol.searchRank(XtreamProtocol.searchKey(c.name), queryKey);
+                if (rank < 0 || rank > 1 || hiddenCats.contains(c.group)) continue;
+                JSONObject o = channelJson(c, i);
+                if (hiddenChannels.contains(o.optString("stream_id"))) continue;
+                o.put("playlist", id);
+                (rank == 0 ? starts : contains).put(o);
+            }
+        } else {
+            File f = liveCacheFile(p);
+            if (!f.exists() || System.currentTimeMillis() - f.lastModified() > LIVE_CACHE_MS) {
+                saveToFile(p.optString("host") + "/player_api.php?username=" + java.net.URLEncoder.encode(p.optString("user"), "UTF-8")
+                        + "&password=" + java.net.URLEncoder.encode(p.optString("pass"), "UTF-8") + "&action=get_live_streams", 60000, f);
+            }
+            try (InputStream in = new java.io.BufferedInputStream(new FileInputStream(f), 65536);
+                 android.util.JsonReader r = new android.util.JsonReader(new java.io.InputStreamReader(in, StandardCharsets.UTF_8))) {
+                r.setLenient(true);
+                if (r.peek() != android.util.JsonToken.BEGIN_ARRAY) { f.delete(); return starts; }
+                r.beginArray();
+                while (r.hasNext() && starts.length() < max) {
+                    if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+                    if (r.peek() != android.util.JsonToken.BEGIN_OBJECT) { r.skipValue(); continue; }
+                    JSONObject o = new JSONObject();
+                    r.beginObject();
+                    while (r.hasNext()) {
+                        String name = r.nextName();
+                        if (!LIVE_FIELDS.contains(name)) { r.skipValue(); continue; }
+                        Object v = readJson(r);
+                        if (v != null) o.put(name, v);
+                    }
+                    r.endObject();
+                    int rank = XtreamProtocol.searchRank(XtreamProtocol.searchKey(o.optString("name")), queryKey);
+                    if (rank < 0 || rank > 1) continue; // not a match: dropped straight away
+                    if (hiddenCats.contains(o.optString("category_id")) || hiddenChannels.contains(o.optString("stream_id"))) continue;
+                    o.put("playlist", id);
+                    if (rank == 0) starts.put(o); else if (contains.length() < max) contains.put(o);
+                }
+            }
+        }
+        for (int i = 0; i < contains.length() && starts.length() < max; i++) starts.put(contains.opt(i));
+        return starts;
+    }
+
+    /** How long a saved channel list is used for search before it's downloaded again. */
+    static final long LIVE_CACHE_MS = 6L * 60 * 60 * 1000;
+
+    private File liveCacheFile(JSONObject p) {
+        return new File(a.getCacheDir(), "live_search_" + p.optString("id").replaceAll("[^A-Za-z0-9_-]", "_") + ".json");
+    }
+
+    /** Forgets every saved channel list used by search, so the next search downloads fresh ones. */
+    void dropLiveSearchCache() {
+        File[] fs = a.getCacheDir().listFiles();
+        if (fs != null) for (File f : fs) if (f.getName().startsWith("live_search_")) f.delete();
+    }
+
+    /** Downloads a URL straight to a file (never held in memory), replacing the file only when complete. */
+    static void saveToFile(String url, int readTimeout, File f) throws Exception {
+        HttpURLConnection c = open(url, readTimeout);
+        File tmp = new File(f.getPath() + ".part");
+        try (InputStream in = c.getInputStream(); OutputStream out = new FileOutputStream(tmp)) {
+            byte[] buf = new byte[65536];
+            int n;
+            while ((n = in.read(buf)) != -1) {
+                if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+                out.write(buf, 0, n);
+            }
+        } catch (Exception e) {
+            tmp.delete();
+            throw e;
+        } finally { c.disconnect(); }
+        if (!tmp.renameTo(f)) { f.delete(); if (!tmp.renameTo(f)) throw new java.io.IOException("couldn't save the list"); }
+    }
+
     /** Whether the app still has at least this much memory to spare (for loading another big list). */
     static boolean memoryLeft(long bytes) {
         Runtime rt = Runtime.getRuntime();

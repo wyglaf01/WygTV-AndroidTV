@@ -28,7 +28,7 @@ public class MainActivity extends Activity {
  /** Favorites are for Live TV only: movie and series favorites saved by older versions move into that playlist's My List (once). */
  void moveVodFavoritesToMyList(){if(prefs.getBoolean("vod_favorites_to_mylist",false))return;android.content.SharedPreferences.Editor edit=prefs.edit();Map<String,JSONArray> lists=new HashMap<>();for(Map.Entry<String,?> e:prefs.getAll().entrySet()){String k=e.getKey();for(String type:new String[]{"vod","series"}){int at=k.indexOf("fav_"+type+"_");if(at<0||!k.startsWith("account_"))continue;String pre=k.substring(0,at),id=k.substring(at+("fav_"+type+"_").length()),title=String.valueOf(e.getValue());edit.remove(k).remove(pre+"ext_"+type+"_"+id);if(title.isEmpty()||id.isEmpty())continue;String listKey=pre+"mylist_"+type;JSONArray l=lists.get(listKey);if(l==null){try{l=new JSONArray(prefs.getString(listKey,"[]"));}catch(JSONException x){l=new JSONArray();}lists.put(listKey,l);}String idKey=type.equals("series")?"series_id":"stream_id";boolean have=false;for(int i=0;i<l.length();i++){JSONObject o=l.optJSONObject(i);if(o!=null&&id.equals(o.optString(idKey)))have=true;}if(have)continue;try{JSONObject o=new JSONObject().put(idKey,id).put("name",title);Object ext=prefs.getAll().get(pre+"ext_"+type+"_"+id);if(ext!=null&&!String.valueOf(ext).isEmpty())o.put("container_extension",String.valueOf(ext));l.put(o);}catch(JSONException ignored){}}}for(Map.Entry<String,JSONArray> e:lists.entrySet())edit.putString(e.getKey(),e.getValue().toString());edit.putBoolean("vod_favorites_to_mylist",true).apply();}
  void migrateFavorites(){if(prefs.getBoolean("favorites_migrated",false))return;android.content.SharedPreferences.Editor edit=prefs.edit();for(Map.Entry<String,?> entry:prefs.getAll().entrySet())if(entry.getKey().startsWith("fav_")||entry.getKey().startsWith("ext_"))edit.putString(accountPrefix()+entry.getKey(),String.valueOf(entry.getValue()));edit.putBoolean("favorites_migrated",true).apply();}
- @Override public void onCreate(Bundle b){super.onCreate(b);prefs=getSharedPreferences("wygtv",MODE_PRIVATE);applyTheme();library=new Library(this,prefs);library.migrate();migrateFavorites();moveVodFavoritesToMyList();getWindow().getDecorView().setSystemUiVisibility(5894|1024|512);if(library.isEmpty())setup();else start();if(b==null){Updater.afterUpdate(this);Updater.checkAtStartup(this);}}
+ @Override public void onCreate(Bundle b){super.onCreate(b);Crash.install(this);prefs=getSharedPreferences("wygtv",MODE_PRIVATE);applyTheme();library=new Library(this,prefs);library.migrate();migrateFavorites();moveVodFavoritesToMyList();getWindow().getDecorView().setSystemUiVisibility(5894|1024|512);if(library.isEmpty())setup();else start();if(b==null){Updater.afterUpdate(this);Updater.checkAtStartup(this);Crash.showLast(this);}}
  /** A button or row background: bg(PANEL) idle, bg(Theme.FOCUS) focused (see Skin). */
  GradientDrawable bg(int color){return Skin.button(this,color!=PANEL);}
  TextView label(String t,int size){TextView v=new TextView(this);v.setText(t);v.setTextColor(-1);v.setTextSize(size);v.setGravity(Gravity.CENTER_VERTICAL);return v;}
@@ -180,13 +180,14 @@ public class MainActivity extends Activity {
   searchField.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH|android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI);searchField.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
   searchField.setOnFocusChangeListener((v,f)->searchField.setBackground(bg(f?Theme.FOCUS:PANEL)));
   bar.addView(searchField,new LinearLayout.LayoutParams(0,dp(56),1));
-  searchField.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int b,int c){}public void onTextChanged(CharSequence s,int a,int b,int c){}public void afterTextChanged(android.text.Editable e){searchQuery=e.toString();searchHandler.removeCallbacks(searchRender);searchHandler.postDelayed(searchRender,250);}});
-  searchField.setOnEditorActionListener((v,action,event)->{searchHandler.removeCallbacks(searchRender);renderSearch();((android.view.inputmethod.InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(searchField.getWindowToken(),0);if(searchResults.getChildCount()>0)searchResults.getChildAt(0).requestFocus();return true;});
+  searchField.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int b,int c){}public void onTextChanged(CharSequence s,int a,int b,int c){}public void afterTextChanged(android.text.Editable e){searchQuery=e.toString();searchHandler.removeCallbacks(searchRender);liveSearchTyped();}});
+  searchField.setOnEditorActionListener((v,action,event)->{searchHandler.removeCallbacks(searchRender);((android.view.inputmethod.InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(searchField.getWindowToken(),0);runLiveSearch();return true;});
+  TextView go=button("⌕ Search",bar,()->{((android.view.inputmethod.InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(searchField.getWindowToken(),0);runLiveSearch();});go.setTextSize(17);go.setGravity(Gravity.CENTER);LinearLayout.LayoutParams goLp=new LinearLayout.LayoutParams(dp(170),dp(56));goLp.setMargins(dp(10),dp(5),dp(5),dp(5));go.setLayoutParams(goLp);
   searchSummary=label("",15);searchSummary.setTextColor(Theme.MUTED);searchSummary.setPadding(dp(8),0,dp(8),0);column.addView(searchSummary,new LinearLayout.LayoutParams(-1,dp(36)));
   ScrollView sv=new ScrollView(this);searchResults=new LinearLayout(this);searchResults.setOrientation(LinearLayout.VERTICAL);sv.addView(searchResults);column.addView(sv,new LinearLayout.LayoutParams(-1,0,1));
-  if(liveIndex!=null&&liveIndexAccount.equals(accountPrefix())){rebuildSearchIndex();if(XtreamProtocol.searchKey(searchQuery).length()>=3)loadOtherPlaylistsForSearch();renderSearch();if(focusResume(searchResults))return;if(!searchQuery.isEmpty()&&searchResults.getChildCount()>0)searchResults.getChildAt(0).requestFocus();else searchField.requestFocus();return;}
-  // Nothing loads yet: the box is ready to type in, and the channel list loads once 3 letters are typed (or Search is pressed).
-  searchField.requestFocus();renderSearch();
+  // Nothing loads while typing: the playlists are searched once the whole name is typed and Search is pressed.
+  if(!searchQuery.isEmpty()&&searchQuery.equals(liveResultsQuery)&&liveResults.length()>0){renderSearch();if(focusResume(searchResults))return;if(searchResults.getChildCount()>0)searchResults.getChildAt(0).requestFocus();return;}
+  searchField.requestFocus();liveSearchTyped();
  }
  /** The screen that started loading the channel list for Search, so typing doesn't start it again. */
  int liveSearchTicket=-1;
@@ -214,17 +215,41 @@ public class MainActivity extends Activity {
  JSONArray hitsFrom(String pid){JSONArray out=new JSONArray();for(int i=0;i<searchHits.length();i++){JSONObject o=searchHits.optJSONObject(i);if(o!=null&&o.optString("playlist").equals(pid))out.put(o);}return out;}
  String lastSearchSummary="";
  void updateSearchSummary(){if(searchSummary!=null)searchSummary.setText(lastSearchSummary+(searchMemoryFull?"  •  some playlists left out to save memory":"")+(otherLiveLoading.isEmpty()?"":"  •  loading "+otherLiveLoading.size()+(otherLiveLoading.size()==1?" more playlist…":" more playlists…")));}
+ /** Results of the last Live TV search, the text searched for, and which search run is current (a newer one stops older ones). */
+ JSONArray liveResults=new JSONArray(); String liveResultsQuery="", liveResultsNote=""; int liveSearchRun;
+ static final int LIVE_SEARCH_MAX=150;
+ /** While typing: nothing is searched or loaded yet, just a hint. */
+ void liveSearchTyped(){if(!mode.equals("search"))return;String q=XtreamProtocol.searchKey(searchQuery);int pls=library.inUse().length();lastSearchSummary=q.isEmpty()?"Type a channel name, then press Search (or the search key on the keyboard)."+(pls>1?" All "+pls+" playlists are searched.":""):searchQuery.equals(liveResultsQuery)?liveResultsNote:"Press Search to look for \""+searchQuery.trim()+"\""+(pls>1?" in "+pls+" playlists":"")+".";updateSearchSummary();}
+ /**
+  * Searches every saved playlist for the typed name, one playlist at a time on a background thread. Each playlist's
+  * channel list is saved to a file and read item by item, keeping only the matching channels, so a big list never
+  * has to fit in memory (see Library.searchLiveIn). Results appear as each playlist finishes.
+  */
+ void runLiveSearch(){
+  if(!mode.equals("search")||searchResults==null)return;String q=XtreamProtocol.searchKey(searchQuery);
+  if(q.length()<2){lastSearchSummary="Type at least 2 letters of a channel name, then press Search.";updateSearchSummary();return;}
+  final int run=++liveSearchRun;final String typed=searchQuery;liveResults=new JSONArray();liveResultsQuery=typed;liveResultsNote="";searchResults.removeAllViews();searchHits=new JSONArray();
+  List<JSONObject> order=new ArrayList<>();JSONArray pls=library.inUse();String activeId=library.activeId();JSONObject act=library.find(activeId);if(act!=null)order.add(act);for(int i=0;i<pls.length();i++){JSONObject p=pls.optJSONObject(i);if(p!=null&&!p.optString("id").equals(activeId))order.add(p);}
+  lastSearchSummary="Searching…";updateSearchSummary();
+  new Thread(()->{List<String> problems=new ArrayList<>();boolean full=false;
+   for(int i=0;i<order.size();i++){JSONObject p=order.get(i);String name=Library.nameOf(p);final int n=i;
+    runOnUiThread(()->{if(run==liveSearchRun&&mode.equals("search")){lastSearchSummary="Searching "+name+(order.size()>1?" ("+(n+1)+" of "+order.size()+")":"")+"…  "+liveResults.length()+" found so far";updateSearchSummary();}});
+    JSONArray got=null;try{got=library.searchLiveIn(p,q,LIVE_SEARCH_MAX);}catch(OutOfMemoryError e){System.gc();problems.add(name+" (not enough memory)");}catch(Throwable e){problems.add(name);}
+    if(run!=liveSearchRun)return;
+    final JSONArray found=got;if(found!=null)runOnUiThread(()->{if(run!=liveSearchRun||!mode.equals("search")||searchResults==null)return;boolean first=searchResults.getChildCount()==0;for(int k=0;k<found.length()&&liveResults.length()<LIVE_SEARCH_MAX;k++){JSONObject it=found.optJSONObject(k);if(it==null)continue;liveResults.put(it);searchRow(it);}if(first&&searchResults.getChildCount()>0&&!searchField.hasFocus()&&!searchResults.hasFocus())searchResults.getChildAt(0).requestFocus();});
+    if(found!=null&&found.length()>=LIVE_SEARCH_MAX)full=true;}
+   final boolean capped=full;
+   runOnUiThread(()->{if(run!=liveSearchRun||!mode.equals("search"))return;int c=liveResults.length();liveResultsNote=(c==0?"No channels match \""+typed.trim()+"\"":c+(c==1?" channel":" channels")+" match \""+typed.trim()+"\""+(capped||c>=LIVE_SEARCH_MAX?" (showing the first "+LIVE_SEARCH_MAX+", type more of the name to narrow it down)":"")+"  •  ★ = in Favorites")+(problems.isEmpty()?"":"  •  couldn't search: "+android.text.TextUtils.join(", ",problems));lastSearchSummary=liveResultsNote;updateSearchSummary();if(searchResults.getChildCount()>0&&!searchResults.hasFocus())searchResults.getChildAt(0).requestFocus();});
+  },"live-search").start();
+ }
+ /** Shows the last search's results again (coming back to the Search screen). */
  void renderSearch(){
   if(!mode.equals("search")||searchResults==null)return;searchResults.removeAllViews();searchHits=new JSONArray();
-  String q=XtreamProtocol.searchKey(searchQuery);
-  if(liveIndex==null||!liveIndexAccount.equals(accountPrefix())){if(q.length()>=3)loadLiveSearch();else{lastSearchSummary="Type at least 3 letters of a channel name, then press Search. The channel list loads after you type.";updateSearchSummary();}return;}
-  // Nothing is listed until 3 letters are typed; then matches come from every saved playlist.
-  if(q.length()<3){int pls=library.inUse().length();lastSearchSummary=(q.isEmpty()?"":"Keep typing: results start at 3 letters.  ")+"Type at least 3 letters of a channel name to search "+liveIndex.length()+" channels"+(pls>1?" in "+pls+" playlists":"")+". Press OK on a result to play, add to Favorites (★), add to a category or hide it (⊘).";updateSearchSummary();return;}
-  Set<String> hidden=new HashSet<>(prefs.getStringSet(hiddenKey("live"),new HashSet<>()));List<Integer> starts=new ArrayList<>(),contains=new ArrayList<>();for(int i=0;i<liveIndexNames.length;i++){if(!hidden.isEmpty()){JSONObject it=liveIndex.optJSONObject(i);if(it!=null&&fromActive(it)&&hidden.contains(it.optString("category_id")))continue;}int rank=XtreamProtocol.searchRank(liveIndexNames[i],q);if(rank==0)starts.add(i);else if(rank==1)contains.add(i);}
-  Set<String> hc=hiddenChannels();List<Integer> hiddenHits=new ArrayList<>();starts.addAll(contains);if(!hc.isEmpty()){for(Iterator<Integer> it=starts.iterator();it.hasNext();){int i=it.next();JSONObject o=liveIndex.optJSONObject(i);if(o!=null&&fromActive(o)&&hc.contains(o.optString("stream_id"))){hiddenHits.add(i);it.remove();}}starts.addAll(hiddenHits);}int limit=Math.min(starts.size(),150);
-  lastSearchSummary=(starts.isEmpty()?"No channels match \""+searchQuery.trim()+"\""+(hidden.isEmpty()?"":" (hidden categories are left out)"):starts.size()+(starts.size()==1?" channel":" channels")+(limit<starts.size()?" (showing the first "+limit+", keep typing to narrow it down)":"")+"  •  ★ = in Favorites"+(hiddenHits.isEmpty()?"":"  •  ⊘ = hidden"));updateSearchSummary();
-  for(int n=0;n<limit;n++){JSONObject item=liveIndex.optJSONObject(starts.get(n));if(item!=null)searchRow(item);}
+  if(!searchQuery.equals(liveResultsQuery)){liveSearchTyped();return;}
+  for(int i=0;i<liveResults.length();i++){JSONObject it=liveResults.optJSONObject(i);if(it!=null)searchRow(it);}
+  lastSearchSummary=liveResultsNote;updateSearchSummary();
  }
+
  void searchAction(JSONObject item,TextView row){
   String id=item.optString("stream_id"),title=item.optString("name","Untitled"),ext=item.optString("container_extension","ts");if(ext.isEmpty())ext="ts";final String extension=ext;
   if(!fromActive(item)){String pid=item.optString("playlist");JSONObject pl=library.find(pid);String pre=pl==null?"":Library.prefixOf(pl);new Dialogs.Builder(this).setTitle(title+"   ("+Library.nameOf(pl)+")").setItems(new String[]{"Play",isFavoriteIn(pre,"live",id)?"Remove from Favorites":"Add to Favorites","Add to channel group…","Close"},(d,which)->{if(which==0){JSONArray zap=hitsFrom(pid);String q=searchQuery;if(!VirtualCategories.useItsPlaylist(this,item))return;searchQuery=q;zapList=zap;play("live",id,extension,title);}else if(which==1){if(pre.isEmpty())return;boolean added=toggleFavoriteIn(pre,"live",id,title,extension);styleOtherSearchRow(row,item);Toast.makeText(this,(added?"Added to Favorites":"Removed from Favorites")+" ("+Library.nameOf(pl)+")",Toast.LENGTH_SHORT).show();}else if(which==2)VirtualCategories.addDialog(this,item);}).show();return;}
