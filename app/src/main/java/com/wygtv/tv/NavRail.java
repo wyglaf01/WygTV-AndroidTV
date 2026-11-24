@@ -30,6 +30,25 @@ final class NavRail {
     private final List<String[]> labels = new ArrayList<>();
     private boolean expanded;
     private View lastContentFocus;
+    private final List<String> keys = new ArrayList<>();
+    private String current;
+    /** The rail on the screen now showing, so Back can open it (see {@link #open}). */
+    private static java.lang.ref.WeakReference<NavRail> showing = new java.lang.ref.WeakReference<>(null);
+
+    /**
+     * Opens the main menu on the left with this screen's entry highlighted. Back out of a screen's own menus lands
+     * here instead of on Home; Home opens only when it's picked from this menu. False when there's no menu showing.
+     */
+    static boolean open(MainActivity a) {
+        NavRail r = showing.get();
+        if (r == null || !r.rail.isAttachedToWindow() || !r.rail.isShown() || r.items.isEmpty()) return false;
+        if (r.rail.hasFocus()) return true;
+        View f = a.getCurrentFocus();
+        if (f != null && !r.inRail(f)) r.lastContentFocus = f;
+        TextView target = r.items.get(0);
+        for (int i = 0; i < r.items.size(); i++) if (r.keys.get(i).equals(r.current)) { target = r.items.get(i); break; }
+        return target.requestFocus();
+    }
 
     /** Wraps {@code content} in a frame with the rail on its left and returns the frame to show. */
     static FrameLayout wrap(MainActivity a, View content, String current) {
@@ -39,6 +58,8 @@ final class NavRail {
         frame.addView(content, lp);
         // Added after the content so the content's first item gets focus by default.
         NavRail r = new NavRail(a, current);
+        r.current = current;
+        showing = new java.lang.ref.WeakReference<>(r);
         frame.addView(r.rail, new FrameLayout.LayoutParams(a.dp(COLLAPSED_DP), -1, Gravity.START));
         // Remember where focus was in the screen, so Right (or OK on the current screen) goes back there.
         // Registered on the window while this screen is showing, and removed when it goes, so old screens don't pile up.
@@ -184,6 +205,7 @@ final class NavRail {
             return false;
         });
         items.add(v);
+        keys.add(key);
         labels.add(new String[]{icon, label});
     }
 

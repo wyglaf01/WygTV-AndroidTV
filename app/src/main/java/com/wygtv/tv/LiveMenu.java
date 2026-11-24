@@ -47,13 +47,18 @@ final class LiveMenu {
         a.browse("live");
     }
 
+    /** ← Menu: opens the main menu on the left (Home only opens when picked there). Live TV only mode goes to the guide. */
+    private static void backOut(MainActivity a) {
+        if (a.liveOnly() || !NavRail.open(a)) a.home();
+    }
+
     /** First tier: Favorites, Search, added categories, added playlists. The full guide and antenna tuners are on the side rail (▦, 📡). */
     static void top(MainActivity a) {
         tier = TOP;
         hideParent();
         picks.clear();
         a.side.removeAllViews();
-        a.button(a.liveOnly() ? "← TV Guide" : "← Home", a.side, a::home);
+        a.button(a.liveOnly() ? "← TV Guide" : "← Menu", a.side, () -> backOut(a));
         pick(a, "★ Favorites", "fav");
         a.sideFixed = 1;
         a.button("⌕ Search", a.side, a::searchLive);
@@ -288,7 +293,7 @@ final class LiveMenu {
         parentCol.removeAllViews();
         parentCurrent = null;
         lastCategory = null;
-        compact(a, "←", a.liveOnly() ? "TV Guide" : "Home", false, a::home);
+        compact(a, "←", a.liveOnly() ? "TV Guide" : "Menu", false, () -> backOut(a));
         compact(a, "★", "Favorites", false, () -> backTo(a, "fav"));
         compact(a, "⌕", "Search", false, a::searchLive);
         if (AirTv.isOn(a.prefs)) compact(a, "📡", AirTv.nameOf(a.prefs), false, () -> AirTv.open(a));
