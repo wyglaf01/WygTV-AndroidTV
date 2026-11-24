@@ -26,9 +26,9 @@ android { namespace 'com.wygtv.tv'; compileSdk 35
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
-dependencies { testImplementation 'junit:junit:4.13.2'; testImplementation 'org.json:json:20231013'; implementation 'androidx.media3:media3-exoplayer:1.5.1'; implementation 'androidx.media3:media3-ui:1.5.1'
+dependencies { testImplementation 'junit:junit:4.13.2'; testImplementation 'org.json:json:20231013'; implementation 'androidx.media3:media3-exoplayer:1.9.0'; implementation 'androidx.media3:media3-ui:1.9.0'
     // HLS (.m3u8): Settings > Live stream format and M3U playlists use it, and it carries its own subtitles and captions.
-    implementation 'androidx.media3:media3-exoplayer-hls:1.5.1'
-    // FFmpeg audio decoders (AC-3 / E-AC-3 for over-the-air TV from HDHomeRun tuners), built for Media3 1.5 by Jellyfin.
-    implementation 'org.jellyfin.media3:media3-ffmpeg-decoder:1.5.0+1' }
+    implementation 'androidx.media3:media3-exoplayer-hls:1.9.0'
+    // FFmpeg audio decoders (AC-3 / E-AC-3 for over-the-air TV from HDHomeRun tuners), built for Media3 1.9 by Jellyfin (1.9 brings many CEA-608/708 closed-caption fixes for live TV).
+    implementation 'org.jellyfin.media3:media3-ffmpeg-decoder:1.9.0+1' }
 

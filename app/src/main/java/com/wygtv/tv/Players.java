@@ -100,9 +100,20 @@ final class Players {
                 .setPrioritizeTimeOverSizeThresholds(true)
                 .build();
         return new ExoPlayer.Builder(c, renderers)
-                .setMediaSourceFactory(new DefaultMediaSourceFactory(new DefaultDataSource.Factory(c, http)))
+                .setMediaSourceFactory(new DefaultMediaSourceFactory(new DefaultDataSource.Factory(c, http), liveExtractors()))
                 .setLoadControl(load)
                 .build();
+    }
+
+    /**
+     * How MPEG-TS live streams are read, set the way IPTV players commonly do: find each video frame by itself (many
+     * IPTV and antenna streams don't mark frame boundaries) and accept streams that start without a full key frame.
+     * Closed captions (CEA-608/708) ride inside those video frames, so reading every frame keeps them coming.
+     */
+    static androidx.media3.extractor.DefaultExtractorsFactory liveExtractors() {
+        return new androidx.media3.extractor.DefaultExtractorsFactory().setTsExtractorFlags(
+                androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS
+                        | androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES);
     }
 
     /** Errors from a decoder or the audio output: the ones FFmpeg can get around when it's the audio part that failed. */
