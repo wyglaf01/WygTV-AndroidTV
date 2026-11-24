@@ -55,6 +55,7 @@ final class LiveMenu {
     /** First tier: Favorites, Search, added categories, added playlists. The full guide and antenna tuners are on the side rail (▦, 📡). */
     static void top(MainActivity a) {
         tier = TOP;
+        lastHeader = null;
         hideParent();
         picks.clear();
         a.side.removeAllViews();
@@ -81,7 +82,9 @@ final class LiveMenu {
         a.resumeCategory = null;
         String active = a.library.activeId();
         boolean resumeHere = resume != null && isActiveCategory(a, resume);
-        if (resumeHere) open.add(active); // coming back to one of its categories: show it open
+        // Coming back to one of its categories: show it open, unless it was just closed on purpose.
+        if (resumeHere && !closedOnPurpose) open.add(active);
+        closedOnPurpose = false;
         JSONArray pls = a.library.inUse();
         android.widget.TextView header = null;
         for (int i = 0; i < pls.length(); i++) {
@@ -94,7 +97,7 @@ final class LiveMenu {
             android.widget.TextView head = a.button((expanded ? "▼  " : "▶  ") + Library.nameOf(p) + (on ? "  ●" : ""), a.side, () -> togglePlaylist(a, p));
             head.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
             head.setTextColor(Theme.ACCENT);
-            if (pid.equals(focusHeader)) header = head;
+            if (pid.equals(focusHeader)) { header = head; lastHeader = head; }
             if (expanded) categoriesUnder(a);
         }
         // Start in the menu (Favorites highlighted) unless coming back from a channel, which re-focuses that channel.
@@ -136,9 +139,10 @@ final class LiveMenu {
             a.browse("live");
             return;
         }
-        if (!open.remove(pid)) open.add(pid);
+        if (open.remove(pid)) closedOnPurpose = true; else open.add(pid);
         a.resumeCategory = a.category; // keep the guide on whatever it shows now
         top(a);
+        focusLater(a);
     }
 
     /** The playing playlist's categories, indented under its heading. */
@@ -146,9 +150,27 @@ final class LiveMenu {
     private static void collapse(MainActivity a) {
         String pid = a.library.activeId();
         open.remove(pid);
+        closedOnPurpose = true;
         focusHeader = pid;
         a.resumeCategory = a.category; // keep the guide on whatever it shows now
         top(a);
+        focusLater(a);
+    }
+
+    /** Set while closing a playlist's categories, so the redraw doesn't open them again for the category on screen. */
+    private static boolean closedOnPurpose;
+    /** The playlist name the focus should be on after it was opened or closed. */
+    private static android.widget.TextView lastHeader;
+
+    /**
+     * Puts the focus on the playlist name once the screen has settled: a closing pop-up hands focus back to whatever
+     * had it before, which the redraw removed, so the name is focused again just after.
+     */
+    private static void focusLater(MainActivity a) {
+        android.widget.TextView h = lastHeader;
+        if (h == null) return;
+        h.requestFocus();
+        a.side.postDelayed(() -> { if (h.isAttachedToWindow() && h.isShown() && !h.isFocused()) h.requestFocus(); }, 150);
     }
 
     private static void categoriesUnder(MainActivity a) {
