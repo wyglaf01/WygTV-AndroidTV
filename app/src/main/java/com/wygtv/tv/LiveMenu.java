@@ -139,6 +139,15 @@ final class LiveMenu {
     }
 
     /** The playing playlist's categories, indented under its heading. */
+    /** Closes the playing playlist's categories (as OK on the playlist does) and puts the focus back on the playlist. */
+    private static void collapse(MainActivity a) {
+        String pid = a.library.activeId();
+        open.remove(pid);
+        focusHeader = pid;
+        a.resumeCategory = a.category; // keep the guide on whatever it shows now
+        top(a);
+    }
+
     private static void categoriesUnder(MainActivity a) {
         java.util.Set<String> hidden = a.hiddenCategories();
         int hiddenCount = 0;
@@ -149,7 +158,8 @@ final class LiveMenu {
             String id = c.optString("category_id"), title = c.optString("category_name", "Category");
             if (hidden.contains(id)) { hiddenCount++; continue; }
             pick(a, "      › " + title, id).setOnLongClickListener(w -> {
-                new Dialogs.Builder(a).setTitle(title).setItems(new String[]{"Hide this category", "Cancel"}, (d, which) -> {
+                new Dialogs.Builder(a).setTitle(title).setItems(new String[]{"Hide this category", "▲  Collapse categories", "Cancel"}, (d, which) -> {
+                    if (which == 1) { collapse(a); return; }
                     if (which != 0) return;
                     java.util.Set<String> h = a.hiddenCategories();
                     h.add(id);
