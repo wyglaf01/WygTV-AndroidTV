@@ -186,8 +186,10 @@ final class LiveMenu {
             android.widget.TextView cat = pick(a, "      › " + title, id);
             UNDER.add(cat);
             cat.setOnLongClickListener(w -> {
-                new Dialogs.Builder(a).setTitle(title).setItems(new String[]{"Hide this category", "▲  Collapse categories", "Cancel"}, (d, which) -> {
-                    if (which == 1) { collapse(a); return; }
+                new Dialogs.Builder(a).setTitle(title).setItems(new String[]{"Hide this category", "⊘  Hide / show channels…", "▲  Collapse categories", "Cancel"}, (d, which) -> {
+                    // Ticks for this category's channels only; back in Live TV on this category afterwards.
+                    if (which == 1) { Manage.channelsIn(a, id, title, () -> { a.resumeCategory = id; a.browse("live"); }); return; }
+                    if (which == 2) { collapse(a); return; }
                     if (which != 0) return;
                     java.util.Set<String> h = a.hiddenCategories();
                     h.add(id);

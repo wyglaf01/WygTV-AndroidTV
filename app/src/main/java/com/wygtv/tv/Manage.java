@@ -165,6 +165,17 @@ final class Manage {
         }, "Unable to load categories");
     }
 
+    /**
+     * The tick page for one Live TV category only (from holding OK on the category): ticked = shown. Only the
+     * channels in that category are listed, so only they can be hidden or shown again here.
+     */
+    static void channelsIn(MainActivity a, String categoryId, String name, Runnable after) {
+        String key = a.hiddenChannelsKey();
+        List<Group> groups = new ArrayList<>();
+        groups.add(new Group("›  " + name, key, false, got -> loadChannels(a, categoryId, got, null, "No channels in " + name + ".")));
+        new Page(a, "HIDE AND SHOW CHANNELS  •  " + name.toUpperCase(java.util.Locale.ROOT), "channels", groups, 0, after).open();
+    }
+
     /** Loads a category's channels (or every channel when categoryId is ""); onlyThese keeps just those ids. */
     private static void loadChannels(MainActivity a, String categoryId, Got got, Set<String> onlyThese, String empty) {
         String action = "get_live_streams" + (categoryId.isEmpty() ? "" : "&category_id=" + a.enc(categoryId));
