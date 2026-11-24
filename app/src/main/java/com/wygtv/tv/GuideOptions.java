@@ -8,7 +8,7 @@ import java.util.HashSet;
 
 /**
  * Hold OK on a channel in a guide (TV Guide or the Live TV guide): Favorites and channel groups
- * (hiding channels is done in Settings › Hide and show channels);
+ * (hiding channels is done by holding OK on a category in Live TV › Hide / show channels);
  * OK while a channel plays: Resume, Favorites and channel groups,
  * saved in the channel's own playlist so channels from other playlists work too.
  */

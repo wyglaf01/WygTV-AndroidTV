@@ -465,9 +465,6 @@ final class Menus {
             final int catsRow = list.getChildCount();
             row(a, list, "Manage categories", Manage.categorySummary(a) + "  •  press OK to tick the categories to show, playlist by playlist",
                     () -> Manage.categories(a, () -> settings(a, catsRow)));
-            final int chansRow = list.getChildCount();
-            row(a, list, "Hide and show channels", Manage.channelSummary(a) + "  •  press OK to tick the channels to show, category by category",
-                    () -> Manage.channels(a, () -> settings(a, chansRow)));
             final int hiddenRow = list.getChildCount();
             int hidden = a.hiddenCount();
             row(a, list, "Show everything again", hidden == 0 ? "nothing hidden" : hidden + " hidden  •  press OK to show every hidden category and channel", () -> {
