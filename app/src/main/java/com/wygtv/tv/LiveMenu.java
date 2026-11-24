@@ -151,13 +151,16 @@ final class LiveMenu {
     private static void categoriesUnder(MainActivity a) {
         java.util.Set<String> hidden = a.hiddenCategories();
         int hiddenCount = 0;
-        pick(a, "      All categories", "");
+        UNDER.clear();
+        UNDER.add(pick(a, "      All categories", ""));
         for (int i = 0; i < a.categories.length(); i++) {
             JSONObject c = a.categories.optJSONObject(i);
             if (c == null) continue;
             String id = c.optString("category_id"), title = c.optString("category_name", "Category");
             if (hidden.contains(id)) { hiddenCount++; continue; }
-            pick(a, "      › " + title, id).setOnLongClickListener(w -> {
+            android.widget.TextView cat = pick(a, "      › " + title, id);
+            UNDER.add(cat);
+            cat.setOnLongClickListener(w -> {
                 new Dialogs.Builder(a).setTitle(title).setItems(new String[]{"Hide this category", "▲  Collapse categories", "Cancel"}, (d, which) -> {
                     if (which == 1) { collapse(a); return; }
                     if (which != 0) return;
@@ -170,7 +173,41 @@ final class LiveMenu {
                 return true;
             });
         }
-        a.button(hiddenCount == 0 ? "      ◐ Hide / show categories" : "      ◐ Hide / show categories (" + hiddenCount + " hidden)", a.side, a::manageCategories);
+        UNDER.add(a.button(hiddenCount == 0 ? "      ◐ Hide / show categories" : "      ◐ Hide / show categories (" + hiddenCount + " hidden)", a.side, a::manageCategories));
+    }
+
+    /** The entries listed under the open playlist (its categories), so Back on one of them steps out to the playlist. */
+    private static final java.util.Set<android.view.View> UNDER = java.util.Collections.newSetFromMap(new java.util.WeakHashMap<>());
+
+    /** The menu entry the focus last left from (into the channels, guide or posters); ◀ and Back return to it. */
+    private static java.lang.ref.WeakReference<android.view.View> origin = new java.lang.ref.WeakReference<>(null);
+
+    /** The origin entry, if it is still in the menu now on screen. */
+    private static android.view.View originIn(android.view.View menu) {
+        android.view.View v = origin.get();
+        return v != null && v.isAttachedToWindow() && v.isFocusable() && inside(v, menu) ? v : null;
+    }
+
+    /**
+     * Back on Live TV, Movies and Series. From the channels, guide or posters it returns to the menu entry you came
+     * from; on a category under an open playlist it closes the categories and goes back to the playlist.
+     * Returns true when the key was used.
+     */
+    static boolean backToMenu(MainActivity a) {
+        if (menuScroll == null || !menuScroll.isShown()) return false;
+        android.view.View f = a.getCurrentFocus();
+        if (f == null) return false;
+        boolean inMenu = inside(f, menuScroll) || (parentScroll != null && parentScroll.isShown() && inside(f, parentScroll));
+        if (!inMenu && a.root != null && inside(f, a.root)) {
+            android.view.View o = originIn(menuScroll);
+            if (o == null && a.side.getChildCount() > 1) o = a.side.getChildAt(1);
+            if (o != null) { o.requestFocus(); return true; }
+        }
+        if ("live".equals(a.mode) && tier.equals(TOP) && UNDER.contains(f) && f.isAttachedToWindow()) {
+            collapse(a);
+            return true;
+        }
+        return false;
     }
 
     private static final android.os.Handler UI = new android.os.Handler(android.os.Looper.getMainLooper());
@@ -378,7 +415,18 @@ final class LiveMenu {
             if (newFocus == null || menuScroll != categoryScroll || !screen.equals(a.mode)) return;
             if (content != null && !inside(newFocus, content)) return; // the main menu, a dialog…
             boolean inParent = parentScroll != null && parentScroll.isShown() && inside(newFocus, parentScroll);
-            setCollapsed(a, !inside(newFocus, categoryScroll));
+            boolean inMenu = inside(newFocus, categoryScroll);
+            if (oldFocus != null && oldFocus != newFocus) {
+                boolean wasInMenu = inside(oldFocus, categoryScroll);
+                if (wasInMenu && !inMenu && !inParent) origin = new java.lang.ref.WeakReference<>(oldFocus); // left the menu for the channels
+                else if (inMenu && !wasInMenu && inside(oldFocus, content)
+                        && !(parentScroll != null && inside(oldFocus, parentScroll))) {
+                    // Coming back from the channels (◀): land on the entry you left from, not the nearest one.
+                    android.view.View o = originIn(categoryScroll);
+                    if (o != null && o != newFocus) categoryScroll.post(o::requestFocus);
+                }
+            }
+            setCollapsed(a, !inMenu);
             setParentCollapsed(a, !inParent);
         };
         android.view.View.OnAttachStateChangeListener attach = new android.view.View.OnAttachStateChangeListener() {
