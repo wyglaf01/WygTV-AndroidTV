@@ -92,13 +92,13 @@ final class LiveMenu {
             if (p == null || Library.isHdhr(p)) continue; // tuners show as Antenna TV above
             String pid = p.optString("id");
             boolean on = pid.equals(active);
-            boolean expanded = on && open.contains(pid);
-            // OK on a playlist opens its categories right under it; OK again closes them.
-            android.widget.TextView head = a.button((expanded ? "▼  " : "▶  ") + Library.nameOf(p) + (on ? "  ●" : ""), a.side, () -> togglePlaylist(a, p));
+            boolean expanded = open.contains(pid);
+            // Every switched-on playlist works the same: OK opens its categories right under it; OK again closes them.
+            android.widget.TextView head = a.button((expanded ? "▼  " : "▶  ") + Library.nameOf(p), a.side, () -> togglePlaylist(a, p));
             head.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
             head.setTextColor(Theme.ACCENT);
             if (pid.equals(focusHeader)) { header = head; lastHeader = head; }
-            if (expanded) categoriesUnder(a);
+            if (expanded) { if (on) categoriesUnder(a); else otherCategoriesUnder(a, p); }
         }
         // Start in the menu (Favorites highlighted) unless coming back from a channel, which re-focuses that channel.
         a.previewOnly = a.resumeStreamId == null;
@@ -132,18 +132,79 @@ final class LiveMenu {
     private static void togglePlaylist(MainActivity a, JSONObject p) {
         String pid = p.optString("id");
         focusHeader = pid;
-        if (!pid.equals(a.library.activeId())) {
-            open.add(pid);
-            tier = TOP;
-            a.switchPlaylist(p);
-            a.browse("live");
-            return;
-        }
-        if (open.remove(pid)) closedOnPurpose = true; else open.add(pid);
+        if (open.remove(pid)) closedOnPurpose = pid.equals(a.library.activeId()); else open.add(pid);
         a.resumeCategory = a.category; // keep the guide on whatever it shows now
         top(a);
         focusLater(a);
     }
+
+    /** Live categories of playlists other than the one whose channels are loaded, by playlist id (kept while the app runs). */
+    private static final java.util.Map<String, JSONArray> OTHER_CATS = new java.util.HashMap<>();
+    private static final java.util.Set<String> OTHER_LOADING = new java.util.HashSet<>();
+
+    /**
+     * The categories of another switched-on playlist, under its heading, so every playlist can be opened at any time.
+     * Picking one shows that category's channels (the app loads that playlist's channels behind the scenes).
+     */
+    private static void otherCategoriesUnder(MainActivity a, JSONObject p) {
+        String pid = p.optString("id");
+        JSONArray cats = OTHER_CATS.get(pid);
+        if (cats == null) {
+            a.button("      Loading…", a.side, () -> { });
+            fetchOther(a, p);
+            return;
+        }
+        java.util.Set<String> hidden = a.prefs.getStringSet(Library.prefixOf(p) + "hidden_categories_live", java.util.Collections.<String>emptySet());
+        a.button("      All categories", a.side, () -> openOther(a, p, ""));
+        for (int i = 0; i < cats.length(); i++) {
+            JSONObject c = cats.optJSONObject(i);
+            if (c == null) continue;
+            String id = c.optString("category_id"), title = c.optString("category_name", "Category");
+            if (hidden.contains(id)) continue; // hidden categories stay out
+            a.button("      › " + title, a.side, () -> openOther(a, p, id));
+        }
+        if (cats.length() == 0) a.button("      No categories", a.side, () -> { });
+    }
+
+    private static void openOther(MainActivity a, JSONObject p, String categoryId) {
+        open.add(p.optString("id"));
+        tier = TOP;
+        a.switchPlaylist(p);
+        a.resumeCategory = categoryId;
+        a.browse("live");
+    }
+
+    /** Loads another playlist's live categories in the background (Xtream from the server, M3U from its saved copy). */
+    private static void fetchOther(MainActivity a, JSONObject p) {
+        String pid = p.optString("id");
+        if (!OTHER_LOADING.add(pid)) return;
+        new Thread(() -> {
+            JSONArray list = null;
+            try {
+                if (Library.M3U.equals(p.optString("type"))) {
+                    list = new JSONArray();
+                    for (String g : a.library.m3uOf(p).groups) list.put(new JSONObject().put("category_id", g).put("category_name", g));
+                } else {
+                    String text = Library.download(p.optString("host") + "/player_api.php?username=" + a.enc(p.optString("user"))
+                            + "&password=" + a.enc(p.optString("pass")) + "&action=get_live_categories", 30000).trim();
+                    list = text.startsWith("[") ? new JSONArray(text) : new JSONArray();
+                }
+            } catch (Throwable ignored) { }
+            final JSONArray got = list;
+            a.runOnUiThread(() -> {
+                OTHER_LOADING.remove(pid);
+                if (a.isFinishing() || a.isDestroyed()) return;
+                if (got == null) {
+                    android.widget.Toast.makeText(a, "Couldn't load " + Library.nameOf(p) + " categories", android.widget.Toast.LENGTH_LONG).show();
+                    open.remove(pid);
+                } else OTHER_CATS.put(pid, got);
+                if ("live".equals(a.mode) && tier.equals(TOP)) { a.resumeCategory = a.category; focusHeader = pid; top(a); }
+            });
+        }).start();
+    }
+
+    /** Forgets other playlists' categories (after playlists change). */
+    static void forgetOthers() { OTHER_CATS.clear(); }
 
     /** The playing playlist's categories, indented under its heading. */
     /** Closes the playing playlist's categories (as OK on the playlist does) and puts the focus back on the playlist. */

@@ -264,6 +264,10 @@ final class Manage {
     static void applyPlaylistsOnOff(MainActivity a) {
         JSONObject next = a.library.replacementForActive();
         MasterSearch.clear();
+        LiveMenu.forgetOthers();
+        // Switched-off playlists are never loaded or updated; their saved lists are deleted to free space.
+        JSONArray all = a.library.all();
+        for (int i = 0; i < all.length(); i++) { JSONObject p = all.optJSONObject(i); if (p != null && !a.library.isOn(p)) { a.library.freeSpaceOf(p); a.otherLive.remove(p.optString("id")); } }
         if (next != null) a.switchPlaylist(next);
         else if (a.activeLive != null && a.liveIndex != null) a.rebuildSearchIndex();
     }

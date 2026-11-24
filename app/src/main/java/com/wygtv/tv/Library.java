@@ -745,15 +745,15 @@ final class Library {
      * file the first time (and again once it's {@link #LIVE_CACHE_MS} old), then read item by item, keeping only the
      * channels whose name matches {@code queryKey} (a {@link XtreamProtocol#searchKey}). Names starting with the
      * search come first, then names containing it; at most {@code max} channels. Each is tagged with "playlist".
-     * Hidden categories are left out; hidden channels too, except in the playing playlist (they show there as ⊘).
+     * Hidden categories and hidden channels are left out.
      * Call off the UI thread.
      */
     JSONArray searchLiveIn(JSONObject p, String queryKey, int max) throws Exception {
         String id = p.optString("id"), pre = prefixOf(p);
         boolean active = id.equals(activeId());
         java.util.Set<String> hiddenCats = prefs.getStringSet(pre + "hidden_categories_live", java.util.Collections.<String>emptySet());
-        java.util.Set<String> hiddenChannels = active && !isHdhr(p) ? java.util.Collections.<String>emptySet() // antenna channels hidden stay hidden everywhere
-                : prefs.getStringSet(pre + "hidden_channels_live", java.util.Collections.<String>emptySet());
+        // Hidden categories and hidden channels never come up in search, in any playlist.
+        java.util.Set<String> hiddenChannels = prefs.getStringSet(pre + "hidden_channels_live", java.util.Collections.<String>emptySet());
         JSONArray starts = new JSONArray(), contains = new JSONArray();
         if (M3U.equals(p.optString("type"))) {
             M3u.Playlist pl = active ? m3uBlocking() : m3uOf(p);
@@ -858,6 +858,17 @@ final class Library {
 
     private File liveCacheFile(JSONObject p) {
         return new File(a.getCacheDir(), "live_search_" + p.optString("id").replaceAll("[^A-Za-z0-9_-]", "_") + ".json");
+    }
+
+    /**
+     * Frees the space a switched-off playlist used: its saved channel, movie and series lists and its saved M3U copy.
+     * They're downloaded again only if it's switched back on.
+     */
+    void freeSpaceOf(JSONObject p) {
+        String id = p.optString("id").replaceAll("[^A-Za-z0-9_-]", "_");
+        for (String n : new String[]{"live_search_" + id + ".json", "vod_vod_" + id + ".json", "vod_series_" + id + ".json"}) new File(a.getCacheDir(), n).delete();
+        if (M3U.equals(p.optString("type")) && !isHdhr(p)) m3uFile(p.optString("url")).delete();
+        synchronized (otherM3u) { otherM3u.remove(p.optString("url")); }
     }
 
     /** Forgets every saved channel list used by search, so the next search downloads fresh ones. */
