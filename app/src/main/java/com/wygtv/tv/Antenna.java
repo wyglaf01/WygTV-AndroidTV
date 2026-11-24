@@ -51,15 +51,6 @@ final class Antenna {
         return "📡 " + nameOf(tuner);
     }
 
-    /** Adds the Antenna TV entries to the first tier of the Live TV menu. */
-    static void addMenuEntries(MainActivity a) {
-        for (JSONObject t : tuners(a)) {
-            String id = PREFIX + t.optString("id");
-            // Highlighting it previews its channels; OK opens its full guide with only the side menu (collapsed) on the left.
-            LiveMenu.pick(a, label(a, t), id).setOnClickListener(w -> a.showGuide(id, null, true));
-        }
-    }
-
     /** Adds each tuner ("📡 Antenna TV") to the TV guide's "Showing" choices. */
     static void addGuideChoices(MainActivity a, List<String> ids, List<String> names) {
         for (JSONObject t : tuners(a)) { ids.add(PREFIX + t.optString("id")); names.add(label(a, t)); }

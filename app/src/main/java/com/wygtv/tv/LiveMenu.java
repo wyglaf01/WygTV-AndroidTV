@@ -47,7 +47,7 @@ final class LiveMenu {
         a.browse("live");
     }
 
-    /** First tier: Favorites, Search, added categories, added playlists. */
+    /** First tier: Favorites, Search, added categories, added playlists. The full guide and antenna tuners are on the side rail (▦, 📡). */
     static void top(MainActivity a) {
         tier = TOP;
         hideParent();
@@ -57,8 +57,6 @@ final class LiveMenu {
         pick(a, "★ Favorites", "fav");
         a.sideFixed = 1;
         a.button("⌕ Search", a.side, a::searchLive);
-        a.button("▦ Full TV guide", a.side, () -> a.openGuide(null));
-        Antenna.addMenuEntries(a);
         if (AirTv.isOn(a.prefs)) a.button("📡 " + AirTv.nameOf(a.prefs), a.side, () -> AirTv.open(a)); // opens Sling (AirTV has no open channel list)
         JSONArray mine = VirtualCategories.all(a);
         for (int i = 0; i < mine.length(); i++) {
@@ -246,11 +244,6 @@ final class LiveMenu {
         compact(a, "←", a.liveOnly() ? "TV Guide" : "Home", false, a::home);
         compact(a, "★", "Favorites", false, () -> backTo(a, "fav"));
         compact(a, "⌕", "Search", false, a::searchLive);
-        compact(a, "▦", "TV guide", false, () -> a.openGuide(null));
-        for (JSONObject t : Antenna.tuners(a)) {
-            String id = Antenna.PREFIX + t.optString("id");
-            compact(a, "📡", Antenna.nameOf(t), false, () -> a.showGuide(id, null, true));
-        }
         if (AirTv.isOn(a.prefs)) compact(a, "📡", AirTv.nameOf(a.prefs), false, () -> AirTv.open(a));
         JSONArray mine = VirtualCategories.all(a);
         for (int i = 0; i < mine.length(); i++) {
