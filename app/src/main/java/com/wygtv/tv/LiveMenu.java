@@ -581,7 +581,7 @@ final class LiveMenu {
             for (Map.Entry<String, ?> e : stored.entrySet()) {
                 if (!e.getKey().startsWith(head)) continue;
                 String id = e.getKey().substring(head.length()), title = String.valueOf(e.getValue());
-                if (title.isEmpty()) continue;
+                if (title.isEmpty() || a.library.hiddenAntenna(p.optString("id"), id)) continue; // hidden antenna channel
                 Object ext = stored.get(pre + "ext_live_" + id);
                 try {
                     JSONObject it = new JSONObject().put("stream_id", id).put("name", title)
