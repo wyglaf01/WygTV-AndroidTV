@@ -95,7 +95,8 @@ jobs:
           if-no-files-found: ignore
 
   # Every build on `app` goes to the WygTV Beta pre-release (tag wygtv-beta) as
-  # wygtv-beta-<version>.apk. It does NOT reach the in-app updater or the Downloader link.
+  # wygtv-beta-<version>.apk and wygtv-beta.apk. It is a separate app (com.wygtv.tv.beta) that installs next to
+  # the release and updates itself from here; the release's updater and Downloader link never get a beta.
   # When the beta is OK, run the "Release WygTV" workflow to promote it.
   publish:
     needs: build

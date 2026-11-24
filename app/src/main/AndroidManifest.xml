@@ -16,6 +16,6 @@
   <receiver android:name=".UpdatedReceiver" android:exported="true">
    <intent-filter><action android:name="android.intent.action.MY_PACKAGE_REPLACED"/></intent-filter>
   </receiver>
-  <provider android:name=".ApkProvider" android:authorities="com.wygtv.tv.update" android:exported="false" android:grantUriPermissions="true"/>
+  <provider android:name=".ApkProvider" android:authorities="${applicationId}.update" android:exported="false" android:grantUriPermissions="true"/>
  </application>
 </manifest>

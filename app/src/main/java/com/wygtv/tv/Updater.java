@@ -27,7 +27,11 @@ import java.net.URL;
  * (playlists, favourites and settings are kept).
  */
 final class Updater {
-    static final String RELEASE = "https://github.com/wyglaf01/WygTV-AndroidTV/releases/latest/download/";
+    /** The beta is its own app (com.wygtv.tv.beta) and updates from the beta; the release updates from the latest release. */
+    static final boolean BETA = BuildConfig.APPLICATION_ID.endsWith(".beta");
+    static final String RELEASE = BETA ? "https://github.com/wyglaf01/WygTV-AndroidTV/releases/download/wygtv-beta/"
+            : "https://github.com/wyglaf01/WygTV-AndroidTV/releases/latest/download/";
+    static final String APK = BETA ? "wygtv-beta.apk" : "wygtv.apk";
     static final String PREF_AUTO = "update_check_startup";
     /** versionCode WygTV had when it started installing an update; read again on the next start. */
     static final String PREF_FROM = "update_from";
@@ -91,7 +95,7 @@ final class Updater {
             String error = null;
             try {
                 apk.getParentFile().mkdirs();
-                HttpURLConnection c = open(RELEASE + "wygtv.apk");
+                HttpURLConnection c = open(RELEASE + APK);
                 int total = c.getContentLength();
                 try (InputStream in = c.getInputStream(); OutputStream out = new FileOutputStream(apk)) {
                     byte[] buf = new byte[64 * 1024];
