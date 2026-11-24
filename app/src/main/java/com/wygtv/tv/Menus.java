@@ -448,7 +448,7 @@ final class Menus {
         if (g.isEmpty()) {
             row(a, list, groupIcon(GROUP_PLAYLISTS) + "  " + groupTitle(GROUP_PLAYLISTS), "playlists, HDHomeRun, AirTV, manage categories, hide and show channels, channel groups, TV guides (EPG)", () -> settingsGroup(a, GROUP_PLAYLISTS));
             row(a, list, groupIcon(GROUP_PLAYER) + "  " + groupTitle(GROUP_PLAYER), "built-in or external player, live stream format, buffer, video decoder, subtitles, watched series, play next", () -> settingsGroup(a, GROUP_PLAYER));
-            row(a, list, groupIcon(GROUP_APPEARANCE) + "  " + groupTitle(GROUP_APPEARANCE), "theme, glass effect, app mode, start-up screen, side menu order, Exit button, guide rows, channel order, live preview, movie and series info, IMDb ratings", () -> settingsGroup(a, GROUP_APPEARANCE));
+            row(a, list, groupIcon(GROUP_APPEARANCE) + "  " + groupTitle(GROUP_APPEARANCE), "theme, glass effect, app mode, main screen, start-up screen, side menu order, Exit button, guide rows, channel order, live preview, movie and series info, IMDb ratings", () -> settingsGroup(a, GROUP_APPEARANCE));
             row(a, list, groupIcon(GROUP_BACKUP) + "  " + groupTitle(GROUP_BACKUP), "back up, restore, check for updates  •  WygTV " + Updater.installedName(a), () -> settingsGroup(a, GROUP_BACKUP));
         } else if (g.equals(GROUP_PLAYLISTS)) {
             row(a, list, "Manage playlists", Manage.playlistSummary(a) + "  •  press OK to add, edit, refresh, delete or turn playlists on and off", () -> { playlistsFromSettings = true; playlists(a); });
@@ -603,6 +603,14 @@ final class Menus {
                         a.prefs.edit().putString("start_screen", startKeys[i]).apply();
                         settings(a, startRow);
                     }));
+            if (!liveOnly) {
+                final int homeRow = list.getChildCount();
+                row(a, list, "Main screen", Showcase.LABELS[Showcase.on(a.prefs) ? 0 : 1] + "  •  press OK to choose", () ->
+                        choose(a, "Main screen", Showcase.LABELS, Showcase.on(a.prefs) ? 0 : 1, i -> {
+                            a.prefs.edit().putString(Showcase.PREF, i == 0 ? "showcase" : "classic").apply();
+                            settings(a, homeRow);
+                        }));
+            }
             final int orderRow = list.getChildCount();
             row(a, list, "Side menu order", "press OK to move side menu items up and down", () -> MenuOrder.edit(a, () -> settings(a, orderRow)));
             if (!liveOnly) {
