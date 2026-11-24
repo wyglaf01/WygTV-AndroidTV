@@ -1,5 +1,8 @@
 # WygTv v2.0 — Four-option opening screen
 
+## How WygTV started
+WygTV began as a way to watch free over-the-air channels from an HDHomeRun network tuner, with its own channel list and TV guide. It then grew into a full IPTV player, so Xtream Codes and M3U playlists can be added alongside the antenna. The first version was made for Android TVs and tablets, and there are now versions for Windows, Mac and Ubuntu too.
+
 Opens directly to a glass-themed Home dashboard with Manage / Login to Playlist, Live TV, Movies and Series. Live TV, Movies and Series use the selected saved playlist or offer a playlist picker; credentials are not requested on every startup. Existing cascading menus, themes and launcher icon remain.
 
 Build: `export ANDROID_HOME="$HOME/Library/Android/sdk" && bash build-on-mac.sh`. Install: `adb install -r output/WygTv.apk`.
