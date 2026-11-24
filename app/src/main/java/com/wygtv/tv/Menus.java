@@ -219,7 +219,7 @@ final class Menus {
                 a.library.put(p);
                 a.switchPlaylist(p);
                 Toast.makeText(a, "Connected to " + p.optString("title"), Toast.LENGTH_SHORT).show();
-                AutoRefresh.added(a, p, a::home);
+                AutoRefresh.added(a, p, a::firstScreen);
             }, "Connection failed");
         });
         a.button("Cancel", form, () -> a.leaveForm());
@@ -276,7 +276,7 @@ final class Menus {
                 a.library.put(p);
                 a.switchPlaylist(p);
                 Toast.makeText(a, loaded.channels.size() + " channels in " + loaded.groups.size() + " groups", Toast.LENGTH_LONG).show();
-                AutoRefresh.added(a, p, a::home);
+                AutoRefresh.added(a, p, a::firstScreen);
             });
         }).start();
     }
@@ -407,7 +407,7 @@ final class Menus {
                 a.library.put(p);
                 if (first || p.optString("id").equals(a.library.activeId())) a.switchPlaylist(p);
                 Toast.makeText(a, loaded.channels.size() + " antenna channels added. Find them in Live TV under " + p.optString("title") + ".", Toast.LENGTH_LONG).show();
-                if (first) a.home(); else backToTuners(a);
+                if (first) a.firstScreen(); else backToTuners(a);
             });
         }).start();
     }
