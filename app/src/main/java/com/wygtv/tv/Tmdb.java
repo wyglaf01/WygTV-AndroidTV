@@ -294,6 +294,26 @@ final class Tmdb {
     }
 
     /** True when TMDb accepts the key (for Settings). */
+    /**
+     * This week's trending movies or TV series on TMDb, most popular first ({@code pages} × 20 titles), for the main
+     * screen. Empty when there is no TMDb key. Call off the UI thread.
+     */
+    static JSONArray trending(Context c, boolean tv, int pages) throws Exception {
+        JSONArray out = new JSONArray();
+        String key = key(c);
+        if (key.isEmpty()) return out;
+        for (int page = 1; page <= pages; page++) {
+            JSONArray r = get(key, "trending/" + (tv ? "tv" : "movie") + "/week?page=" + page).optJSONArray("results");
+            for (int i = 0; r != null && i < r.length(); i++) if (r.optJSONObject(i) != null) out.put(r.optJSONObject(i));
+        }
+        return out;
+    }
+
+    /** A TMDb image address at the given size (e.g. "w342", "w780"), or "" for none. */
+    static String image(String path, String size) {
+        return path == null || path.isEmpty() || "null".equals(path) ? "" : IMAGES + size + path;
+    }
+
     static boolean works(String key) {
         try { return get(key, "configuration").has("images"); } catch (Exception e) { return false; }
     }

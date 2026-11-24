@@ -151,6 +151,7 @@ final class AutoRefresh {
      */
     static void updateAll(MainActivity a, Runnable then) {
         a.library.dropLiveSearchCache(); // search downloads the fresh channel lists next time
+        Showcase.forget(a); // the main screen's popular rows are looked up again
         List<Step> steps = new ArrayList<>();
         JSONArray on = a.library.inUse();
         for (int i = 0; i < on.length(); i++) { JSONObject p = on.optJSONObject(i); if (p != null) addPlaylist(a, steps, p, true); }

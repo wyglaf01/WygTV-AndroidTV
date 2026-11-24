@@ -49,6 +49,8 @@ public class MainActivity extends Activity {
  boolean liveOnly(){return prefs.getBoolean("live_only",false);}
  void home(){Antenna.restoreMain(this);
   if(liveOnly()&&!library.isEmpty()){mode="guide";screenGeneration++;listGeneration++;shell("TV GUIDE");if(status!=null)status.setText("Loading the TV guide…");showGuide(prefs.getString(guideSourceKey(),"fav"),null,false);return;}
+  /* Main screen option 1 (default): popular movies and series. Option 2 (classic tiles) below. Settings > Appearance > Main screen. */
+  if(Showcase.on(prefs)&&!library.isEmpty()&&library.hasVod()){Showcase.show(this);return;}
   mode="home";screenGeneration++;listGeneration++;
   FrameLayout scene=new FrameLayout(this);View frame=NavRail.wrap(this,scene,"home");frame.setBackground(new SteampunkBackdrop(getResources(),R.drawable.steampunk_home,true));setContentView(frame);
   LinearLayout layout=new LinearLayout(this);layout.setOrientation(LinearLayout.VERTICAL);layout.setPadding(dp(36),dp(20),dp(36),dp(18));scene.addView(layout,new FrameLayout.LayoutParams(-1,-1));
