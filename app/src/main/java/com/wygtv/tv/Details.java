@@ -109,6 +109,12 @@ final class Details {
         });
         JSONObject[] shown = {Tmdb.fromProvider(item, null)};
         action(a, buttons, "▷  Trailer", () -> trailer(a, shown[0], name));
+        // Like the main screen's posters: where else it's streaming (needs the optional TMDb key).
+        if (!Tmdb.key(a).isEmpty()) action(a, buttons, "◎  Where to watch", () -> {
+            JSONObject m = shown[0], p = new JSONObject();
+            try { p.put("_title", m.optString("title", Tmdb.cleanTitle(name)[0])).put("_year", m.optString("year")).put("_tmdb", m.optString("tmdb_id")); } catch (org.json.JSONException ignored) { }
+            Showcase.whereToWatch(a, series, p);
+        });
 
         TextView tagline = text(a, col, 17, Theme.ACCENT);
         tagline.setTypeface(null, Typeface.ITALIC);
@@ -176,7 +182,7 @@ final class Details {
         return android.text.TextUtils.join("   •   ", parts);
     }
 
-    private static String sourceLine(MainActivity a, JSONObject m) {
+    static String sourceLine(MainActivity a, JSONObject m) {
         boolean tmdb = "TMDb".equals(m.optString("source")), omdb = m.has("omdb");
         if (tmdb || omdb) return "Details from " + (tmdb ? "TMDb" : "") + (tmdb && omdb ? ", " : "") + (omdb ? "OMDb (IMDb ratings)" : "") + " and your provider.";
         if (!Tmdb.enabled(a)) return "Details from your provider.  Add a free TMDb or OMDb API key in Settings for posters, plots, cast and IMDb ratings.";
@@ -217,7 +223,7 @@ final class Details {
 
     private static String listLabel(MainActivity a, String type, String id) { return a.inMyList(type, id) ? "✓  My List" : "＋  My List"; }
 
-    private static TextView action(MainActivity a, LinearLayout parent, String label, Runnable r) {
+    static TextView action(MainActivity a, LinearLayout parent, String label, Runnable r) {
         TextView v = a.button(label, parent, r);
         v.setTextSize(19);
         v.setGravity(Gravity.CENTER);
@@ -228,7 +234,7 @@ final class Details {
         return v;
     }
 
-    private static TextView text(MainActivity a, LinearLayout parent, int size, int color) {
+    static TextView text(MainActivity a, LinearLayout parent, int size, int color) {
         TextView t = a.label("", size);
         t.setTextColor(color);
         t.setGravity(Gravity.START);
@@ -237,7 +243,7 @@ final class Details {
         return t;
     }
 
-    private static void show(TextView t, String s) {
+    static void show(TextView t, String s) {
         t.setText(s);
         t.setVisibility(s == null || s.isEmpty() ? View.GONE : View.VISIBLE);
     }
