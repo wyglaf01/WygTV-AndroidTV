@@ -24,10 +24,14 @@ final class Antenna {
 
     static boolean isAntenna(String categoryId) { return categoryId != null && categoryId.startsWith(PREFIX); }
 
-    /** Saved tuners, in the order they were added. */
-    static List<JSONObject> tuners(MainActivity a) {
+    /** Switched-on tuners, in the order they were added (side menu, Home, guides). */
+    static List<JSONObject> tuners(MainActivity a) { return tuners(a, a.library.inUse()); }
+
+    /** Every saved tuner, switched off or not (Settings > HDHomeRun antenna TV). */
+    static List<JSONObject> allTuners(MainActivity a) { return tuners(a, a.library.all()); }
+
+    private static List<JSONObject> tuners(MainActivity a, JSONArray all) {
         List<JSONObject> out = new ArrayList<>();
-        JSONArray all = a.library.all();
         for (int i = 0; i < all.length(); i++) { JSONObject p = all.optJSONObject(i); if (Library.isHdhr(p)) out.add(p); }
         return out;
     }
@@ -35,23 +39,16 @@ final class Antenna {
     /** Name a new HDHomeRun tuner gets automatically. */
     static final String DEFAULT_NAME = "Antenna TV";
 
-    /** The tuner's name, with "Antenna TV" for tuners that were left with no name or the device's own name. */
+    /** The tuner's name with its first letter capitalized, or "Antenna TV" for tuners that were left with no name or the device's own name. */
     static String nameOf(JSONObject tuner) {
         String t = tuner == null ? "" : tuner.optString("title").trim();
-        return t.isEmpty() || t.startsWith("HDHomeRun") ? DEFAULT_NAME : t;
+        if (t.isEmpty() || t.startsWith("HDHomeRun")) return DEFAULT_NAME;
+        return t.substring(0, 1).toUpperCase(java.util.Locale.getDefault()) + t.substring(1); // "local" shows as "Local"
     }
 
     /** "📡 Antenna TV", or whatever name the tuner was given. */
     static String label(MainActivity a, JSONObject tuner) {
         return "📡 " + nameOf(tuner);
-    }
-
-    /** Adds the Antenna TV entries to the first tier of the Live TV menu. */
-    static void addMenuEntries(MainActivity a) {
-        for (JSONObject t : tuners(a)) {
-            String id = PREFIX + t.optString("id");
-            LiveMenu.pick(a, label(a, t), id);
-        }
     }
 
     /** Adds each tuner ("📡 Antenna TV") to the TV guide's "Showing" choices. */
@@ -149,8 +146,9 @@ final class Antenna {
     static void restoreMain(MainActivity a) {
         if (!a.library.activeIsHdhr()) return;
         JSONObject main = a.library.find(a.prefs.getString(MAIN_PLAYLIST, ""));
+        if (main != null && !a.library.isOn(main)) main = null;
         if (main == null) {
-            JSONArray all = a.library.all();
+            JSONArray all = a.library.inUse();
             for (int i = 0; i < all.length() && main == null; i++) { JSONObject p = all.optJSONObject(i); if (p != null && !Library.isHdhr(p)) main = p; }
         }
         if (main != null) a.switchPlaylist(main);

@@ -60,6 +60,50 @@ final class Library {
 
     boolean isEmpty() { return all().length() == 0; }
 
+    // ------------------------------------------------------------------ on / off
+
+    /** Pref: ids of saved playlists that are switched off (Settings > Manage playlists > Turn playlists on or off). */
+    static final String OFF = "playlists_off";
+
+    java.util.Set<String> offIds() { return prefs.getStringSet(OFF, java.util.Collections.<String>emptySet()); }
+
+    boolean isOn(JSONObject p) { return p != null && !offIds().contains(p.optString("id")); }
+
+    /**
+     * The saved playlists that are switched on: everything the menus, guides, Favorites and Search read from.
+     * A switched-off playlist is skipped (never downloaded or refreshed) until it is switched back on.
+     */
+    /** The first switched-on playlist with movies and series (Xtream Codes), or null when none has them. */
+    JSONObject firstVod() {
+        JSONArray l = inUse();
+        for (int i = 0; i < l.length(); i++) { JSONObject p = l.optJSONObject(i); if (p != null && !M3U.equals(p.optString("type"))) return p; }
+        return null;
+    }
+
+    /** True when any switched-on playlist has movies and series, so Home and the side menu show them. */
+    boolean hasVod() { return firstVod() != null; }
+
+    JSONArray inUse() {
+        JSONArray l = all(), out = new JSONArray();
+        java.util.Set<String> off = offIds();
+        for (int i = 0; i < l.length(); i++) { JSONObject p = l.optJSONObject(i); if (p != null && !off.contains(p.optString("id"))) out.put(p); }
+        return out;
+    }
+
+    /**
+     * When the playlist in use was switched off, the first switched-on one takes over (a regular playlist
+     * before an antenna tuner). Returns that playlist, or null when nothing had to change.
+     */
+    JSONObject replacementForActive() {
+        JSONObject active = find(activeId());
+        if (active != null && isOn(active)) return null;
+        JSONArray on = inUse();
+        JSONObject pick = null;
+        for (int i = 0; i < on.length() && pick == null; i++) { JSONObject p = on.optJSONObject(i); if (!isHdhr(p)) pick = p; }
+        if (pick == null) pick = on.optJSONObject(0);
+        return pick;
+    }
+
     void saveAll(JSONArray list) { prefs.edit().putString("playlists", list.toString()).apply(); }
 
     /** The prefix that a playlist's favorites, hidden items and lists are saved under (same as MainActivity.accountPrefix() while it is active). */
@@ -93,11 +137,15 @@ final class Library {
         JSONArray l = all(), out = new JSONArray();
         for (int i = 0; i < l.length(); i++) { JSONObject q = l.optJSONObject(i); if (q != null && !q.optString("id").equals(id)) out.put(q); }
         saveAll(out);
+        java.util.Set<String> off = new java.util.HashSet<>(offIds());
+        if (off.remove(id)) prefs.edit().putStringSet(OFF, off).apply();
         JSONObject gone = null;
         for (int i = 0; i < l.length(); i++) { JSONObject q = l.optJSONObject(i); if (q != null && q.optString("id").equals(id)) gone = q; }
         if (gone != null && M3U.equals(gone.optString("type"))) m3uFile(gone.optString("url")).delete();
         if (id.equals(activeId())) {
-            if (out.length() > 0) activate(out.optJSONObject(0));
+            JSONObject next = replacementForActive();
+            if (next == null && out.length() > 0) next = out.optJSONObject(0);
+            if (next != null) activate(next);
             else prefs.edit().remove("active_playlist").remove("title").remove("host").remove("user").remove("pass").remove("expiry")
                     .remove("type").remove("m3u_url").remove("epg_url").apply();
         }
@@ -231,15 +279,7 @@ final class Library {
      * "playlist" = its id. Channels and categories hidden in that playlist are left out. Call off the UI thread.
      */
     JSONArray liveChannelsOf(JSONObject p) throws Exception {
-        JSONArray raw = new JSONArray();
-        if (M3U.equals(p.optString("type"))) {
-            M3u.Playlist pl = m3uOf(p);
-            for (int i = 0; i < pl.channels.size(); i++) raw.put(channelJson(pl.channels.get(i), i));
-        } else {
-            String body = download(p.optString("host") + "/player_api.php?username=" + java.net.URLEncoder.encode(p.optString("user"), "UTF-8")
-                    + "&password=" + java.net.URLEncoder.encode(p.optString("pass"), "UTF-8") + "&action=get_live_streams", 60000);
-            raw = new JSONArray(body.trim());
-        }
+        JSONArray raw = liveSearchList(p);
         String pre = prefixOf(p), id = p.optString("id");
         java.util.Set<String> hiddenCats = prefs.getStringSet(pre + "hidden_categories_live", java.util.Collections.<String>emptySet());
         java.util.Set<String> hiddenChannels = prefs.getStringSet(pre + "hidden_channels_live", java.util.Collections.<String>emptySet());
@@ -247,6 +287,27 @@ final class Library {
         for (int i = 0; i < raw.length(); i++) {
             JSONObject o = raw.optJSONObject(i);
             if (o == null || hiddenCats.contains(o.optString("category_id")) || hiddenChannels.contains(o.optString("stream_id"))) continue;
+            o.put("playlist", id);
+            out.put(o);
+        }
+        return out;
+    }
+
+    /**
+     * Every movie ("vod") or series of a saved Xtream playlist (for the master Search), each tagged with
+     * "playlist" = its id. Hidden categories are left out; M3U playlists have none. Call off the UI thread.
+     */
+    JSONArray vodOf(JSONObject p, String type) throws Exception {
+        JSONArray out = new JSONArray();
+        if (M3U.equals(p.optString("type"))) return out;
+        JSONArray raw = downloadList(p.optString("host") + "/player_api.php?username=" + java.net.URLEncoder.encode(p.optString("user"), "UTF-8")
+                + "&password=" + java.net.URLEncoder.encode(p.optString("pass"), "UTF-8")
+                + "&action=" + (type.equals("series") ? "get_series" : "get_vod_streams"), 90000, VOD_FIELDS);
+        java.util.Set<String> hiddenCats = prefs.getStringSet(prefixOf(p) + "hidden_categories_" + type, java.util.Collections.<String>emptySet());
+        String id = p.optString("id");
+        for (int i = 0; i < raw.length(); i++) {
+            JSONObject o = raw.optJSONObject(i);
+            if (o == null || hiddenCats.contains(o.optString("category_id"))) continue;
             o.put("playlist", id);
             out.put(o);
         }
@@ -314,6 +375,13 @@ final class Library {
         });
     }
 
+    /** The player pop-up's source line: the playlist's name and what kind of source it is. */
+    static String sourceLabel(JSONObject p) {
+        if (p == null) return "";
+        if (isHdhr(p)) return "📡 " + Antenna.nameOf(p) + "  ·  HDHomeRun antenna";
+        return nameOf(p) + "  ·  " + (M3U.equals(p.optString("type")) ? "M3U playlist" : "Xtream Codes");
+    }
+
     /** A playlist's name for labels: its title, else its server. */
     static String nameOf(JSONObject p) {
         if (p == null) return "removed playlist";
@@ -360,16 +428,8 @@ final class Library {
         guideLoadedAt = now;
         try {
             File f = new File(a.getCacheDir(), guideCacheName(url));
-            if (!f.exists() || now - f.lastModified() > GUIDE_MAX_AGE) {
-                File tmp = new File(a.getCacheDir(), f.getName() + ".part");
-                HttpURLConnection c = open(url, 120000);
-                try (InputStream in = c.getInputStream(); OutputStream out = new FileOutputStream(tmp)) {
-                    byte[] buf = new byte[65536];
-                    int n;
-                    while ((n = in.read(buf)) != -1) out.write(buf, 0, n);
-                } finally { c.disconnect(); }
-                if (!tmp.renameTo(f)) throw new IllegalStateException("could not save guide");
-            }
+            // Kept as long as Settings > Update playlists and guides says (AutoRefresh does the scheduled updates).
+            if (!f.exists() || now - f.lastModified() > AutoRefresh.maxAge(prefs)) fetchTo(url, f);
             try (InputStream in = new FileInputStream(f)) { guide = Xmltv.parse(in, now - 3 * 3600_000L, now + 30 * 3600_000L); }
             guideError = "";
             return guide;
@@ -378,6 +438,51 @@ final class Library {
             guideError = "could not load (" + e.getClass().getSimpleName() + ")";
             return null;
         }
+    }
+
+    /**
+     * Downloads the active playlist's own guide again now (its XMLTV link, the M3U's guide, or the HDHomeRun
+     * guide). The old guide stays in use if the download fails. Returns "" when fine, else the problem.
+     * Call off the UI thread.
+     */
+    String reloadGuide() {
+        synchronized (hdhrGuideLock) { hdhrGuides.clear(); }
+        if (activeIsM3u()) try { m3uBlocking(); } catch (Exception ignored) { } // an M3U names its guide inside
+        String url = guideUrl();
+        if (url.isEmpty()) return "";
+        synchronized (guideLock) {
+            long now = System.currentTimeMillis();
+            try {
+                File f = new File(a.getCacheDir(), guideCacheName(url));
+                fetchTo(url, f);
+                Xmltv.Guide g;
+                try (InputStream in = new FileInputStream(f)) { g = Xmltv.parse(in, now - 3 * 3600_000L, now + 30 * 3600_000L); }
+                guide = g;
+                guideKey = url;
+                guideLoadedAt = now;
+                guideError = "";
+                return "";
+            } catch (Throwable e) {
+                String err = "could not load (" + e.getClass().getSimpleName() + ")";
+                if (guide == null || !url.equals(guideKey)) { guide = null; guideKey = url; guideLoadedAt = now; guideError = err; }
+                return err;
+            }
+        }
+    }
+
+    /** Downloads a link into a file, through a ".part" file so a failed download never replaces a good copy. */
+    static void fetchTo(String url, File f) throws Exception {
+        File tmp = new File(f.getParentFile(), f.getName() + ".part");
+        HttpURLConnection c = open(url, 120000);
+        try (InputStream in = c.getInputStream(); OutputStream out = new FileOutputStream(tmp)) {
+            byte[] buf = new byte[65536];
+            int n;
+            while ((n = in.read(buf)) != -1) {
+                if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+                out.write(buf, 0, n);
+            }
+        } finally { c.disconnect(); }
+        if (!tmp.renameTo(f)) { tmp.delete(); throw new IllegalStateException("could not save guide"); }
     }
 
     /**
@@ -602,6 +707,292 @@ final class Library {
         c.setInstanceFollowRedirects(true);
         c.setRequestProperty("User-Agent", "WygTV/1.0 (Android TV)");
         return c;
+    }
+
+    /**
+     * What a movie or series row in a search list needs (title, ids, poster, year, rating, TMDb id). Long fields such
+     * as plot and cast are left out: the details page fetches them again, and a big provider's full list would
+     * otherwise not fit in a TV box's memory.
+     */
+    /**
+     * What a live channel needs for search, playing, logos, the guide and catch-up. A big provider sends tens of
+     * thousands of channels with many more fields each; keeping only these lets the whole list fit in a TV box's memory.
+     */
+    static final java.util.Set<String> LIVE_FIELDS = new java.util.HashSet<>(java.util.Arrays.asList(
+            "name", "stream_id", "stream_icon", "epg_channel_id", "category_id", "container_extension", "num",
+            "stream_type", "tv_archive", "tv_archive_duration"));
+
+    /**
+     * Every live channel of a saved playlist (hidden ones included), with only {@link #LIVE_FIELDS}, read item by item
+     * from the network instead of as one big text, each tagged with "playlist" = its id. Call off the UI thread.
+     */
+    JSONArray liveSearchList(JSONObject p) throws Exception {
+        JSONArray raw = new JSONArray();
+        if (M3U.equals(p.optString("type"))) {
+            M3u.Playlist pl = m3uOf(p);
+            for (int i = 0; i < pl.channels.size(); i++) raw.put(channelJson(pl.channels.get(i), i));
+        } else {
+            raw = downloadList(p.optString("host") + "/player_api.php?username=" + java.net.URLEncoder.encode(p.optString("user"), "UTF-8")
+                    + "&password=" + java.net.URLEncoder.encode(p.optString("pass"), "UTF-8") + "&action=get_live_streams", 60000, LIVE_FIELDS);
+        }
+        String id = p.optString("id");
+        for (int i = 0; i < raw.length(); i++) { JSONObject o = raw.optJSONObject(i); if (o != null) o.put("playlist", id); }
+        return raw;
+    }
+
+    /**
+     * Live TV search in one playlist without holding its whole channel list in memory. An Xtream list is saved to a
+     * file the first time (and again once it's {@link #LIVE_CACHE_MS} old), then read item by item, keeping only the
+     * channels whose name matches {@code queryKey} (a {@link XtreamProtocol#searchKey}). Names starting with the
+     * search come first, then names containing it; at most {@code max} channels. Each is tagged with "playlist".
+     * Hidden categories and hidden channels are left out.
+     * Call off the UI thread.
+     */
+    JSONArray searchLiveIn(JSONObject p, String queryKey, int max) throws Exception {
+        String id = p.optString("id"), pre = prefixOf(p);
+        boolean active = id.equals(activeId());
+        java.util.Set<String> hiddenCats = prefs.getStringSet(pre + "hidden_categories_live", java.util.Collections.<String>emptySet());
+        // Hidden categories and hidden channels never come up in search, in any playlist.
+        java.util.Set<String> hiddenChannels = prefs.getStringSet(pre + "hidden_channels_live", java.util.Collections.<String>emptySet());
+        JSONArray starts = new JSONArray(), contains = new JSONArray();
+        if (M3U.equals(p.optString("type"))) {
+            M3u.Playlist pl = active ? m3uBlocking() : m3uOf(p);
+            for (int i = 0; i < pl.channels.size() && starts.length() < max; i++) {
+                M3u.Channel c = pl.channels.get(i);
+                int rank = XtreamProtocol.searchRank(XtreamProtocol.searchKey(c.name), queryKey);
+                if (rank < 0 || rank > 1 || hiddenCats.contains(c.group)) continue;
+                JSONObject o = channelJson(c, i);
+                if (hiddenChannels.contains(o.optString("stream_id"))) continue;
+                o.put("playlist", id);
+                (rank == 0 ? starts : contains).put(o);
+            }
+        } else {
+            File f = liveCacheFile(p);
+            if (!f.exists() || System.currentTimeMillis() - f.lastModified() > LIVE_CACHE_MS) {
+                saveToFile(p.optString("host") + "/player_api.php?username=" + java.net.URLEncoder.encode(p.optString("user"), "UTF-8")
+                        + "&password=" + java.net.URLEncoder.encode(p.optString("pass"), "UTF-8") + "&action=get_live_streams", 60000, f);
+            }
+            try (InputStream in = new java.io.BufferedInputStream(new FileInputStream(f), 65536);
+                 android.util.JsonReader r = new android.util.JsonReader(new java.io.InputStreamReader(in, StandardCharsets.UTF_8))) {
+                r.setLenient(true);
+                if (r.peek() != android.util.JsonToken.BEGIN_ARRAY) { f.delete(); return starts; }
+                r.beginArray();
+                while (r.hasNext() && starts.length() < max) {
+                    if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+                    if (r.peek() != android.util.JsonToken.BEGIN_OBJECT) { r.skipValue(); continue; }
+                    JSONObject o = new JSONObject();
+                    r.beginObject();
+                    while (r.hasNext()) {
+                        String name = r.nextName();
+                        if (!LIVE_FIELDS.contains(name)) { r.skipValue(); continue; }
+                        Object v = readJson(r);
+                        if (v != null) o.put(name, v);
+                    }
+                    r.endObject();
+                    int rank = XtreamProtocol.searchRank(XtreamProtocol.searchKey(o.optString("name")), queryKey);
+                    if (rank < 0 || rank > 1) continue; // not a match: dropped straight away
+                    if (hiddenCats.contains(o.optString("category_id")) || hiddenChannels.contains(o.optString("stream_id"))) continue;
+                    o.put("playlist", id);
+                    if (rank == 0) starts.put(o); else if (contains.length() < max) contains.put(o);
+                }
+            }
+        }
+        for (int i = 0; i < contains.length() && starts.length() < max; i++) starts.put(contains.opt(i));
+        return starts;
+    }
+
+    /**
+     * Every copy of one title (e.g. HD and 4K versions) in an Xtream playlist's movies or series, matched by TMDb id or
+     * by cleaned name (and year when both are known). Reads the playlist's saved list item by item (downloading it
+     * first when it's missing or old), so it uses little memory. Each match is tagged with "playlist". Call off the UI thread.
+     */
+    JSONArray findVod(JSONObject p, String type, String tmdbId, String nameKey, String altKey, String year, int max) throws Exception {
+        JSONArray out = new JSONArray();
+        if (M3U.equals(p.optString("type"))) return out;
+        String id = p.optString("id");
+        java.util.Set<String> hiddenCats = prefs.getStringSet(prefixOf(p) + "hidden_categories_" + type, java.util.Collections.<String>emptySet());
+        File f = new File(a.getCacheDir(), "vod_" + type + "_" + id.replaceAll("[^A-Za-z0-9_-]", "_") + ".json");
+        if (!f.exists() || System.currentTimeMillis() - f.lastModified() > LIVE_CACHE_MS) {
+            saveToFile(p.optString("host") + "/player_api.php?username=" + java.net.URLEncoder.encode(p.optString("user"), "UTF-8")
+                    + "&password=" + java.net.URLEncoder.encode(p.optString("pass"), "UTF-8")
+                    + "&action=" + (type.equals("series") ? "get_series" : "get_vod_streams"), 90000, f);
+        }
+        try (InputStream in = new java.io.BufferedInputStream(new FileInputStream(f), 65536);
+             android.util.JsonReader r = new android.util.JsonReader(new java.io.InputStreamReader(in, StandardCharsets.UTF_8))) {
+            r.setLenient(true);
+            if (r.peek() != android.util.JsonToken.BEGIN_ARRAY) { f.delete(); return out; }
+            r.beginArray();
+            while (r.hasNext() && out.length() < max) {
+                if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+                if (r.peek() != android.util.JsonToken.BEGIN_OBJECT) { r.skipValue(); continue; }
+                JSONObject o = new JSONObject();
+                r.beginObject();
+                while (r.hasNext()) {
+                    String name = r.nextName();
+                    if (!VOD_FIELDS.contains(name)) { r.skipValue(); continue; }
+                    Object v = readJson(r);
+                    if (v != null) o.put(name, v);
+                }
+                r.endObject();
+                if (hiddenCats.contains(o.optString("category_id"))) continue;
+                String tmdb = o.optString("tmdb", o.optString("tmdb_id", "")).trim();
+                boolean match = !tmdbId.isEmpty() && tmdb.equals(tmdbId);
+                if (!match) {
+                    String[] t = Tmdb.cleanTitle(o.optString("name", o.optString("title", "")));
+                    String k = XtreamProtocol.searchKey(t[0]);
+                    String y = t[1].isEmpty() ? o.optString("year", "") : t[1];
+                    boolean sameName = k.equals(nameKey) || (!altKey.isEmpty() && k.equals(altKey));
+                    match = sameName && (year.isEmpty() || y.isEmpty() || y.equals(year));
+                }
+                if (!match) continue;
+                o.put("playlist", id);
+                out.put(o);
+            }
+        }
+        return out;
+    }
+
+
+    /** How long a saved channel list is used for search before it's downloaded again. */
+    static final long LIVE_CACHE_MS = 6L * 60 * 60 * 1000;
+
+    private File liveCacheFile(JSONObject p) {
+        return new File(a.getCacheDir(), "live_search_" + p.optString("id").replaceAll("[^A-Za-z0-9_-]", "_") + ".json");
+    }
+
+    /**
+     * Frees the space a switched-off playlist used: its saved channel, movie and series lists and its saved M3U copy.
+     * They're downloaded again only if it's switched back on.
+     */
+    void freeSpaceOf(JSONObject p) {
+        String id = p.optString("id").replaceAll("[^A-Za-z0-9_-]", "_");
+        for (String n : new String[]{"live_search_" + id + ".json", "vod_vod_" + id + ".json", "vod_series_" + id + ".json"}) new File(a.getCacheDir(), n).delete();
+        if (M3U.equals(p.optString("type")) && !isHdhr(p)) {
+            // Its own TV guide: saved under the guide's address, which only an M3U names (in its first line). Deleted
+            // unless something still on uses the same guide: the guide set in Settings, an extra guide, or another
+            // switched-on M3U that names it too.
+            java.util.Set<String> keep = new java.util.HashSet<>(ExtraGuides.urls(prefs));
+            keep.add(prefs.getString("epg_url", ""));
+            JSONArray on = inUse();
+            for (int i = 0; i < on.length(); i++) {
+                JSONObject q = on.optJSONObject(i);
+                if (q != null && M3U.equals(q.optString("type")) && !isHdhr(q)) keep.addAll(advertisedGuides(m3uFile(q.optString("url"))));
+            }
+            for (String g : advertisedGuides(m3uFile(p.optString("url")))) if (!keep.contains(g)) new File(a.getCacheDir(), guideCacheName(g)).delete();
+            m3uFile(p.optString("url")).delete();
+        }
+        synchronized (otherM3u) { otherM3u.remove(p.optString("url")); }
+    }
+
+    /** The TV guide addresses an M3U file names in its first line (url-tvg / x-tvg-url / tvg-url), read without loading the rest. */
+    private static java.util.List<String> advertisedGuides(File m3u) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (!m3u.exists()) return out;
+        try (java.io.BufferedReader r = new java.io.BufferedReader(new java.io.InputStreamReader(new FileInputStream(m3u), StandardCharsets.UTF_8))) {
+            String head = r.readLine();
+            if (head == null) return out;
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("(?:url-tvg|x-tvg-url|tvg-url)=\"([^\"]+)\"").matcher(head);
+            while (m.find()) for (String u : m.group(1).split(",")) if (!u.trim().isEmpty()) out.add(u.trim());
+        } catch (Throwable ignored) { }
+        return out;
+    }
+
+    /** Forgets every saved channel list used by search, so the next search downloads fresh ones. */
+    void dropLiveSearchCache() {
+        File[] fs = a.getCacheDir().listFiles();
+        if (fs != null) for (File f : fs) if (f.getName().startsWith("live_search_") || f.getName().startsWith("vod_")) f.delete();
+    }
+
+    /** Downloads a URL straight to a file (never held in memory), replacing the file only when complete. */
+    static void saveToFile(String url, int readTimeout, File f) throws Exception {
+        HttpURLConnection c = open(url, readTimeout);
+        File tmp = new File(f.getPath() + ".part");
+        try (InputStream in = c.getInputStream(); OutputStream out = new FileOutputStream(tmp)) {
+            byte[] buf = new byte[65536];
+            int n;
+            while ((n = in.read(buf)) != -1) {
+                if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+                out.write(buf, 0, n);
+            }
+        } catch (Exception e) {
+            tmp.delete();
+            throw e;
+        } finally { c.disconnect(); }
+        if (!tmp.renameTo(f)) { f.delete(); if (!tmp.renameTo(f)) throw new java.io.IOException("couldn't save the list"); }
+    }
+
+    /**
+     * Whether a channel is an HDHomeRun antenna channel hidden in its tuner's TV guide (⊘ Hide / show channels).
+     * Those stay out of Favorites and channel groups too, until shown again; nothing is deleted.
+     */
+    boolean hiddenAntenna(String playlistId, String streamId) {
+        JSONObject p = find(playlistId == null || playlistId.isEmpty() ? activeId() : playlistId);
+        if (!isHdhr(p)) return false;
+        return prefs.getStringSet(prefixOf(p) + "hidden_channels_live", java.util.Collections.<String>emptySet()).contains(streamId);
+    }
+
+    /** Whether the app still has at least this much memory to spare (for loading another big list). */
+    static boolean memoryLeft(long bytes) {
+        Runtime rt = Runtime.getRuntime();
+        return rt.maxMemory() - (rt.totalMemory() - rt.freeMemory()) > bytes;
+    }
+
+    static final java.util.Set<String> VOD_FIELDS = new java.util.HashSet<>(java.util.Arrays.asList(
+            "name", "title", "stream_id", "series_id", "stream_type", "stream_icon", "cover", "container_extension",
+            "category_id", "rating", "rating_5based", "year", "releaseDate", "release_date", "tmdb", "tmdb_id", "added", "last_modified", "num"));
+
+    /**
+     * Downloads a player_api list (a JSON array of objects) and reads it item by item instead of as one big string,
+     * keeping only {@code keep} fields of each item (all of them when null). An answer that isn't a list gives an
+     * empty list. Call off the UI thread.
+     */
+    static JSONArray downloadList(String url, int readTimeout, java.util.Set<String> keep) throws Exception {
+        HttpURLConnection c = open(url, readTimeout);
+        JSONArray out = new JSONArray();
+        try (InputStream in = new java.io.BufferedInputStream(c.getInputStream(), 65536);
+             android.util.JsonReader r = new android.util.JsonReader(new java.io.InputStreamReader(in, StandardCharsets.UTF_8))) {
+            r.setLenient(true);
+            if (r.peek() != android.util.JsonToken.BEGIN_ARRAY) return out;
+            r.beginArray();
+            while (r.hasNext()) {
+                if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+                if (r.peek() != android.util.JsonToken.BEGIN_OBJECT) { r.skipValue(); continue; }
+                JSONObject o = new JSONObject();
+                r.beginObject();
+                while (r.hasNext()) {
+                    String name = r.nextName();
+                    if (keep != null && !keep.contains(name)) { r.skipValue(); continue; }
+                    Object v = readJson(r);
+                    if (v != null) o.put(name, v);
+                }
+                r.endObject();
+                out.put(o);
+            }
+        } finally { c.disconnect(); }
+        return out;
+    }
+
+    /** One JSON value from the reader: numbers come back as text, null as null. */
+    static Object readJson(android.util.JsonReader r) throws Exception {
+        switch (r.peek()) {
+            case BEGIN_ARRAY: {
+                JSONArray a = new JSONArray();
+                r.beginArray();
+                while (r.hasNext()) { Object v = readJson(r); a.put(v == null ? JSONObject.NULL : v); }
+                r.endArray();
+                return a;
+            }
+            case BEGIN_OBJECT: {
+                JSONObject o = new JSONObject();
+                r.beginObject();
+                while (r.hasNext()) { String n = r.nextName(); Object v = readJson(r); if (v != null) o.put(n, v); }
+                r.endObject();
+                return o;
+            }
+            case BOOLEAN: return r.nextBoolean();
+            case NULL: r.nextNull(); return null;
+            default: return r.nextString();
+        }
     }
 
     static String download(String url, int readTimeout) throws Exception {

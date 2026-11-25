@@ -1,5 +1,8 @@
 # WygTv v2.0 — Four-option opening screen
 
+## How WygTV started
+WygTV began with a simple goal: to bring free over-the-air channels from an HDHomeRun network tuner to the TV, complete with a proper channel list and TV guide. From there it grew into a full IPTV player, so your Xtream Codes and M3U playlists sit right alongside your antenna channels in one place. It was first built for Android TVs and tablets, and it has since come to Windows, Mac, Ubuntu, iPhone and iPad as well.
+
 Opens directly to a glass-themed Home dashboard with Manage / Login to Playlist, Live TV, Movies and Series. Live TV, Movies and Series use the selected saved playlist or offer a playlist picker; credentials are not requested on every startup. Existing cascading menus, themes and launcher icon remain.
 
 Build: `export ANDROID_HOME="$HOME/Library/Android/sdk" && bash build-on-mac.sh`. Install: `adb install -r output/WygTv.apk`.
@@ -34,9 +37,9 @@ WygTV can watch free over-the-air channels from a SiliconDust HDHomeRun network 
 ## WygOTA — antenna TV only (Android TV, tablets and Ubuntu)
 **WygOTA** is a second app built from this repository that does only live over-the-air TV from an HDHomeRun tuner: no IPTV playlists, movies or series. It installs next to WygTV (its own app id `com.wygtv.ota`, name and antenna icon).
 
-- **Android TV and tablets:** the `wygota` product flavor of `app/` (WygTV is the `wygtv` flavor). It shares all of WygTV's antenna code: first run goes straight to adding the tuner (`hdhomerun.local`, *Find tuners*, or an IP address), it opens on the TV guide of the tuner's channels, and Settings has no playlist, app-mode, TMDb or OMDb rows. Updates come from WygOTA's own release.
+- **Android TV and tablets:** `app/` built with `WYGOTA=1` (the same way `WYGTV_BETA=1` makes the beta). It shares all of WygTV's antenna code: first run goes straight to adding the tuner (`hdhomerun.local`, *Find tuners*, or an IP address), it opens on the TV guide of the tuner's channels, and Settings has no playlist, app-mode, TMDb or OMDb rows. Updates come from WygOTA's own release.
 - **Ubuntu (desktop Linux):** `desktop/` is a small Java (Swing) app that compiles the same `Hdhr.java` from the Android app, so tuners, lineups, sub-channel groups and the 12-hour HDHomeRun guide work the same way. Video plays through VLC (libVLC), which handles MPEG-2, H.264 and AC-3 natively, with deinterlacing for 1080i/480i. Keys: ▲▼ pick, Enter play, Page Up/Down change channel, type a number like `4.1` to jump, F full screen, M mute.
 - **Downloads** (rebuilt on every push to `app`):
   - Android: https://github.com/wyglaf01/WygTV-AndroidTV/releases/download/wygota-latest/wygota.apk
   - Ubuntu 22.04 or newer: https://github.com/wyglaf01/WygTV-AndroidTV/releases/download/wygota-latest/wygota_amd64.deb — install with `sudo apt install ./wygota_amd64.deb` (this also installs VLC), then open **WygOTA** from the app menu.
-- Build locally: `gradle :app:assembleWygotaDebug` for Android, `gradle -p desktop installDist` then `desktop/build/install/wygota/bin/wygota` for Linux.
+- Build locally: `WYGOTA=1 gradle :app:assembleDebug` for Android, `gradle -p desktop installDist` then `desktop/build/install/wygota/bin/wygota` for Linux.

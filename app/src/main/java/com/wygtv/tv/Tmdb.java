@@ -109,7 +109,36 @@ final class Tmdb {
         String id = digits(first(info, "tmdb_id", "tmdb"));
         if (id.isEmpty()) id = digits(first(item, "tmdb_id", "tmdb"));
         put(meta, "tmdb_id", id);
+        put(meta, "trailer", youtubeKey(first(info, "youtube_trailer", "trailer")));
         return meta;
+    }
+
+    /**
+     * The YouTube video id in a provider's trailer field, which may be a bare id ("dQw4w9WgXcQ") or a full
+     * youtube.com / youtu.be link. Empty when there's none.
+     */
+    static String youtubeKey(String s) {
+        if (s == null) return "";
+        s = s.trim();
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(?:v=|youtu\\.be/|embed/|shorts/)([A-Za-z0-9_-]{11})").matcher(s);
+        if (m.find()) return m.group(1);
+        return s.matches("[A-Za-z0-9_-]{11}") ? s : "";
+    }
+
+    /** The best YouTube trailer in a TMDb "videos" answer: official trailers first, then any trailer, then a teaser. */
+    static String trailerFrom(JSONObject videos) {
+        JSONArray r = videos == null ? null : videos.optJSONArray("results");
+        String best = "";
+        int bestScore = 0;
+        for (int i = 0; r != null && i < r.length(); i++) {
+            JSONObject v = r.optJSONObject(i);
+            if (v == null || !"YouTube".equalsIgnoreCase(v.optString("site")) || v.optString("key").isEmpty()) continue;
+            String type = v.optString("type");
+            int score = type.equals("Trailer") ? 4 : type.equals("Teaser") ? 2 : 1;
+            if (v.optBoolean("official")) score++;
+            if (score > bestScore) { bestScore = score; best = v.optString("key"); }
+        }
+        return best;
     }
 
     // ------------------------------------------------------------------ TMDb answers
@@ -153,6 +182,7 @@ final class Tmdb {
         if ((imdb.isEmpty() || "null".equals(imdb)) && ext != null) imdb = ext.optString("imdb_id");
         if (imdb.startsWith("tt")) put(meta, "imdb", imdb);
         if (t.optInt("id", 0) > 0) put(meta, "tmdb_id", String.valueOf(t.optInt("id")));
+        put(meta, "trailer", trailerFrom(t.optJSONObject("videos")));
         return meta;
     }
 
@@ -203,7 +233,7 @@ final class Tmdb {
         if (key.isEmpty()) return null;
         boolean tv = type.equals("series");
         String lang = Locale.getDefault().toLanguageTag();
-        File cache = new File(c.getCacheDir(), "tmdb/" + M3u.idFor(type + "|" + tmdbId + "|" + title + "|" + year + "|" + lang) + ".json");
+        File cache = new File(c.getCacheDir(), "tmdb/" + M3u.idFor("v2|" + type + "|" + tmdbId + "|" + title + "|" + year + "|" + lang) + ".json");
         JSONObject saved = cached(cache, KEEP_MS, KEEP_MISS_MS);
         if (saved != null) return saved.optBoolean("miss") ? null : saved.optJSONObject("meta");
         try {
@@ -218,7 +248,8 @@ final class Tmdb {
             }
             JSONObject full;
             try {
-                full = get(key, (tv ? "tv/" : "movie/") + id + "?language=" + lang + "&append_to_response=credits,external_ids," + (tv ? "content_ratings" : "release_dates"));
+                full = get(key, (tv ? "tv/" : "movie/") + id + "?language=" + lang + "&append_to_response=credits,external_ids,videos," + (tv ? "content_ratings" : "release_dates")
+                        + "&include_video_language=" + Locale.getDefault().getLanguage() + ",en,null");
             } catch (java.io.FileNotFoundException wrongKind) {
                 // Some providers put a movie id on a series (or the reverse): search by title instead.
                 if (tmdbId.isEmpty()) throw wrongKind;
@@ -263,6 +294,72 @@ final class Tmdb {
     }
 
     /** True when TMDb accepts the key (for Settings). */
+    /**
+     * This week's trending movies or TV series on TMDb, most popular first ({@code pages} × 20 titles), for the main
+     * screen. Empty when there is no TMDb key. Call off the UI thread.
+     */
+    static JSONArray trending(Context c, boolean tv, int pages) throws Exception {
+        JSONArray out = new JSONArray();
+        String key = key(c);
+        if (key.isEmpty()) return out;
+        for (int page = 1; page <= pages; page++) {
+            JSONArray r = get(key, "trending/" + (tv ? "tv" : "movie") + "/week?page=" + page).optJSONArray("results");
+            for (int i = 0; r != null && i < r.length(); i++) if (r.optJSONObject(i) != null) out.put(r.optJSONObject(i));
+        }
+        return out;
+    }
+
+    /**
+     * A title's trailer and where it can be watched, for the main screen's titles that aren't in a playlist:
+     * {"trailer": YouTube key, "stream"/"rent"/"buy"/"free": service names, "link": TMDb's watch page}. The services
+     * are for this device's country (US when unknown); TMDb gets them from JustWatch. Call off the UI thread.
+     */
+    static JSONObject extras(Context c, boolean tv, String tmdbId) throws Exception {
+        JSONObject out = new JSONObject();
+        String key = key(c);
+        if (key.isEmpty() || tmdbId == null || tmdbId.isEmpty()) return out;
+        JSONObject t = get(key, (tv ? "tv/" : "movie/") + tmdbId + "?append_to_response=videos,watch/providers");
+        out.put("trailer", trailerFrom(t.optJSONObject("videos")));
+        JSONObject all = t.optJSONObject("watch/providers");
+        all = all == null ? null : all.optJSONObject("results");
+        String country = java.util.Locale.getDefault().getCountry();
+        JSONObject here = all == null ? null : all.optJSONObject(country == null || country.isEmpty() ? "US" : country);
+        if (here == null && all != null) here = all.optJSONObject("US");
+        if (here != null) {
+            out.put("link", here.optString("link"));
+            String[][] kinds = {{"flatrate", "stream"}, {"free", "free"}, {"ads", "free"}, {"rent", "rent"}, {"buy", "buy"}};
+            for (String[] k : kinds) {
+                JSONArray list = here.optJSONArray(k[0]);
+                StringBuilder b = new StringBuilder(out.optString(k[1]));
+                for (int i = 0; list != null && i < list.length(); i++) {
+                    String name = list.optJSONObject(i) == null ? "" : list.optJSONObject(i).optString("provider_name");
+                    if (name.isEmpty() || b.indexOf(name) >= 0) continue;
+                    if (b.length() > 0) b.append(", ");
+                    b.append(name);
+                }
+                if (b.length() > 0) out.put(k[1], b.toString());
+            }
+        }
+        return out;
+    }
+
+    /** A title's TMDb id found by name (and year when known), or "" (no key, no match). Call off the UI thread. */
+    static String findId(Context c, boolean tv, String title, String year) {
+        String key = key(c);
+        if (key.isEmpty() || title.isEmpty()) return "";
+        try {
+            String q = (tv ? "search/tv?query=" : "search/movie?query=") + URLEncoder.encode(title, "UTF-8");
+            JSONObject hit = year.isEmpty() ? null : pick(get(key, q + (tv ? "&first_air_date_year=" : "&year=") + year).optJSONArray("results"), title, year, tv);
+            if (hit == null) hit = pick(get(key, q).optJSONArray("results"), title, year, tv);
+            return hit == null ? "" : String.valueOf(hit.optInt("id"));
+        } catch (Throwable e) { return ""; }
+    }
+
+    /** A TMDb image address at the given size (e.g. "w342", "w780"), or "" for none. */
+    static String image(String path, String size) {
+        return path == null || path.isEmpty() || "null".equals(path) ? "" : IMAGES + size + path;
+    }
+
     static boolean works(String key) {
         try { return get(key, "configuration").has("images"); } catch (Exception e) { return false; }
     }

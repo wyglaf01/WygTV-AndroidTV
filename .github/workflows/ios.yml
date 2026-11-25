@@ -1,0 +1,181 @@
+name: Build WygTV-iOS (iPhone and iPad)
+
+# WygTV-iOS is WygDesktop's screens in a Capacitor app (folder WygTV-iOS/). It is built unsigned: AltStore
+# (or Sideloadly) signs it with the person's own Apple ID when installing.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [app, "claude/**"]
+    paths: ["WygTV-iOS/**", "WygDesktop/src/renderer/**", "WygDesktop/src/main/m3u.js", "WygDesktop/src/main/xmltv.js", "WygDesktop/src/main/hdhr.js", ".github/workflows/ios.yml"]
+  pull_request:
+    branches: [app]
+    paths: ["WygTV-iOS/**", "WygDesktop/src/renderer/**", "WygDesktop/src/main/m3u.js", "WygDesktop/src/main/xmltv.js", "WygDesktop/src/main/hdhr.js", ".github/workflows/ios.yml"]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: WygTV-iOS
+    env:
+      VERSION: 1.1.${{ github.run_number }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: WygTV-iOS/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Test iOS bridge and transport settings
+        run: |
+          npm test
+          python3 scripts/verify-transport.py ios/App/App/Info.plist
+
+      - name: Build the app's pages and copy them into the Xcode project
+        run: |
+          npm run build:web
+          npx cap sync ios
+          xcodebuild -version
+
+      # ---------------------------------------------------------------- try it in an iPad Simulator
+      - name: Build for the Simulator
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/sim" \
+            CODE_SIGNING_ALLOWED=NO MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION=${{ github.run_number }} build -quiet
+
+      # Plays an HLS channel from a pretend IPTV service at this Mac's network address (plain http, like real
+      # providers), checks the MPEG-2 channel offers VLC, loads the guide and movies, and screenshots each screen.
+      - name: Try WygTV-iOS in an iPad Simulator
+        timeout-minutes: 20
+        run: |
+          brew list ffmpeg >/dev/null 2>&1 || brew install ffmpeg >/dev/null
+          M="$RUNNER_TEMP/media"; mkdir -p "$M/hls" "$RUNNER_TEMP/shots"
+          ffmpeg -loglevel error -y -f lavfi -i testsrc2=size=1280x720:rate=25 -f lavfi -i sine=frequency=440 -t 40 -c:v libx264 -preset ultrafast -g 50 -c:a aac -f mpegts "$M/h264.ts"
+          ffmpeg -loglevel error -y -f lavfi -i smptebars=size=720x480:rate=30 -f lavfi -i sine=frequency=300 -t 40 -c:v mpeg2video -b:v 4M -c:a ac3 -f mpegts "$M/mpeg2.ts"
+          ffmpeg -loglevel error -y -i "$M/h264.ts" -c copy -f hls -hls_time 4 -hls_list_size 0 "$M/hls/index.m3u8"
+          IP="$(ipconfig getifaddr en0 || ipconfig getifaddr en1 || echo 127.0.0.1)"
+          echo "Pretend provider at http://$IP:8765"
+          MOCK_HOST=0.0.0.0 MOCK_BASE="http://$IP:8765" nohup node ../WygDesktop/test/mock-server.js 8765 "$M" > "$RUNNER_TEMP/mock.log" 2>&1 &
+          sleep 2
+          curl -sf "http://$IP:8765/player_api.php?username=demo&password=demo" >/dev/null
+          DEV="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; l=[x for k,v in d.items() if "iOS" in k for x in v if x["name"].startswith("iPad")]; l.sort(key=lambda x: ("Pro" not in x["name"], x["name"])); print(l[0]["udid"])')"
+          xcrun simctl list devices available | grep "$DEV"
+          xcrun simctl boot "$DEV"
+          xcrun simctl bootstatus "$DEV" -b
+          xcrun simctl install "$DEV" "$RUNNER_TEMP/sim/Build/Products/Debug-iphonesimulator/App.app"
+          # -CapacitorStorage.smoke sets the "smoke" preference the app's self-test looks for (see web/ios-bridge.js).
+          ( xcrun simctl launch --console-pty --terminate-running-process "$DEV" com.wygtv.ios -CapacitorStorage.smoke "http://$IP:8765" > "$RUNNER_TEMP/app.log" 2>&1 & )
+          RESULT=""; seen=""
+          for i in $(seq 1 300); do
+            sleep 1
+            for s in $(grep -o 'WYG-STEP [a-z0-9-]*' "$RUNNER_TEMP/app.log" | awk '{print $2}'); do
+              case " $seen " in *" $s "*) ;; *) seen="$seen $s"; xcrun simctl io "$DEV" screenshot "$RUNNER_TEMP/shots/$s.png" >/dev/null 2>&1; echo "screenshot $s";; esac
+            done
+            RESULT="$(grep -o 'WYG-SMOKE .*' "$RUNNER_TEMP/app.log" | head -1 || true)"
+            [ -n "$RESULT" ] && break
+          done
+          xcrun simctl terminate "$DEV" com.wygtv.ios || true
+          echo "$RESULT"
+          echo "$RESULT" | grep -q '"ok":true'
+
+      - name: Simulator logs
+        if: always()
+        run: |
+          grep -v '^\s*$' "$RUNNER_TEMP/app.log" | grep -iE 'WYG-|error|warn|⚡️' | tail -n 120 || true
+          tail -n 30 "$RUNNER_TEMP/mock.log" || true
+
+      - name: Upload Simulator screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wygtv-ios-screenshots
+          path: ${{ runner.temp }}/shots
+          if-no-files-found: ignore
+
+      # ---------------------------------------------------------------- the real thing, for iPhone and iPad
+      - name: Build for iPhone and iPad (unsigned .ipa)
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release -sdk iphoneos \
+            -destination 'generic/platform=iOS' -derivedDataPath "$RUNNER_TEMP/dev" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION=${{ github.run_number }} build -quiet
+          APP="$RUNNER_TEMP/dev/Build/Products/Release-iphoneos/App.app"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' -c 'Print :CFBundleIdentifier' "$APP/Info.plist"
+          python3 scripts/verify-transport.py "$APP/Info.plist"
+          test -f "$APP/public/js/ios-bridge.js"
+          lipo -archs "$APP/App"
+          mkdir -p dist/Payload
+          cp -R "$APP" dist/Payload/
+          (cd dist && zip -qry WygTV-iOS.ipa Payload && rm -rf Payload)
+          stat -f '%z bytes' dist/WygTV-iOS.ipa
+          cp ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png dist/WygTV-iOS-icon.png
+          (cd "$RUNNER_TEMP/shots" && zip -q "$GITHUB_WORKSPACE/WygTV-iOS/dist/simulator-screenshots.zip" *.png) || true
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: wygtv-ios
+          path: |
+            WygTV-iOS/dist/WygTV-iOS.ipa
+            WygTV-iOS/dist/WygTV-iOS-icon.png
+            WygTV-iOS/dist/simulator-screenshots.zip
+          if-no-files-found: error
+
+  # Fixed download links:
+  #   app branch     → release wygtv-ios-latest (also the AltStore source and the in-app "Check for updates")
+  #   other branches → release wygtv-ios-test (for trying a pull request before merging)
+  publish:
+    needs: build
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Download the build
+        uses: actions/download-artifact@v4
+        with:
+          name: wygtv-ios
+          path: dist
+
+      - name: Update the WygTV-iOS release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "$GITHUB_REF_NAME" = "app" ]; then TAG=wygtv-ios-latest; TITLE="WygTV-iOS (latest build)"; else TAG=wygtv-ios-test; TITLE="WygTV-iOS (test build from $GITHUB_REF_NAME)"; fi
+          VERSION="1.1.${GITHUB_RUN_NUMBER}"
+          URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/$TAG"
+          echo "{\"version\": \"$VERSION\", \"notes\": \"${GITHUB_REF_NAME} ${GITHUB_SHA::7}\"}" > dist/ios-version.json
+          node WygTV-iOS/scripts/altstore-source.mjs "$URL" "$VERSION" "$(stat -c %s dist/WygTV-iOS.ipa)" > dist/altstore-source.json
+          cat dist/altstore-source.json
+          git tag -f "$TAG"
+          git push -f origin "refs/tags/$TAG"
+          NOTES="WygTV-iOS $VERSION from ${GITHUB_REF_NAME} (${GITHUB_SHA::7}), $(date -u '+%Y-%m-%d %H:%M UTC').
+
+          For iPhone and iPad (iOS 15 or newer). It isn't signed by Apple: install it with AltStore, which signs it with your own Apple ID.
+
+          AltStore source (adds WygTV-iOS to AltStore and brings updates): $URL/altstore-source.json
+          The app itself: $URL/WygTV-iOS.ipa"
+          # Kept as a pre-release so it never replaces WygTV's APK as the repository's "latest" release.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "$TITLE" --notes "$NOTES" --prerelease --latest=false
+          else
+            gh release create "$TAG" --title "$TITLE" --notes "$NOTES" --prerelease --latest=false
+          fi
+          gh release upload "$TAG" dist/WygTV-iOS.ipa dist/WygTV-iOS-icon.png dist/ios-version.json dist/altstore-source.json --clobber
+          # iPad Simulator screenshots from the self-test, kept with test builds for a quick look.
+          if [ "$TAG" = wygtv-ios-test ] && [ -f dist/simulator-screenshots.zip ]; then gh release upload "$TAG" dist/simulator-screenshots.zip --clobber; fi

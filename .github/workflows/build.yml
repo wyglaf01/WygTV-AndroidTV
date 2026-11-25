@@ -4,8 +4,17 @@ on:
   workflow_dispatch:
   push:
     branches: [app, main, "codex/**"]
+    paths-ignore: ["WygDesktop/**", ".github/workflows/desktop.yml"]
   pull_request:
     branches: [app, main]
+    paths-ignore: ["WygDesktop/**", ".github/workflows/desktop.yml"]
+
+# One build at a time per branch, so merges close together publish the beta in order and the
+# newest merge always ends up as the beta. A newer merge replaces any build still waiting; the
+# one already running finishes (stopping it mid-publish could leave the beta without its APK).
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -50,40 +59,30 @@ jobs:
             echo "::warning::WYGTV_KEYSTORE_B64 secret not set; signing with a temporary debug key."
           fi
 
-      - name: Check and build debug APKs (WygTV and WygOTA)
+      - name: Check and build debug APK
         env:
           WYGTV_KEY_PASSWORD: ${{ secrets.WYGTV_KEY_PASSWORD }}
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
           OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
-        run: gradle --no-daemon :app:lintWygtvDebug :app:lintWygotaDebug :app:testWygtvDebugUnitTest :app:testWygotaDebugUnitTest :app:assembleWygtvDebug :app:assembleWygotaDebug
+          # Beta: burnt-orange icon and "WygTV Beta" name. Release WygTV rebuilds without it.
+          WYGTV_BETA: '1'
+        run: gradle --no-daemon :app:lintDebug :app:testDebugUnitTest :app:assembleDebug
 
-      - name: Name the APKs wygtv.apk and wygota.apk
+      - name: Name the APK wygtv.apk
         run: |
-          mkdir -p dist/wygtv dist/wygota
-          cp app/build/outputs/apk/wygtv/debug/*.apk dist/wygtv/wygtv.apk
-          cp app/build/outputs/apk/wygota/debug/*.apk dist/wygota/wygota.apk
-          # Each app's in-app updater reads its version.json to know whether a newer build exists.
-          for d in dist/wygtv dist/wygota; do
-            echo "{\"versionCode\": ${GITHUB_RUN_NUMBER}, \"versionName\": \"1.0.${GITHUB_RUN_NUMBER}\"}" > "$d/version.json"
-          done
-          cat dist/wygtv/version.json
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/*.apk dist/wygtv.apk
+          # WygTV's in-app updater reads this to know whether a newer build exists.
+          echo "{\"versionCode\": ${GITHUB_RUN_NUMBER}, \"versionName\": \"1.0.${GITHUB_RUN_NUMBER}\"}" > dist/version.json
+          cat dist/version.json
 
-      - name: Upload WygTV APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: wygtv
           path: |
-            dist/wygtv/wygtv.apk
-            dist/wygtv/version.json
-          if-no-files-found: error
-
-      - name: Upload WygOTA APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: wygota
-          path: |
-            dist/wygota/wygota.apk
-            dist/wygota/version.json
+            dist/wygtv.apk
+            dist/version.json
           if-no-files-found: error
 
 
@@ -92,6 +91,72 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: WygTV-check-reports
+          path: app/build/reports/
+          if-no-files-found: ignore
+
+  # WygOTA for Android TV and tablets: the same app/ code built with WYGOTA=1 (com.wygtv.ota, antenna TV only).
+  wygota:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Load the signing key
+        env:
+          WYGTV_KEYSTORE_B64: ${{ secrets.WYGTV_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$WYGTV_KEYSTORE_B64" ]; then
+            echo "$WYGTV_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/wygtv-release.jks"
+            echo "WYGTV_KEYSTORE=$RUNNER_TEMP/wygtv-release.jks" >> "$GITHUB_ENV"
+          else
+            echo "::warning::WYGTV_KEYSTORE_B64 secret not set; signing with a temporary debug key."
+          fi
+
+      - name: Check and build WygOTA
+        env:
+          WYGTV_KEY_PASSWORD: ${{ secrets.WYGTV_KEY_PASSWORD }}
+          WYGOTA: '1'
+        run: gradle --no-daemon :app:lintDebug :app:testDebugUnitTest :app:assembleDebug
+
+      - name: Name the APK wygota.apk
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/*.apk dist/wygota.apk
+          # WygOTA's in-app updater reads this to know whether a newer build exists.
+          echo "{\"versionCode\": ${GITHUB_RUN_NUMBER}, \"versionName\": \"1.0.${GITHUB_RUN_NUMBER}\"}" > dist/version.json
+
+      - name: Upload WygOTA APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: wygota
+          path: |
+            dist/wygota.apk
+            dist/version.json
+          if-no-files-found: error
+
+      - name: Upload check reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: WygOTA-check-reports
           path: app/build/reports/
           if-no-files-found: ignore
 
@@ -138,9 +203,10 @@ jobs:
           path: dist/wygota_amd64.deb
           if-no-files-found: error
 
-  # Publishes wygtv.apk to a public GitHub Release so it has a fixed direct link
-  # (for Downloader codes):
-  # https://github.com/wyglaf01/WygTV-AndroidTV/releases/latest/download/wygtv.apk
+  # Every build on `app` goes to the WygTV Beta pre-release (tag wygtv-beta) as
+  # wygtv-beta-<version>.apk and wygtv-beta.apk. It is a separate app (com.wygtv.tv.beta) that installs next to
+  # the release and updates itself from here; the release's updater and Downloader link never get a beta.
+  # When the beta is OK, run the "Release WygTV" workflow to promote it.
   publish:
     needs: build
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/app')
@@ -157,28 +223,40 @@ jobs:
           name: wygtv
           path: dist
 
-      - name: Update the WygTV release
+      - name: Update the WygTV Beta pre-release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: wygtv-latest
+          TAG: wygtv-beta
         run: |
+          VERSION="1.0.${GITHUB_RUN_NUMBER}"
+          APK="wygtv-beta-${VERSION}.apk"
+          mv dist/wygtv.apk "dist/$APK"
+          # The same file under a fixed name, so one short address (e.g. in Downloader) always gets the newest beta.
+          cp "dist/$APK" dist/wygtv-beta.apk
           git tag -f "$TAG"
           git push -f origin "refs/tags/$TAG"
-          NOTES="Latest WygTV build from ${GITHUB_REF_NAME} (${GITHUB_SHA::7}), $(date -u '+%Y-%m-%d %H:%M UTC').
+          NOTES="WygTV Beta ${VERSION} from ${GITHUB_REF_NAME} (${GITHUB_SHA::7}), $(date -u '+%Y-%m-%d %H:%M UTC').
 
-          Direct download: https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/wygtv.apk"
+          Download: https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${APK}
+          Always the newest beta: https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/wygtv-beta.apk
+
+          Test this build. When it's OK, run the \"Release WygTV\" workflow to make it the release."
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" --title "WygTV (latest build)" --notes "$NOTES" --latest
+            gh release edit "$TAG" --title "WygTV Beta ${VERSION}" --notes "$NOTES" --prerelease --latest=false
+            # Drop the previous beta APK so only the current one is listed.
+            for old in $(gh release view "$TAG" --json assets --jq '.assets[].name' | grep '^wygtv-beta-.*\.apk$'); do
+              gh release delete-asset "$TAG" "$old" --yes
+            done
           else
-            gh release create "$TAG" --title "WygTV (latest build)" --notes "$NOTES" --latest
+            gh release create "$TAG" --title "WygTV Beta ${VERSION}" --notes "$NOTES" --prerelease --latest=false
           fi
-          gh release upload "$TAG" dist/wygtv.apk dist/version.json --clobber
+          gh release upload "$TAG" "dist/$APK" dist/wygtv-beta.apk dist/version.json --clobber
 
-  # WygOTA's own release (not marked latest, so WygTV's links keep working):
+  # WygOTA's own release (never marked latest, so WygTV's links keep working):
   # https://github.com/wyglaf01/WygTV-AndroidTV/releases/download/wygota-latest/wygota.apk
   # https://github.com/wyglaf01/WygTV-AndroidTV/releases/download/wygota-latest/wygota_amd64.deb
   publish-wygota:
-    needs: [build, linux]
+    needs: [wygota, linux]
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/app')
     runs-on: ubuntu-latest
     permissions:
@@ -207,13 +285,13 @@ jobs:
           git tag -f "$TAG"
           git push -f origin "refs/tags/$TAG"
           URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/$TAG"
-          NOTES="Latest WygOTA build from ${GITHUB_REF_NAME} (${GITHUB_SHA::7}), $(date -u '+%Y-%m-%d %H:%M UTC').
+          NOTES="Latest WygOTA build 1.0.${GITHUB_RUN_NUMBER} from ${GITHUB_REF_NAME} (${GITHUB_SHA::7}), $(date -u '+%Y-%m-%d %H:%M UTC').
 
           Android TV and tablets: $URL/wygota.apk
-          Ubuntu: $URL/wygota_amd64.deb (install with: sudo apt install ./wygota_amd64.deb)"
+          Ubuntu 22.04 or newer: $URL/wygota_amd64.deb (install with: sudo apt install ./wygota_amd64.deb)"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" --title "WygOTA (latest build)" --notes "$NOTES" --latest=false
+            gh release edit "$TAG" --title "WygOTA 1.0.${GITHUB_RUN_NUMBER}" --notes "$NOTES" --latest=false
           else
-            gh release create "$TAG" --title "WygOTA (latest build)" --notes "$NOTES" --latest=false
+            gh release create "$TAG" --title "WygOTA 1.0.${GITHUB_RUN_NUMBER}" --notes "$NOTES" --latest=false
           fi
           gh release upload "$TAG" dist/wygota.apk dist/version.json dist/wygota_amd64.deb --clobber

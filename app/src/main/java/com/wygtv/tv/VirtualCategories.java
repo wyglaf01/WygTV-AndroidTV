@@ -50,8 +50,11 @@ final class VirtualCategories {
     /** All channels in the category, each tagged with the playlist it came from. */
     static JSONArray channels(MainActivity a, String id) {
         JSONObject c = find(a, id);
-        JSONArray ch = c == null ? null : c.optJSONArray("channels");
-        return ch == null ? new JSONArray() : ch;
+        JSONArray ch = c == null ? null : c.optJSONArray("channels"), out = new JSONArray();
+        java.util.Set<String> off = a.library.offIds();
+        // Channels from a switched-off playlist stay saved, but don't show until it is switched back on.
+        for (int i = 0; ch != null && i < ch.length(); i++) { JSONObject o = ch.optJSONObject(i); if (o != null && !off.contains(o.optString("playlist")) && !a.library.hiddenAntenna(o.optString("playlist"), o.optString("stream_id"))) out.put(o); }
+        return out;
     }
 
     /** Only the channels that belong to the given playlist (what CH+/CH- and the TV guide can use). */
@@ -168,6 +171,12 @@ final class VirtualCategories {
                     toggle(a, cats.get(w), item, playlist);
                 })
                 .setNegativeButton("Cancel", null).show();
+    }
+
+    /** Makes a new channel group (asks its name) with this channel in it. */
+    static void addToNew(MainActivity a, JSONObject item) {
+        String playlist = item.optString("playlist", "").isEmpty() ? a.library.activeId() : item.optString("playlist");
+        create(a, cat -> toggle(a, cat, item, playlist));
     }
 
     private static void toggle(MainActivity a, JSONObject cat, JSONObject item, String playlist) {

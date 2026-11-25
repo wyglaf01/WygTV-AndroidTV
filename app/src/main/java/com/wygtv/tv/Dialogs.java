@@ -26,10 +26,7 @@ final class Dialogs {
 
     static GradientDrawable background(Context c) {
         float dp = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 1, c.getResources().getDisplayMetrics());
-        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{Theme.PANEL, Theme.alpha(Theme.BG, 0xff)});
-        g.setCornerRadius(14 * dp);
-        g.setStroke(Math.round(2 * dp), Theme.STROKE);
-        return g;
+        return Skin.panel(dp, 16);
     }
 
     /** Colours the buttons; call it from any OnShowListener that replaces the default one. */

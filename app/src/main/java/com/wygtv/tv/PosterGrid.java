@@ -41,9 +41,21 @@ final class PosterGrid {
     }
 
     /** The info panel and poster grid for these items, added to box (the right-hand pane, or under the search bar). */
-    static void showIn(MainActivity a, LinearLayout box, JSONArray items, boolean takeFocus) {
+    static void showIn(MainActivity a, LinearLayout box, JSONArray all, boolean takeFocus) {
         boolean series = a.mode.equals("series");
         String type = a.mode, key = series ? "series_id" : "stream_id";
+        // Settings > Watched series: Hide leaves out every series whose episodes are all watched.
+        int hiddenWatched = 0;
+        JSONArray keep = all;
+        if (series && Watch.hideWatched(a)) {
+            keep = new JSONArray();
+            for (int i = 0; i < all.length(); i++) {
+                JSONObject it = all.optJSONObject(i);
+                if (it != null && Watch.complete(a, it.optString(key))) hiddenWatched++;
+                else keep.put(it);
+            }
+        }
+        final JSONArray items = keep;
         // Posters are added in chunks as you scroll down, so a big category opens fast and scrolls to the end.
         int want = PAGE;
         if (a.resumeStreamId != null) {
@@ -64,7 +76,8 @@ final class PosterGrid {
         TextView facts = line(a, info, 15, Theme.ACCENT, 1);
         TextView plot = line(a, info, 15, Theme.MUTED, 4);
         title.setText(items.length() == 0 ? "Nothing here yet" : series ? "Series" : "Movies");
-        facts.setText(items.length() == 0 ? "" : items.length() + (series ? " series" : " movies") + "  •  scroll with the arrows, press OK on a poster for details");
+        facts.setText((items.length() == 0 ? "" : items.length() + (series ? " series" : " movies") + "  •  scroll with the arrows, press OK on a poster for details")
+                + (hiddenWatched > 0 ? (items.length() == 0 ? "" : "  •  ") + hiddenWatched + " watched series hidden (Settings > Appearance)" : ""));
 
         ScrollView sv = new ScrollView(a);
         sv.setSmoothScrollingEnabled(true);
@@ -148,8 +161,8 @@ final class PosterGrid {
         art.addView(poster, new FrameLayout.LayoutParams(-1, -1));
         Details.image(poster, m.optString("poster"), a.dp(140), generation, a);
 
-        boolean fav = a.isFavorite(type, id);
-        TextView label = a.label((fav ? "★ " : "") + name, 14);
+        boolean mine = a.inMyList(type, id), watched = series && Watch.complete(a, id);
+        TextView label = a.label((mine ? "☰ " : "") + (watched ? "✓ " : "") + name, 14);
         label.setSingleLine(true);
         label.setEllipsize(TextUtils.TruncateAt.END);
         label.setPadding(a.dp(2), a.dp(5), a.dp(2), 0);
@@ -160,7 +173,7 @@ final class PosterGrid {
             if (!m.optString("year").isEmpty()) b.append(m.optString("year"));
             if (!m.optString("rating").isEmpty()) b.append(b.length() > 0 ? "   ★ " : "★ ").append(m.optString("rating"));
             sub = b.toString();
-        } else sub = "▶ " + sub;
+        } else if (!sub.startsWith("✓")) sub = "▶ " + sub;
         TextView under = a.label(sub.isEmpty() ? " " : sub, 12);
         under.setTextColor(Theme.MUTED);
         under.setSingleLine(true);

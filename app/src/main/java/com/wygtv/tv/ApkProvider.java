@@ -14,7 +14,7 @@ import java.io.FileNotFoundException;
 
 /** Shares the downloaded update (and nothing else) with the system installer, read-only. */
 public final class ApkProvider extends ContentProvider {
-    static final String AUTHORITY = BuildConfig.APPLICATION_ID + ".update";
+    static final String AUTHORITY = BuildConfig.APPLICATION_ID + ".update"; // the beta and the release each have their own
 
     static File file(Context c) { return new File(new File(c.getCacheDir(), "update"), "wygtv.apk"); }
 

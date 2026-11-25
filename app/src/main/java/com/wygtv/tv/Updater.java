@@ -21,14 +21,20 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 
 /**
- * In-app updates. Every CI build on `app` publishes wygtv.apk plus version.json to the
+ * In-app updates. Each promoted release (Release WygTV workflow) publishes wygtv.apk plus version.json to the
  * "latest" GitHub release. WygTV compares that versionCode with its own and, when newer,
  * downloads the APK and hands it to the system installer, which installs it over the old one
  * (playlists, favourites and settings are kept).
  */
 final class Updater {
-    static final String RELEASE = Brand.RELEASE;
+    /** The beta is its own app (com.wygtv.tv.beta) and updates from the beta; the release updates from the latest release. */
+    static final boolean BETA = BuildConfig.APPLICATION_ID.endsWith(".beta");
+    static final String RELEASE = Brand.OTA ? Brand.OTA_RELEASE : BETA ? "https://github.com/wyglaf01/WygTV-AndroidTV/releases/download/wygtv-beta/"
+            : "https://github.com/wyglaf01/WygTV-AndroidTV/releases/latest/download/";
+    static final String APK = Brand.OTA ? Brand.OTA_APK : BETA ? "wygtv-beta.apk" : "wygtv.apk";
     static final String PREF_AUTO = "update_check_startup";
+    /** versionCode WygTV had when it started installing an update; read again on the next start. */
+    static final String PREF_FROM = "update_from";
 
     private Updater() { }
 
@@ -40,6 +46,17 @@ final class Updater {
 
     static String installedName(MainActivity a) {
         try { return a.getPackageManager().getPackageInfo(a.getPackageName(), 0).versionName; } catch (Exception e) { return ""; }
+    }
+
+    /** Called once at start-up, before the update check: says "Updated to …" after an in-app update and tidies up. */
+    static void afterUpdate(MainActivity a) {
+        int from = a.prefs.getInt(PREF_FROM, -1);
+        if (from < 0) return;
+        int now = installedCode(a);
+        if (now <= from) return; // the install was cancelled or failed; the download is kept for next time
+        a.prefs.edit().remove(PREF_FROM).remove("update_downloaded").apply();
+        try { ApkProvider.file(a).delete(); } catch (Exception ignored) { }
+        Toast.makeText(a, Brand.NAME + " updated to " + installedName(a) + ". Welcome back!", Toast.LENGTH_LONG).show();
     }
 
     /** Called once at start-up: quietly offers an update when there is one. */
@@ -78,7 +95,7 @@ final class Updater {
             String error = null;
             try {
                 apk.getParentFile().mkdirs();
-                HttpURLConnection c = open(RELEASE + Brand.APK);
+                HttpURLConnection c = open(RELEASE + APK);
                 int total = c.getContentLength();
                 try (InputStream in = c.getInputStream(); OutputStream out = new FileOutputStream(apk)) {
                     byte[] buf = new byte[64 * 1024];
@@ -117,6 +134,18 @@ final class Updater {
     static void install(MainActivity a) {
         if (!canInstall(a)) { askPermission(a); return; }
         waitingForPermission = false;
+        // Android always closes an app while it installs a new version of it, so say so first
+        // instead of WygTV just vanishing from the screen.
+        new Dialogs.Builder(a).setTitle(Brand.NAME + " will close to update")
+                .setMessage("Android closes " + Brand.NAME + " while the new version installs. That's normal, nothing has crashed.\n\n"
+                        + "After you choose Install on the next screen, " + Brand.NAME + " reopens by itself when it's done. "
+                        + "If it doesn't, open " + Brand.NAME + " again from the Home screen. Your playlists, favourites and settings are kept.")
+                .setPositiveButton("Install now", (d, w) -> startInstall(a))
+                .setNegativeButton("Later", null).show();
+    }
+
+    private static void startInstall(MainActivity a) {
+        a.prefs.edit().putInt(PREF_FROM, installedCode(a)).commit();
         Toast.makeText(a, "Installing the " + Brand.NAME + " update…", Toast.LENGTH_SHORT).show();
         new Thread(() -> {
             String error = null;

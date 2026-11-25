@@ -1,0 +1,89 @@
+name: Release WygTV
+
+# Run this when the current WygTV Beta is OK. It rebuilds the exact commit the beta
+# was built from, with the same version number, but with the normal blue icon and
+# "WygTV" name, and publishes it as e.g. "WygTV 1.0.123" with wygtv-1.0.123.apk.
+# That release becomes "latest", so the in-app updater and the Downloader link
+# (releases/latest/download/wygtv.apk) pick it up; wygtv.apk is the same file
+# under the fixed name those links need.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Read the current beta
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download wygtv-beta --repo "$GITHUB_REPOSITORY" --pattern version.json --dir "$RUNNER_TEMP/beta"
+          CODE=$(jq -r .versionCode "$RUNNER_TEMP/beta/version.json")
+          VERSION=$(jq -r .versionName "$RUNNER_TEMP/beta/version.json")
+          SHA=$(gh api "repos/$GITHUB_REPOSITORY/commits/wygtv-beta" --jq .sha)
+          if gh release view "wygtv-v${VERSION}" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::wygtv-v${VERSION} is already released. Push a change to make a new beta first."
+            exit 1
+          fi
+          echo "CODE=$CODE" >> "$GITHUB_ENV"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "SHA=$SHA" >> "$GITHUB_ENV"
+
+      - name: Checkout the beta's commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SHA }}
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Load the WygTV signing key
+        env:
+          WYGTV_KEYSTORE_B64: ${{ secrets.WYGTV_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$WYGTV_KEYSTORE_B64" ]; then
+            echo "$WYGTV_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/wygtv-release.jks"
+            echo "WYGTV_KEYSTORE=$RUNNER_TEMP/wygtv-release.jks" >> "$GITHUB_ENV"
+          else
+            echo "::warning::WYGTV_KEYSTORE_B64 secret not set; signing with a temporary debug key."
+          fi
+
+      - name: Build the release APK
+        env:
+          WYGTV_KEY_PASSWORD: ${{ secrets.WYGTV_KEY_PASSWORD }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
+          WYGTV_VERSION_CODE: ${{ env.CODE }}
+        run: gradle --no-daemon :app:assembleDebug
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="wygtv-v${VERSION}"
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/*.apk "dist/wygtv-${VERSION}.apk"
+          cp "dist/wygtv-${VERSION}.apk" dist/wygtv.apk
+          echo "{\"versionCode\": ${CODE}, \"versionName\": \"${VERSION}\"}" > dist/version.json
+          NOTES="WygTV ${VERSION} (${SHA::7}), released $(date -u '+%Y-%m-%d %H:%M UTC') from the tested beta.
+
+          Download: https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/wygtv-${VERSION}.apk
+          Always-newest link: https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/wygtv.apk"
+          gh release create "$TAG" --target "$SHA" --title "WygTV ${VERSION}" --notes "$NOTES" --latest \
+            "dist/wygtv-${VERSION}.apk" dist/wygtv.apk dist/version.json

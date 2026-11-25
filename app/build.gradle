@@ -1,19 +1,20 @@
 plugins { id 'com.android.application' }
+// WYGOTA=1 builds WygOTA instead of WygTV: the antenna-TV-only app (com.wygtv.ota), with the antenna
+// icons in src/wygota/res and the WygOTA name. It installs next to WygTV and WygTV Beta.
+def wygota = System.getenv('WYGOTA') == '1'
 android { namespace 'com.wygtv.tv'; compileSdk 35
-    defaultConfig { minSdk 23; targetSdk 28; versionCode((System.getenv('GITHUB_RUN_NUMBER') ?: '1') as int); versionName "1.0.${System.getenv('GITHUB_RUN_NUMBER') ?: '0'}"
+    defaultConfig { applicationId wygota ? 'com.wygtv.ota' : System.getenv('WYGTV_BETA') == '1' ? 'com.wygtv.tv.beta' : 'com.wygtv.tv'; minSdk 23; targetSdk 28; versionCode((System.getenv('WYGTV_VERSION_CODE') ?: System.getenv('GITHUB_RUN_NUMBER') ?: '1') as int); versionName "1.0.${System.getenv('WYGTV_VERSION_CODE') ?: System.getenv('GITHUB_RUN_NUMBER') ?: '0'}"
+        // Beta builds (WYGTV_BETA=1) are labelled "WygTV Beta" and use the burnt-orange icons in src/beta/res.
+        // They are a separate app (com.wygtv.tv.beta), so the beta and the release can be installed side by side.
+        manifestPlaceholders = [appLabel: wygota ? 'WygOTA' : System.getenv('WYGTV_BETA') == '1' ? 'WygTV Beta' : 'WygTV']
+        buildConfigField 'boolean', 'OTA', wygota ? 'true' : 'false'
         // Optional TMDb key for movie/series details, from the GitHub secret TMDB_API_KEY (Settings can override it).
         buildConfigField 'String', 'TMDB_API_KEY', "\"${(System.getenv('TMDB_API_KEY') ?: '').replaceAll('[^A-Za-z0-9._-]', '')}\""
         // Eddie's OMDb key is the default (a GitHub secret OMDB_API_KEY replaces it; Settings overrides both).
         buildConfigField 'String', 'OMDB_API_KEY', "\"${(System.getenv('OMDB_API_KEY') ?: '5b5c4d64').replaceAll('[^A-Za-z0-9._-]', '')}\"" }
     buildFeatures { buildConfig true }
-    // Two apps from one codebase. WygTV: IPTV playlists, movies, series and antenna TV.
-    // WygOTA: only live over-the-air TV from an HDHomeRun tuner (own app id, name and icon,
-    // so both can be installed side by side).
-    flavorDimensions 'app'
-    productFlavors {
-        wygtv { dimension 'app'; applicationId 'com.wygtv.tv'; buildConfigField 'boolean', 'OTA', 'false'; resValue 'string', 'app_name', 'WygTV' }
-        wygota { dimension 'app'; applicationId 'com.wygtv.ota'; buildConfigField 'boolean', 'OTA', 'true'; resValue 'string', 'app_name', 'WygOTA' }
-    }
+    if (wygota) { sourceSets { debug { res.srcDirs = ['src/wygota/res'] } } }
+    else if (System.getenv('WYGTV_BETA') == '1') { sourceSets { debug { res.srcDirs = ['src/beta/res'] } } }
     // Preserve the existing sideloaded TV runtime behavior; Play target migration needs device testing.
     lint { warning 'ExpiredTargetSdkVersion' }
     // Permanent WygTV signing key, given to CI as GitHub secrets (never committed), so each
@@ -31,7 +32,9 @@ android { namespace 'com.wygtv.tv'; compileSdk 35
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
-dependencies { testImplementation 'junit:junit:4.13.2'; testImplementation 'org.json:json:20231013'; implementation 'androidx.media3:media3-exoplayer:1.5.1'; implementation 'androidx.media3:media3-ui:1.5.1'
-    // FFmpeg audio decoders (AC-3 / E-AC-3 for over-the-air TV from HDHomeRun tuners), built for Media3 1.5 by Jellyfin.
-    implementation 'org.jellyfin.media3:media3-ffmpeg-decoder:1.5.0+1' }
+dependencies { testImplementation 'junit:junit:4.13.2'; testImplementation 'org.json:json:20231013'; implementation 'androidx.media3:media3-exoplayer:1.9.0'; implementation 'androidx.media3:media3-ui:1.9.0'
+    // HLS (.m3u8): Settings > Live stream format and M3U playlists use it, and it carries its own subtitles and captions.
+    implementation 'androidx.media3:media3-exoplayer-hls:1.9.0'
+    // FFmpeg audio decoders (AC-3 / E-AC-3 for over-the-air TV from HDHomeRun tuners), built for Media3 1.9 by Jellyfin (1.9 brings many CEA-608/708 closed-caption fixes for live TV).
+    implementation 'org.jellyfin.media3:media3-ffmpeg-decoder:1.9.0+1' }
 

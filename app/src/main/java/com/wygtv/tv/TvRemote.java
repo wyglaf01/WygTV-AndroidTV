@@ -24,7 +24,7 @@ import org.json.JSONObject;
 /**
  * Android TV remote handling for the whole app.
  *
- * Full-screen player: CH+/CH- (or D-pad up/down) change channel, digit keys type a channel number,
+ * Full-screen player: CH+/CH- (or D-pad up) change channel, D-pad down shows the playback controls, digit keys type a channel number,
  * OK/Info shows the channel banner, Guide opens the TV guide, Last returns to the previous channel,
  * Menu opens options, and the media keys play, pause, rewind and fast-forward.
  * List screens: CH+/CH- and Page keys jump ten rows, Menu opens a row's options, Guide and Search jump
@@ -48,10 +48,19 @@ final class TvRemote {
 
     // Overlays.
     private LinearLayout banner;
-    private TextView bannerNumber, bannerTitle, bannerNow, bannerNext, numberBox;
+    private TextView bannerLogo, bannerTitle, bannerSource, bannerNow, bannerNext, numberBox;
     private String typed = "";
     private final Runnable hideBanner = () -> { if (banner != null) banner.setVisibility(View.GONE); };
     private final Runnable commitNumber = this::commitNumber;
+
+    // Series: the "Up next" card shown near the end of an episode. OK plays the next episode, Back hides the card;
+    // when the episode finishes it starts the next one by itself after a short countdown.
+    private static final long UP_NEXT_MS = 40_000;
+    private static final int AUTO_NEXT_SECONDS = 8;
+    private TextView upNext;
+    private boolean upNextDismissed;
+    private int endedSeconds = -1;
+    private final Runnable upNextTick = this::upNextTick;
 
     // Full live channel list, loaded in the background so channel numbers can reach any channel.
     private JSONArray allLive;
@@ -76,7 +85,8 @@ final class TvRemote {
         ui.removeCallbacksAndMessages(null);
         playerView.setKeepScreenOn(true); // stop the TV screensaver from starting while something plays
         playerView.setControllerShowTimeoutMs(4000);
-        playerView.setShowSubtitleButton(true); // CC button in the on-screen controls
+        playerView.setShowSubtitleButton(true); // Media3 CC button; Subtitles.useView swaps it for WygTV's own always-on CC button
+        if (a.subs != null) a.subs.useView(playerView, type, title);
 
         zapList = null;
         zapIndex = -1;
@@ -97,6 +107,7 @@ final class TvRemote {
         FrameLayout.LayoutParams nlp = new FrameLayout.LayoutParams(a.dp(170), a.dp(90), Gravity.TOP | Gravity.END);
         nlp.setMargins(0, a.dp(28), a.dp(36), 0);
         frame.addView(numberBox, nlp);
+        buildUpNext(frame);
 
         if (isLive()) {
             playerView.setControllerAutoShow(false);
@@ -114,13 +125,18 @@ final class TvRemote {
         banner.setVisibility(View.GONE);
         LinearLayout top = new LinearLayout(a);
         top.setGravity(Gravity.CENTER_VERTICAL);
-        bannerNumber = text("", 30, Theme.ACCENT, true);
-        top.addView(bannerNumber, new LinearLayout.LayoutParams(-2, -2));
+        // The channel's logo from the playlist (or nothing), never its number.
+        bannerLogo = text("", 30, Theme.ACCENT, true);
+        top.addView(bannerLogo, new LinearLayout.LayoutParams(-2, -2));
         bannerTitle = text("", 28, Theme.TEXT, true);
         bannerTitle.setSingleLine(true);
-        bannerTitle.setPadding(a.dp(18), 0, 0, 0);
+        bannerTitle.setPadding(a.dp(4), 0, 0, 0);
         top.addView(bannerTitle, new LinearLayout.LayoutParams(0, -2, 1));
         banner.addView(top);
+        bannerSource = text("", 15, Theme.ACCENT, false);
+        bannerSource.setSingleLine(true);
+        bannerSource.setPadding(0, a.dp(2), 0, a.dp(4));
+        banner.addView(bannerSource);
         bannerNow = text("", 19, Theme.TEXT, false);
         bannerNow.setSingleLine(true);
         banner.addView(bannerNow);
@@ -128,7 +144,8 @@ final class TvRemote {
         bannerNext.setSingleLine(true);
         banner.addView(bannerNext);
         TextView hints = text(isLive()
-                ? "▲▼ / CH± change channel    0-9 channel number    OK info    GUIDE TV guide    MENU options / subtitles    BACK exit"
+                ? "▲ / CH± change channel    ▼ controls    0-9 channel number    OK resume / favorites / groups    INFO channel info    GUIDE TV guide    MENU options / subtitles    BACK exit"
+                : "series".equals(type) && Episodes.next(a) != null ? "◀▶ seek    ▶❚❚ play / pause    MENU next episode / options / subtitles    BACK exit"
                 : "◀▶ seek    ▶❚❚ play / pause    MENU options / subtitles    BACK exit", 14, Theme.MUTED, false);
         hints.setPadding(0, a.dp(8), 0, 0);
         banner.addView(hints);
@@ -137,10 +154,53 @@ final class TvRemote {
         frame.addView(banner, lp);
     }
 
+    private void buildUpNext(FrameLayout frame) {
+        upNext = text("", 20, Theme.TEXT, true);
+        upNext.setSingleLine(false);
+        upNext.setMaxLines(3);
+        upNext.setPadding(a.dp(22), a.dp(14), a.dp(22), a.dp(14));
+        upNext.setBackground(panel());
+        upNext.setVisibility(View.GONE);
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(a.dp(420), -2, Gravity.BOTTOM | Gravity.END);
+        lp.setMargins(0, 0, a.dp(36), a.dp(120));
+        frame.addView(upNext, lp);
+        upNextDismissed = false;
+        endedSeconds = -1;
+        if ("series".equals(type) && Episodes.next(a) != null) ui.postDelayed(upNextTick, 1000);
+    }
+
+    /** Once a second while an episode plays: shows the Up next card in its last 40 seconds, and counts down at the end. */
+    private void upNextTick() {
+        if (view == null || a.player == null || upNext == null) return;
+        String label = Episodes.nextLabel(a);
+        if (label == null) return;
+        long dur = a.player.getDuration(), pos = a.player.getCurrentPosition();
+        boolean ended = a.player.getPlaybackState() == Player.STATE_ENDED;
+        boolean near = ended || (dur > 0 && dur - pos <= UP_NEXT_MS);
+        if (!near) { endedSeconds = -1; upNextDismissed = false; upNext.setVisibility(View.GONE); }
+        else if (!upNextDismissed) {
+            if (ended) {
+                if (endedSeconds < 0) endedSeconds = AUTO_NEXT_SECONDS;
+                if (endedSeconds == 0) { Episodes.playNext(a); return; }
+                upNext.setText("Up next   " + label + "\nStarting in " + endedSeconds-- + "…   OK play now   BACK cancel");
+            } else upNext.setText("Up next   " + label + "\nOK play next episode   BACK hide");
+            upNext.setVisibility(View.VISIBLE);
+        }
+        ui.postDelayed(upNextTick, 1000);
+    }
+
+    private boolean upNextShowing() { return upNext != null && upNext.getVisibility() == View.VISIBLE; }
+
     private void showBanner() {
         if (banner == null) return;
-        bannerNumber.setText(channelNumber(current()));
+        JSONObject ch = channel();
+        String icon = ch.optString("stream_icon").trim();
+        bannerLogo.setVisibility(icon.isEmpty() ? View.GONE : View.VISIBLE);
+        ChannelIcons.attach(bannerLogo, icon, title, 48);
         bannerTitle.setText(title);
+        String source = Library.sourceLabel(a.library.find(a.library.activeId()));
+        bannerSource.setText(source.isEmpty() ? "" : "Source  " + source);
+        bannerSource.setVisibility(source.isEmpty() ? View.GONE : View.VISIBLE);
         banner.setVisibility(View.VISIBLE);
         ui.removeCallbacks(hideBanner);
         ui.postDelayed(hideBanner, BANNER_MS);
@@ -176,6 +236,12 @@ final class TvRemote {
     boolean handleKey(KeyEvent e) {
         int key = e.getKeyCode();
         if (a.mode.equals("player") && a.player != null && view != null) return playerKey(e, key);
+        // Up/Down in a menu column (side menu, Live TV / Movies / Series menu) stay in it; only sideways leaves.
+        if (FocusWrap.menuKey(a.getCurrentFocus(), e)) return true;
+        // Live TV: Left from a playlist's categories goes to the compacted first tier beside it, Right comes back.
+        if (LiveMenu.sideways(a, e)) return true;
+        // Settings pages (and other pages opened from a list): Left goes to the collapsed menu tree beside them.
+        if (TreeMenu.sideways(a, e)) return true;
         if (e.getAction() != KeyEvent.ACTION_DOWN) return false;
         return listKey(e, key);
     }
@@ -193,20 +259,22 @@ final class TvRemote {
                 if (down && isLive()) zap(-1);
                 return isLive();
             case KeyEvent.KEYCODE_DPAD_UP:
-            case KeyEvent.KEYCODE_DPAD_DOWN:
                 if (!isLive() || controls) return false;
-                if (down) zap(key == KeyEvent.KEYCODE_DPAD_UP ? 1 : -1);
+                if (down) zap(1);
+                return true;
+            case KeyEvent.KEYCODE_DPAD_DOWN:
+                // Down shows the playback controls (live too) instead of changing channel; CH- still goes down a channel.
+                if (controls) return false;
+                if (down && e.getRepeatCount() == 0) { hideBanner.run(); view.showController(); }
                 return true;
             case KeyEvent.KEYCODE_DPAD_CENTER:
             case KeyEvent.KEYCODE_ENTER:
             case KeyEvent.KEYCODE_NUMPAD_ENTER:
                 if (controls) return false;
+                if (upNextShowing()) { if (down && e.getRepeatCount() == 0) Episodes.playNext(a); return true; }
                 if (!typed.isEmpty()) { if (down) { ui.removeCallbacks(commitNumber); commitNumber(); } return true; }
                 if (!isLive()) return false; // movies and episodes: OK shows the playback controls
-                if (down && e.getRepeatCount() == 0) {
-                    if (banner.getVisibility() == View.VISIBLE) { banner.setVisibility(View.GONE); view.showController(); }
-                    else showBanner();
-                }
+                if (down && e.getRepeatCount() == 0) channelOptions();
                 return true;
             case KeyEvent.KEYCODE_INFO:
                 if (down) { if (banner.getVisibility() == View.VISIBLE) hideBanner.run(); else showBanner(); }
@@ -241,6 +309,13 @@ final class TvRemote {
                 if (down) seek(key == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD ? SEEK_LONG_MS : -SEEK_LONG_MS);
                 return true;
             case KeyEvent.KEYCODE_MEDIA_NEXT:
+                if (!isLive()) {
+                    boolean hasNext = Episodes.next(a) != null;
+                    if (down && hasNext && e.getRepeatCount() == 0) Episodes.playNext(a);
+                    return hasNext;
+                }
+                if (down) zap(1);
+                return true;
             case KeyEvent.KEYCODE_MEDIA_PREVIOUS:
                 if (!isLive()) return false;
                 if (down) zap(key == KeyEvent.KEYCODE_MEDIA_NEXT ? 1 : -1);
@@ -260,6 +335,7 @@ final class TvRemote {
         if (!a.mode.equals("player") || view == null) return false;
         if (!typed.isEmpty()) { ui.removeCallbacks(commitNumber); typed = ""; numberBox.setVisibility(View.GONE); return true; }
         if (view.isControllerFullyVisible()) { view.hideController(); return true; }
+        if (upNextShowing()) { upNextDismissed = true; endedSeconds = -1; upNext.setVisibility(View.GONE); return true; }
         return false;
     }
 
@@ -270,6 +346,7 @@ final class TvRemote {
         if (a.tvGuide != null && isLive()) a.tvGuide.focusStream(id);
         view = null;
         banner = null;
+        upNext = null;
     }
 
     private void flashControls() { if (!isLive()) view.showController(); }
@@ -362,10 +439,35 @@ final class TvRemote {
 
     private static int parse(String s) { try { return Integer.parseInt(s); } catch (NumberFormatException e) { return -1; } }
 
-    private String channelNumber(JSONObject ch) {
-        String n = ch == null ? "" : ch.optString("num");
-        if (!n.isEmpty()) return n;
-        return zapIndex >= 0 ? String.valueOf(zapIndex + 1) : "";
+    /** The channel playing, with its logo and playlist when known (from the list you zap through, else all channels). */
+    private JSONObject channel() {
+        JSONObject ch = current();
+        if (ch != null && id.equals(ch.optString("stream_id"))) return ch;
+        if (allLiveReady()) { int i = indexOf(allLive, id); if (i >= 0) return allLive.optJSONObject(i); }
+        return channelStub(id, title, ext);
+    }
+
+    /**
+     * OK on a live channel: Resume, Favorites, Add to channel group and New channel group (the guide pop-up
+     * without Hidden), with the channel banner shown under it for the logo, source and what's on.
+     */
+    private void channelOptions() {
+        showBanner();
+        ui.removeCallbacks(hideBanner);
+        android.app.AlertDialog d = GuideOptions.showInPlayer(a, channel(), this::restart);
+        if (d == null) { ui.postDelayed(hideBanner, BANNER_MS); return; }
+        d.setOnDismissListener(x -> { ui.removeCallbacks(hideBanner); ui.postDelayed(hideBanner, BANNER_MS); });
+    }
+
+    /** Start the channel playing again from scratch (a fresh connection to the stream). */
+    private void restart() {
+        if (a.player == null || view == null || id.isEmpty()) return;
+        if (a.recovery != null) a.recovery.newStream();
+        a.player.stop();
+        a.player.setMediaItem(MediaItem.fromUri(a.streamUrl("live", id, ext)));
+        a.player.prepare();
+        a.player.play();
+        Toast.makeText(a, "Resuming " + title + "…", Toast.LENGTH_SHORT).show();
     }
 
     private static String[] numbers(JSONArray list) {
@@ -416,10 +518,24 @@ final class TvRemote {
     private void playerMenu() {
         ui.removeCallbacks(hideBanner);
         if (!isLive()) {
-            boolean fav = a.isFavorite(type, id);
+            // Favorites are for Live TV; a movie (or the series of this episode) goes in My List instead.
+            boolean series = "series".equals(type);
+            String listType = series ? "series" : "vod", listId = series ? (a.watching != null ? a.watching[0] : "") : id;
+            JSONObject listItem = new JSONObject();
+            try {
+                listItem.put(series ? "series_id" : "stream_id", listId).put("name", series && a.seriesTitle != null ? a.seriesTitle : title);
+                if (!series) listItem.put("container_extension", ext);
+            } catch (Exception ignored) { }
+            boolean mine = !listId.isEmpty() && a.inMyList(listType, listId);
+            String next = series ? Episodes.nextLabel(a) : null;
+            String[] items = {mine ? "Remove from My List" : "Add to My List", subtitlesItem(), "Exit player"};
+            if (next != null) items = new String[]{"▶  Play next episode   " + next, items[0], items[1], items[2]};
+            final int shift = next != null ? 1 : 0;
             new Dialogs.Builder(a).setTitle(title)
-                    .setItems(new String[]{fav ? "Remove from Favorites" : "Add to Favorites", subtitlesItem(), "Exit player"}, (d, w) -> {
-                        if (w == 0) toast(a.toggleFavorite(type, id, title, ext) ? "Added to Favorites" : "Removed from Favorites");
+                    .setItems(items, (d, which) -> {
+                        if (shift == 1 && which == 0) { Episodes.playNext(a); return; }
+                        int w = which - shift;
+                        if (w == 0) { if (!listId.isEmpty()) toast(a.toggleMyList(listType, listItem) ? "Added to My List" : "Removed from My List"); }
                         else if (w == 1) { if (a.subs != null) a.subs.choose(); }
                         else a.onBackPressed();
                     }).show();
@@ -442,14 +558,22 @@ final class TvRemote {
     /** A quick channel picker over the video, so you can jump without leaving the player. */
     private void channelList() {
         if (zapList == null || zapList.length() == 0) { toast("No channel list to show."); return; }
-        String[] names = new String[zapList.length()];
-        for (int i = 0; i < names.length; i++) {
-            JSONObject o = zapList.optJSONObject(i);
-            String num = o == null ? "" : o.optString("num");
-            names[i] = (num.isEmpty() ? String.valueOf(i + 1) : num) + "   " + (o == null ? "" : o.optString("name"));
-        }
         final JSONArray list = zapList;
-        AlertDialog d = new Dialogs.Builder(a).setTitle("Channels").setSingleChoiceItems(names, Math.max(0, zapIndex), (dialog, which) -> {
+        final int playing = zapIndex;
+        // Each row: the channel's logo from the playlist and its name (▶ marks the one playing).
+        android.widget.ArrayAdapter<String> rows = new android.widget.ArrayAdapter<String>(a, android.R.layout.select_dialog_item) {
+            @Override public int getCount() { return list.length(); }
+            @Override public String getItem(int i) { JSONObject o = list.optJSONObject(i); return o == null ? "" : o.optString("name"); }
+            @Override public View getView(int i, View convert, android.view.ViewGroup parent) {
+                TextView t = (TextView) super.getView(i, convert, parent);
+                JSONObject o = list.optJSONObject(i);
+                String name = o == null ? "" : o.optString("name");
+                t.setText(i == playing ? "▶  " + name : name);
+                ChannelIcons.attach(t, o == null ? "" : o.optString("stream_icon"), name, 28);
+                return t;
+            }
+        };
+        AlertDialog d = new Dialogs.Builder(a).setTitle("Channels").setAdapter(rows, (dialog, which) -> {
             dialog.dismiss();
             if (which != zapIndex || list != zapList) switchTo(list, which);
         }).create();
@@ -538,9 +662,9 @@ final class TvRemote {
     }
 
     private GradientDrawable panel() {
-        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{Theme.alpha(Theme.PANEL,0xe6), Theme.alpha(Theme.BG,0xf0)});
+        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{Theme.pane(Theme.alpha(Theme.PANEL,0xe6)), Theme.alpha(Theme.BG, Theme.glass ? 0xb0 : 0xf0)});
         g.setCornerRadius(a.dp(14));
-        g.setStroke(a.dp(2), Theme.STROKE_FOCUS);
+        g.setStroke(a.dp(Theme.glass ? 1 : 2), Theme.glass ? Theme.edge(false) : Theme.STROKE_FOCUS);
         return g;
     }
 

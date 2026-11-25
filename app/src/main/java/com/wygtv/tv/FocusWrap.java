@@ -47,6 +47,65 @@ final class FocusWrap {
         return true;
     }
 
+    /** Tag on a menu column (the side menu, the Live TV / Movies / Series menu): Up and Down never leave it. */
+    static final String MENU = "focuswrap_menu";
+
+    /**
+     * Up/Down inside a column tagged {@link #MENU}: go to the next item above or below in that column, wrapping at the
+     * ends (holding the key stops at the end). Focus only leaves the column sideways. Returns true when the key was used.
+     */
+    static boolean menuKey(View focused, KeyEvent e) {
+        int key = e.getKeyCode();
+        if (key != KeyEvent.KEYCODE_DPAD_DOWN && key != KeyEvent.KEYCODE_DPAD_UP) return false;
+        ViewGroup column = menuOf(focused);
+        if (column == null) return false;
+        if (e.getAction() != KeyEvent.ACTION_DOWN) return true;
+        java.util.ArrayList<View> all = new java.util.ArrayList<>();
+        column.addFocusables(all, View.FOCUS_DOWN);
+        java.util.ArrayList<View> items = new java.util.ArrayList<>();
+        for (View v : all) if (v != column && v.isShown()) items.add(v);
+        if (items.isEmpty()) return true;
+        boolean down = key == KeyEvent.KEYCODE_DPAD_DOWN;
+        int[] here = top(focused);
+        View best = null; int bestY = 0, bestX = 0;
+        for (View v : items) {
+            if (v == focused) continue;
+            int[] p = top(v);
+            if (down ? p[1] <= here[1] : p[1] >= here[1]) continue;
+            int dy = Math.abs(p[1] - here[1]), dx = Math.abs(p[0] - here[0]);
+            if (best == null || dy < bestY || (dy == bestY && dx < bestX)) { best = v; bestY = dy; bestX = dx; }
+        }
+        if (best == null) { // at the end: wrap to the other end, unless the key is held down
+            if (e.getRepeatCount() > 0) return true;
+            for (View v : items) {
+                if (v == focused) continue;
+                int[] p = top(v);
+                int y = down ? p[1] : -p[1], dx = Math.abs(p[0] - here[0]);
+                if (best == null || y < bestY || (y == bestY && dx < bestX)) { best = v; bestY = y; bestX = dx; }
+            }
+        }
+        if (best != null) best.requestFocus();
+        return true;
+    }
+
+    private static ViewGroup menuOf(View v) {
+        for (android.view.ViewParent p = v == null ? null : v.getParent(); p instanceof ViewGroup; p = p.getParent())
+            if (MENU.equals(((ViewGroup) p).getTag())) return (ViewGroup) p;
+        return null;
+    }
+
+    /** Position of a view's top-left corner inside the scrolling content (not the screen), so off-screen rows count too. */
+    private static int[] top(View v) {
+        int x = 0, y = 0;
+        for (View c = v; c != null; ) {
+            x += c.getLeft(); y += c.getTop();
+            android.view.ViewParent p = c.getParent();
+            if (!(p instanceof View) || MENU.equals(((View) p).getTag())) break;
+            c = (View) p;
+        }
+        return new int[]{x, y};
+    }
+
     /** Pop-up lists (pickers, item menus): wrap the list, still letting Down reach the dialog's buttons first. */
     static boolean dialogKey(Dialog d, ListView lv, KeyEvent e) {
         int key = e.getKeyCode();

@@ -23,7 +23,6 @@ import org.json.JSONObject;
  * screen changes, a channel opens full screen or the app goes to the background.
  */
 final class LivePreview {
-    private static final int DELAY_MS = 700;
     private static final Handler UI = new Handler(Looper.getMainLooper());
 
     private static PlayerView view;
@@ -55,7 +54,7 @@ final class LivePreview {
             @Override public void onViewAttachedToWindow(View v) { }
             @Override public void onViewDetachedFromWindow(View v) { if (view == mine) release(); }
         });
-        label = a.label("Highlight a channel to preview it", 14);
+        label = a.label(frame.isInTouchMode() ? "Tap a channel name to preview it" : "Highlight a channel to preview it", 14);
         label.setTextColor(Theme.MUTED);
         label.setGravity(Gravity.CENTER);
         frame.addView(label, new FrameLayout.LayoutParams(-1, -1));
@@ -65,19 +64,49 @@ final class LivePreview {
         return frame;
     }
 
-    /** The guide's focused channel changed: preview it shortly. */
+    /** The guide's focused channel changed: preview it after the delay chosen in Settings (not at all for OK only). */
     static void show(MainActivity a, JSONObject item) {
         if (view == null || !view.isAttachedToWindow()) return;
         wanted = item;
         if (pending != null) UI.removeCallbacks(pending);
+        pending = null;
+        // The first channel after the screen opens previews right away; the Settings delay (or OK only) is for later changes.
+        int delay = player == null ? 0 : PreviewDelay.ms(a.prefs);
+        if (delay < 0) return;
         pending = () -> { if (wanted == item) start(a, item); };
-        UI.postDelayed(pending, DELAY_MS);
+        UI.postDelayed(pending, delay);
+    }
+
+    /**
+     * OK on a guide row. In "OK only" mode, a channel that isn't in the preview yet starts previewing and this
+     * returns true (OK is used up); OK on the channel already previewing returns false so it opens full screen.
+     */
+    static boolean previewOnOk(MainActivity a, JSONObject item) {
+        if (!PreviewDelay.okOnly(a.prefs) || view == null || !view.isAttachedToWindow()) return false;
+        if (player != null && keyOf(a, item).equals(playingKey)) return false;
+        wanted = item;
+        start(a, item);
+        return true;
+    }
+
+    /** Tap on a channel name (touch screens): preview it now, whatever the Settings delay. */
+    static void previewNow(MainActivity a, JSONObject item) {
+        if (view == null || !view.isAttachedToWindow()) return;
+        if (pending != null) UI.removeCallbacks(pending);
+        pending = null;
+        wanted = item;
+        start(a, item);
+    }
+
+    private static String keyOf(MainActivity a, JSONObject item) {
+        String pid = item.optString("playlist");
+        return (pid.isEmpty() ? a.library.activeId() : pid) + "|" + item.optString("stream_id");
     }
 
     private static void start(MainActivity a, JSONObject item) {
         if (view == null || !view.isAttachedToWindow()) return;
         String pid = item.optString("playlist"), sid = item.optString("stream_id");
-        String key = (pid.isEmpty() ? a.library.activeId() : pid) + "|" + sid;
+        String key = keyOf(a, item);
         if (player != null && key.equals(playingKey)) return;
         String ext = item.optString("container_extension", "ts");
         if (ext.isEmpty()) ext = "ts";
@@ -89,10 +118,11 @@ final class LivePreview {
         label.setText("Loading " + item.optString("name", "") + "…");
         label.setVisibility(View.VISIBLE);
         if (player == null) {
-            player = new ExoPlayer.Builder(a).build();
+            player = Players.create(a);
             view.setPlayer(player);
             player.addListener(new Player.Listener() {
                 @Override public void onPlayerError(PlaybackException error) {
+                    if (player != null && Players.useFfmpegAudio(player, error)) { player.prepare(); return; }
                     if (label != null) { label.setText("Preview unavailable"); label.setVisibility(View.VISIBLE); }
                 }
                 @Override public void onRenderedFirstFrame() { if (label != null) label.setVisibility(View.GONE); }

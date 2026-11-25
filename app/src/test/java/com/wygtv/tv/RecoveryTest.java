@@ -35,4 +35,11 @@ public class RecoveryTest {
         assertEquals(Players.BUFFER_KEYS.length, Players.BUFFER_LABELS.length);
         assertEquals(Players.DECODER_KEYS.length, Players.DECODER_LABELS.length);
     }
+    @Test public void ffmpegFallbackErrors() {
+        assertTrue(Players.decoderError(androidx.media3.common.PlaybackException.ERROR_CODE_DECODER_INIT_FAILED));
+        assertTrue(Players.decoderError(androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED));
+        assertTrue(Players.decoderError(androidx.media3.common.PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED));
+        assertFalse(Players.decoderError(androidx.media3.common.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED));
+        assertFalse(Players.decoderError(androidx.media3.common.PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW));
+    }
 }

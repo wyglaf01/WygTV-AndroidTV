@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WygTV Builds · every download and its address</title>
+<meta name="description" content="Newest WygTV builds for Android TV, Fire TV, Windows, Ubuntu, Mac, iPhone and iPad, with the direct address of every file.">
+<link rel="icon" href="img/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+  .builds { display: grid; gap: 18px; }
+  .build { border: 1px solid var(--bronze); border-radius: var(--radius); padding: 22px; background: rgba(26, 52, 128, .35); }
+  .build.test { border-style: dashed; background: rgba(26, 52, 128, .2); }
+  .build-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: 6px; }
+  .build-head h3 { margin: 0; font: 700 22px var(--serif); color: var(--gold); }
+  .build-head img { height: 20px; display: inline-block; }
+  .meta { color: var(--dim); font-size: 14px; margin: 0 0 14px; }
+  .build > p { color: var(--muted); margin: 0 0 12px; }
+  .files { width: 100%; border-collapse: collapse; font-size: 15px; }
+  .files th { text-align: left; color: var(--dim); font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  .files td { padding: 10px 8px; border-bottom: 1px solid rgba(205, 127, 50, .15); vertical-align: middle; }
+  .files tr:last-child td { border-bottom: 0; }
+  .files td.name { font-weight: 600; white-space: nowrap; }
+  .files td.addr code { word-break: break-all; font-size: 13px; }
+  .files td.num { white-space: nowrap; color: var(--muted); text-align: right; }
+  .copy { font: 600 13px var(--sans); padding: 6px 12px; border-radius: 8px; cursor: pointer; border: 1px solid var(--bronze); color: var(--text); background: rgba(205, 127, 50, .12); white-space: nowrap; }
+  .copy:hover { background: rgba(205, 127, 50, .25); }
+  .copy.done { border-color: var(--gold); color: var(--gold); }
+  .dlbtn { padding: 6px 12px; font-size: 13px; white-space: nowrap; }
+  .acts { display: flex; gap: 6px; justify-content: flex-end; }
+  @media (max-width: 760px) {
+    .files thead { display: none; }
+    .files tr { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; padding: 10px 0; border-bottom: 1px solid rgba(205, 127, 50, .15); }
+    .files td { border: 0; padding: 0; }
+    .files td.addr { grid-column: 1 / -1; }
+    .files td.num { text-align: left; }
+    .files td.acts-cell { grid-column: 1 / -1; }
+    .acts { justify-content: flex-start; }
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="./"><img src="img/favicon.png" alt="">WygTV</a>
+    <nav class="links">
+      <a href="./#features">Features</a>
+      <a href="./#download">Download</a>
+      <a class="on" href="builds.html">Builds</a>
+      <a href="./#firetv">Fire TV</a>
+      <a href="help.html">Help guide</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<section>
+  <div class="wrap">
+    <div class="tagline">Builds</div>
+    <h2>Every build and its address</h2>
+    <p class="sub">Each change merged on GitHub is built automatically, and the newest files replace the old ones at the same addresses, so a link copied from here never goes stale. The dates, sizes and download counts below come live from GitHub.</p>
+
+    <div class="builds" id="builds"></div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<section id="whatsnew">
+  <div class="wrap">
+    <h2>What's new in WygTV for Android</h2>
+    <p class="sub">Released versions, newest first. Each one was tested as a beta before it was released.</p>
+    <div class="build">
+      <div class="build-head"><h3>WygTV 1.0.310</h3></div>
+      <p class="meta">Released November 23, 2026</p>
+      <ul class="notes">
+        <li><b>Search no longer closes the app:</b> channel lists load in smaller pieces with only what's needed, other playlists load one at a time, and if memory gets low search leaves some playlists out instead of crashing.</li>
+        <li><b>All categories</b> in Live TV, Movies and Series loads in pieces too, and shows a message instead of closing when a list is too big.</li>
+        <li><b>◀ and Back return to where you were:</b> leaving the channels, guide or posters goes back to the menu entry you came from (Back used to go straight Home).</li>
+        <li><b>Back on a category</b> under an open playlist closes the categories and returns to the playlist.</li>
+        <li><b>▲ Collapse categories</b> is a new choice when you hold OK on a category.</li>
+        <li><b>Live TV menu:</b> Full TV guide and antenna tuner entries were removed; they're on the side rail (▦, 📡) and on Home.</li>
+      </ul>
+    </div>
+    <div class="build">
+      <div class="build-head"><h3>WygTV 1.0.297</h3></div>
+      <p class="meta">Released November 23, 2026</p>
+      <ul class="notes">
+        <li><b>Live TV:</b> pressing OK or tapping a playlist (such as Trex) opens its categories right under it; press again to close them.</li>
+        <li><b>Live TV, Movies and Series menus</b> shrink to a strip of icons when you move into the channels or the guide, giving the guide more room.</li>
+        <li><b>Tablets:</b> tap a channel name to preview it straight away; tap a show to open the channel full screen. Long-press for channel options.</li>
+        <li><b>Channel options:</b> "Restart" is now called <b>Resume</b>, and the Hidden switch is gone (hide channels in Settings › Hide and show channels).</li>
+        <li><b>Movies and Series search:</b> the search bar sits in the title row, so the posters get the full height.</li>
+        <li><b>Playlists and TV guides update automatically</b> when added and on a schedule (every start-up, 6, 12 or 24 hours), with the last update time shown in Settings › Manage playlists.</li>
+        <li><b>AirTV antenna TV:</b> a new entry that opens the Sling TV app, where AirTV channels play.</li>
+        <li><b>Menus:</b> two-line rows show a bigger title and a smaller description.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<section>
+  <div class="wrap">
+    <h2>Addresses on GitHub</h2>
+    <p class="sub">Where everything lives. Copy any address into a browser, a message, or the Downloader app.</p>
+    <div class="build">
+      <table class="files"><thead><tr><th>What</th><th>Address</th><th></th></tr></thead>
+        <tbody id="addresses"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>WygTV · free for Android TV, Fire TV, Windows, Ubuntu, Mac, iPhone and iPad</span>
+    <span><a href="./">Home</a> · <a href="help.html">Help guide</a> · <a href="https://github.com/wyglaf01/WygTV-AndroidTV">Source on GitHub</a></span>
+    <span>WygTV plays the content you bring. It doesn't come with any channels or subscriptions.</span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var REPO = "wyglaf01/WygTV-AndroidTV";
+  var GH = "https://github.com/" + REPO;
+  var DL = GH + "/releases/download/";
+  var SITE = "https://wyglaf01.github.io/WygTV-AndroidTV/";
+
+  // The builds and their files. Addresses are fixed; dates, sizes and counts are filled in from GitHub.
+  var BUILDS = [
+    { tag: "latest", title: "📺 WygTV for Android TV, Fire TV & tablets", workflow: "release.yml",
+      text: "Google TV, Android TV boxes, NVIDIA Shield, Fire TV Stick and Cube, and Android tablets. This is the released version: installed copies update themselves from Settings → Manage app → Check for updates.",
+      files: [["Android app (.apk)", GH + "/releases/latest/download/wygtv.apk", "wygtv.apk"]] },
+    { tag: "wygtv-beta", title: "🧪 WygTV Beta for Android", workflow: "build.yml", test: true,
+      text: "Every change is built here first for testing, then moved to the release above once it's OK. It's a separate app: it installs next to the release (both can be on the same TV or tablet), shows as \"WygTV Beta\" with an orange icon, and updates itself to the newest beta. It keeps its own playlists and settings; to copy yours, use Settings → Back up in WygTV and Restore in the beta.",
+      files: [["Android beta (.apk)", DL + "wygtv-beta/wygtv-beta.apk", "wygtv-beta.apk"]] },
+    { tag: "wygdesktop-latest", title: "🖥 WygDesktop for Windows & Ubuntu", workflow: "desktop.yml",
+      text: "The same app for PCs, with mouse and keyboard. Installed copies update themselves from Settings → About & updates → Check for updates.",
+      files: [
+        ["Windows installer", DL + "wygdesktop-latest/WygDesktop-Setup.exe", "WygDesktop-Setup.exe"],
+        ["Windows, no install", DL + "wygdesktop-latest/WygDesktop-Portable.exe", "WygDesktop-Portable.exe"],
+        ["Ubuntu .deb", DL + "wygdesktop-latest/WygDesktop-linux.deb", "WygDesktop-linux.deb"],
+        ["Ubuntu AppImage", DL + "wygdesktop-latest/WygDesktop-linux.AppImage", "WygDesktop-linux.AppImage"]] },
+    { id: "mac", tag: "wygdesktop-latest", title: "🍎 WygTV-Mac for macOS", workflow: "desktop.yml",
+      text: "For Macs with macOS 11 Big Sur or newer. Pick Apple Silicon for M1, M2, M3, M4 and newer Macs, Intel for older ones ( → About This Mac shows which). It isn't signed by Apple yet: the first time, open it, click Done, then go to System Settings → Privacy & Security and click Open Anyway.",
+      files: [
+        ["Apple Silicon (M1 and newer)", DL + "wygdesktop-latest/WygTV-Mac-AppleSilicon.dmg", "WygTV-Mac-AppleSilicon.dmg"],
+        ["Intel Mac", DL + "wygdesktop-latest/WygTV-Mac-Intel.dmg", "WygTV-Mac-Intel.dmg"]] },
+    { tag: "wygtv-ios-latest", title: "📱 WygTV-iOS for iPhone & iPad", workflow: "ios.yml",
+      text: "For iPhone and iPad with iOS 15 or newer. It isn't on the App Store: install it with AltStore, which signs it with your own Apple ID. Add the AltStore source below in AltStore (Browse → Sources → +) and new builds show up as updates.",
+      files: [
+        ["AltStore source", DL + "wygtv-ios-latest/altstore-source.json", "altstore-source.json"],
+        ["iPhone & iPad app (.ipa)", DL + "wygtv-ios-latest/WygTV-iOS.ipa", "WygTV-iOS.ipa"]] },
+    { tag: "wygdesktop-test", title: "🧪 WygDesktop and WygTV-Mac test build", test: true,
+      text: "Built from a change that hasn't been merged yet, for trying it out before it goes to everyone. May be older or newer than the build above.",
+      files: [
+        ["Windows installer", DL + "wygdesktop-test/WygDesktop-Setup.exe", "WygDesktop-Setup.exe"],
+        ["Windows, no install", DL + "wygdesktop-test/WygDesktop-Portable.exe", "WygDesktop-Portable.exe"],
+        ["Ubuntu .deb", DL + "wygdesktop-test/WygDesktop-linux.deb", "WygDesktop-linux.deb"],
+        ["Ubuntu AppImage", DL + "wygdesktop-test/WygDesktop-linux.AppImage", "WygDesktop-linux.AppImage"],
+        ["Mac, Apple Silicon", DL + "wygdesktop-test/WygTV-Mac-AppleSilicon.dmg", "WygTV-Mac-AppleSilicon.dmg"],
+        ["Mac, Intel", DL + "wygdesktop-test/WygTV-Mac-Intel.dmg", "WygTV-Mac-Intel.dmg"]] },
+    { tag: "wygtv-ios-test", title: "🧪 WygTV-iOS test build", test: true,
+      text: "Built from a change that hasn't been merged yet. Open the .ipa in AltStore to try it.",
+      files: [["iPhone & iPad app (.ipa)", DL + "wygtv-ios-test/WygTV-iOS.ipa", "WygTV-iOS.ipa"]] }
+  ];
+
+  var ADDRESSES = [
+    ["Website", SITE],
+    ["This Builds page", SITE + "builds.html"],
+    ["Help guide", SITE + "help.html"],
+    ["Source code on GitHub", GH],
+    ["All releases", GH + "/releases"],
+    ["Android beta", GH + "/releases/tag/wygtv-beta"],
+    ["Build history (GitHub Actions)", GH + "/actions"],
+    ["Android version file", GH + "/releases/latest/download/version.json"],
+    ["Desktop version file", DL + "wygdesktop-latest/desktop-version.json"],
+    ["iOS version file", DL + "wygtv-ios-latest/ios-version.json"]
+  ];
+
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function copyBtn(url) {
+    var b = el("button", "copy", "Copy");
+    b.type = "button";
+    b.onclick = function () {
+      var done = function () { b.textContent = "Copied ✓"; b.classList.add("done"); setTimeout(function () { b.textContent = "Copy"; b.classList.remove("done"); }, 1600); };
+      if (navigator.clipboard) navigator.clipboard.writeText(url).then(done, function () { prompt("Copy this address:", url); });
+      else prompt("Copy this address:", url);
+    };
+    return b;
+  }
+  function size(n) { return n > 1e9 ? (n / 1e9).toFixed(1) + " GB" : n > 1e6 ? Math.round(n / 1e6) + " MB" : Math.round(n / 1e3) + " KB"; }
+  function when(iso) { var d = new Date(iso); return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) + ", " + d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }); }
+
+  var cells = {}; // tag|file → { size, count }, meta: tag → element
+  var metas = {};
+  var root = document.getElementById("builds");
+  BUILDS.forEach(function (b) {
+    var card = el("div", "build" + (b.test ? " test" : ""));
+    var head = el("div", "build-head");
+    head.appendChild(el("h3", null, b.title));
+    if (b.workflow) {
+      var badge = document.createElement("img");
+      badge.src = GH + "/actions/workflows/" + b.workflow + "/badge.svg?branch=app";
+      badge.alt = "Build status";
+      var a = el("a"); a.href = GH + "/actions/workflows/" + b.workflow; a.appendChild(badge);
+      head.appendChild(a);
+    }
+    card.appendChild(head);
+    metas[b.id || b.tag] = card.appendChild(el("p", "meta", "Checking GitHub for the newest build…"));
+    card.appendChild(el("p", null, b.text));
+    var t = el("table", "files");
+    t.innerHTML = "<thead><tr><th>File</th><th>Address</th><th style='text-align:right'>Size</th><th style='text-align:right'>Downloads</th><th></th></tr></thead>";
+    var tb = el("tbody");
+    b.files.forEach(function (f) {
+      var tr = el("tr");
+      tr.appendChild(el("td", "name", f[0]));
+      var ad = el("td", "addr"); var code = ad.appendChild(el("code", null, f[1])); tr.appendChild(ad);
+      var sz = tr.appendChild(el("td", "num", ""));
+      var ct = tr.appendChild(el("td", "num", ""));
+      var ac = el("td", "acts-cell"); var acts = el("div", "acts");
+      var dl = el("a", "btn primary dlbtn", "⬇ Download"); dl.href = f[1];
+      var cp = copyBtn(f[1]);
+      acts.appendChild(dl); acts.appendChild(cp); ac.appendChild(acts); tr.appendChild(ac);
+      tb.appendChild(tr);
+      cells[b.tag + "|" + f[2]] = { size: sz, count: ct, link: dl, code: code, copy: cp };
+    });
+    t.appendChild(tb);
+    card.appendChild(t);
+    root.appendChild(card);
+  });
+
+  var at = document.getElementById("addresses");
+  ADDRESSES.forEach(function (x) {
+    var tr = el("tr");
+    tr.appendChild(el("td", "name", x[0]));
+    var ad = el("td", "addr"); var a = el("a"); a.href = x[1]; a.appendChild(el("code", null, x[1])); ad.appendChild(a); tr.appendChild(ad);
+    var ac = el("td", "acts-cell"); var acts = el("div", "acts"); acts.appendChild(copyBtn(x[1])); ac.appendChild(acts); tr.appendChild(ac);
+    at.appendChild(tr);
+  });
+
+  // Live details from GitHub (no sign-in needed; the page still works if this fails).
+  fetch("https://api.github.com/repos/" + REPO + "/releases?per_page=30")
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (list) {
+      BUILDS.forEach(function (b) {
+        var rel = b.tag === "latest"
+          ? list.filter(function (r) { return !r.prerelease && !r.draft && /^wygtv-v/.test(r.tag_name); })[0]
+          : list.filter(function (r) { return r.tag_name === b.tag; })[0];
+        var m = metas[b.id || b.tag];
+        if (!rel) { m.textContent = "No build here right now."; return; }
+        var last = rel.assets.reduce(function (t, a) { return a.updated_at > t ? a.updated_at : t; }, rel.published_at || "");
+        var ver = (rel.name || "").match(/\d+\.\d+\.\d+/);
+        m.textContent = (ver ? "Version " + ver[0] + " · " : "") + (b.tag === "latest" ? "Released " : "Last built ") + when(last);
+        rel.assets.forEach(function (a) {
+          var c = cells[b.tag + "|" + a.name];
+          if (!c && /^wygtv-beta-.*\.apk$/.test(a.name)) { // the beta file's name carries its version
+            c = cells[b.tag + "|wygtv-beta-*.apk"];
+            if (c) { c.link.href = a.browser_download_url; c.code.textContent = a.browser_download_url; c.copy.replaceWith(copyBtn(a.browser_download_url)); }
+          }
+          if (c) { c.size.textContent = size(a.size); c.count.textContent = a.download_count.toLocaleString() + " ⬇"; }
+        });
+      });
+    })
+    .catch(function () {
+      Object.keys(metas).forEach(function (k) { metas[k].textContent = "Newest build (live details couldn't be loaded from GitHub just now)."; });
+    });
+})();
+</script>
+<!-- Buy Me a Coffee button (bottom right) -->
+<script data-name="BMC-Widget" data-cfasync="false" src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js" data-id="wyglaf" data-description="Support me on Buy me a coffee!" data-message="" data-color="#5F7FFF" data-position="Right" data-x_margin="18" data-y_margin="18"></script>
+</body>
+</html>
