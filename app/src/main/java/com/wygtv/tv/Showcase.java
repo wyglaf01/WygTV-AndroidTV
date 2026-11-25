@@ -26,9 +26,10 @@ import java.util.Map;
 /**
  * Main screen option 1 (the default): popular movies and series right now, in rows of posters to scroll through,
  * from public sources that need no key (Rotten Tomatoes, Apple, TVmaze: see PopularSources). The rows don't depend
- * on any playlist. Choosing a poster looks for that title in your playlists and lists
- * every playlist (and every copy, e.g. HD or 4K) that has it, to pick one; it then opens the same details page as
- * Movies and Series. Live TV, Movies, Series, Search and antenna TV are in the side menu.
+ * on any playlist. Choosing a poster opens its details page straight away (like Movies and Series), which then
+ * looks for the title in your playlists; ▶ Play plays it from there (see {@link PosterDetails}). A row of shortcuts
+ * at the top has the classic Home's items (Live TV, TV Guide, Movies, Series, Search, antenna TV, Playlists,
+ * Settings, Exit); they're in the side menu too.
  * Option 2 is the classic Home with its tiles; Settings > Appearance > Main screen picks one.
  */
 final class Showcase {
@@ -80,13 +81,20 @@ final class Showcase {
         a.status.setTextColor(Theme.MUTED);
         header.addView(a.status, new LinearLayout.LayoutParams(0, -1, 1));
 
+        // The original Home's items as one row of shortcuts at the top.
+        LinearLayout shortcuts = shortcuts(a);
+        LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(-1, a.dp(46));
+        slp.setMargins(0, a.dp(2), 0, a.dp(8));
+        layout.addView(shortcuts, slp);
+        shortcuts.getChildAt(0).requestFocus(); // Live TV, as on the classic Home
+
         // Spotlight: what the highlighted poster is.
         TextView title = a.label("Popular this week", 22);
         title.setTypeface(null, Typeface.BOLD);
         title.setSingleLine(true);
         title.setEllipsize(TextUtils.TruncateAt.END);
         layout.addView(title, new LinearLayout.LayoutParams(-1, -2));
-        TextView facts = a.label("Movies and series people are watching now. Press OK on one to find it in your playlists.", 13);
+        TextView facts = a.label("Movies and series people are watching now. Press OK on one for its details.", 13);
         facts.setTextColor(Theme.ACCENT);
         facts.setSingleLine(true);
         layout.addView(facts, new LinearLayout.LayoutParams(-1, -2));
@@ -105,7 +113,7 @@ final class Showcase {
         rows.setOrientation(LinearLayout.VERTICAL);
         scroll.addView(rows, new FrameLayout.LayoutParams(-1, -2));
 
-        Spot spot = new Spot(a, generation, backdrop, title, facts, plot);
+        Spot spot = new Spot(a, generation, backdrop, title, facts, plot, shortcuts);
         JSONObject saved = readSaved(a);
         if (saved != null) fill(a, rows, saved, spot);
         else a.status.setText("Finding this week's popular movies and series in your playlists…");
@@ -116,9 +124,9 @@ final class Showcase {
 
     /** The spotlight texts and picture, updated as posters are highlighted. */
     private static final class Spot {
-        final MainActivity a; final int generation; final ImageView backdrop; final TextView title, facts, plot;
-        Spot(MainActivity a, int generation, ImageView backdrop, TextView title, TextView facts, TextView plot) {
-            this.a = a; this.generation = generation; this.backdrop = backdrop; this.title = title; this.facts = facts; this.plot = plot;
+        final MainActivity a; final int generation; final ImageView backdrop; final TextView title, facts, plot; final View top;
+        Spot(MainActivity a, int generation, ImageView backdrop, TextView title, TextView facts, TextView plot, View top) {
+            this.a = a; this.generation = generation; this.backdrop = backdrop; this.title = title; this.facts = facts; this.plot = plot; this.top = top;
         }
         void show(JSONObject it, boolean series) {
             title.setText(it.optString("_title", it.optString("name", "")));
@@ -180,7 +188,55 @@ final class Showcase {
             none.setPadding(0, a.dp(20), 0, 0);
             rows.addView(none);
         }
-        if (first != null && !a.isFinishing()) first.requestFocus();
+        // The rows load after the screen opens: don't pull the highlight off the shortcuts row.
+        if (first != null && !a.isFinishing() && !spot.top.hasFocus()) first.requestFocus();
+    }
+
+    /**
+     * The classic Home's items, small, in one row: Live TV, TV Guide, Movies, Series, Search, a 📡 tile for each
+     * antenna tuner (and AirTV), Playlists, Settings and Exit. Live TV is highlighted when the screen opens.
+     */
+    private static LinearLayout shortcuts(MainActivity a) {
+        LinearLayout row = new LinearLayout(a);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        shortcut(a, row, "▣  Live TV", () -> a.browse("live"));
+        shortcut(a, row, "▦  TV Guide", () -> a.openGuide(null));
+        if (a.library.hasVod()) {
+            shortcut(a, row, "▶  Movies", () -> a.browseVod("vod"));
+            shortcut(a, row, "▤  Series", () -> a.browseVod("series"));
+        }
+        shortcut(a, row, "⌕  Search", () -> MasterSearch.show(a));
+        for (JSONObject t : Antenna.tuners(a)) {
+            String aid = Antenna.PREFIX + t.optString("id");
+            shortcut(a, row, "📡  " + Antenna.nameOf(t), () -> a.showGuide(aid, null, true));
+        }
+        if (AirTv.isOn(a.prefs)) shortcut(a, row, "📡  " + AirTv.nameOf(a.prefs), () -> AirTv.open(a));
+        shortcut(a, row, "☰  Playlists", () -> { Menus.playlistsFromSettings = false; a.playlists(); });
+        shortcut(a, row, "⚙  Settings", a::settings);
+        if (MenuOrder.homeExit(a.prefs)) shortcut(a, row, "⏻  Exit", a::confirmExit);
+        return row;
+    }
+
+    private static TextView shortcut(MainActivity a, LinearLayout row, String text, Runnable action) {
+        TextView t = a.label(text, 15);
+        t.setGravity(Gravity.CENTER);
+        t.setTypeface(null, Typeface.BOLD);
+        t.setSingleLine(true);
+        t.setEllipsize(TextUtils.TruncateAt.END);
+        t.setPadding(a.dp(6), 0, a.dp(6), 0);
+        t.setFocusable(true);
+        t.setClickable(true);
+        t.setBackground(Skin.tile(a, false));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -1, 1);
+        lp.setMargins(a.dp(4), a.dp(3), a.dp(4), a.dp(3));
+        row.addView(t, lp);
+        t.setOnClickListener(v -> action.run());
+        t.setOnFocusChangeListener((v, focused) -> {
+            t.setBackground(Skin.tile(a, focused));
+            t.setTextColor(focused ? Theme.INK : Theme.TEXT);
+            t.animate().scaleX(focused ? 1.05f : 1f).scaleY(focused ? 1.05f : 1f).setDuration(120).start();
+        });
+        return t;
     }
 
     /** One titled row of posters that scrolls sideways. Returns its first poster. */
@@ -248,65 +304,16 @@ final class Showcase {
     }
 
     /**
-     * OK on a poster: looks for the title in every switched-on playlist (one at a time, in the background), then lists
-     * each playlist and copy that has it to choose from. The chosen one opens its details page (play, trailer, My List).
+     * OK on a poster: opens its details page straight away, like Movies and Series, which then looks for the title
+     * in your playlists (see {@link PosterDetails}).
      */
-    private static void open(MainActivity a, String type, JSONObject poster, JSONArray row) {
-        boolean series = type.equals("series");
-        String title = poster.optString("_title");
-        android.app.AlertDialog wait = new Dialogs.Builder(a).setTitle(title)
-                .setMessage("Looking for it in your playlists…").setNegativeButton("Cancel", null).show();
-        final int generation = a.screenGeneration;
-        String tmdbId = poster.optString("_tmdb"), year = poster.optString("_year");
-        String key = XtreamProtocol.searchKey(title), alt = XtreamProtocol.searchKey(poster.optString("_original"));
-        if (alt.equals(key)) alt = "";
-        final String altKey = alt;
-        new Thread(() -> {
-            java.util.List<JSONObject> found = new java.util.ArrayList<>();
-            java.util.List<String> problems = new java.util.ArrayList<>();
-            JSONArray pls = a.library.inUse();
-            String active = a.library.activeId();
-            java.util.List<JSONObject> order = new java.util.ArrayList<>();
-            for (int i = 0; i < pls.length(); i++) { JSONObject p = pls.optJSONObject(i); if (p != null && p.optString("id").equals(active)) order.add(0, p); else if (p != null) order.add(p); }
-            for (JSONObject p : order) {
-                if (Library.M3U.equals(p.optString("type"))) continue; // M3U playlists have no movie or series lists
-                if (!wait.isShowing()) return; // cancelled
-                try {
-                    JSONArray got = a.library.findVod(p, type, tmdbId, key, altKey, year, 8);
-                    for (int i = 0; i < got.length(); i++) found.add(got.optJSONObject(i));
-                } catch (OutOfMemoryError e) { System.gc(); problems.add(Library.nameOf(p)); }
-                catch (Throwable e) { problems.add(Library.nameOf(p)); }
-            }
-            a.runOnUiThread(() -> {
-                if (a.isFinishing() || a.isDestroyed() || !wait.isShowing() || generation != a.screenGeneration) return;
-                wait.dismiss();
-                String trouble = problems.isEmpty() ? "" : "  (couldn't check " + TextUtils.join(", ", problems) + ")";
-                // Each copy found, then the trailer and where else it can be watched (offered even when it's in no playlist).
-                java.util.List<String> labels = new java.util.ArrayList<>();
-                for (JSONObject o : found) {
-                    labels.add("▶  " + Library.nameOf(a.library.find(o.optString("playlist"))) + "  •  " + o.optString("name", o.optString("title", title)));
-                }
-                final int trailerRow = labels.size();
-                labels.add("▷  Watch the trailer");
-                boolean where = !Tmdb.key(a).isEmpty(); // needs TMDb (optional): offered only when a key is set
-                if (where) labels.add("◎  Where else to watch it");
-                labels.add("Close");
-                String head = found.isEmpty() ? title + "  •  not in your playlists" + trouble : title + "  •  available in" + trouble;
-                new Dialogs.Builder(a).setTitle(head)
-                        .setItems(labels.toArray(new String[0]), (d, w) -> {
-                            if (w < trailerRow) play(a, type, found.get(w), poster);
-                            else if (w == trailerRow) trailer(a, series, poster);
-                            else if (where && w == trailerRow + 1) whereToWatch(a, series, poster);
-                        }).show();
-            });
-        }, "showcase-find").start();
-    }
+    private static void open(MainActivity a, String type, JSONObject poster, JSONArray row) { PosterDetails.open(a, type, poster); }
 
     /**
      * Plays the title's trailer: TMDb's when a TMDb key is set, else (or when none is found) a YouTube search for
      * "title year trailer", which needs no key.
      */
-    private static void trailer(MainActivity a, boolean series, JSONObject poster) {
+    static void trailer(MainActivity a, boolean series, JSONObject poster) {
         Toast.makeText(a, "Finding the trailer…", Toast.LENGTH_SHORT).show();
         new Thread(() -> {
             String key = "";
@@ -326,7 +333,7 @@ final class Showcase {
     }
 
     /** Lists the streaming services that have the title in this country (from TMDb / JustWatch). */
-    private static void whereToWatch(MainActivity a, boolean series, JSONObject poster) {
+    static void whereToWatch(MainActivity a, boolean series, JSONObject poster) {
         String title = poster.optString("_title");
         android.app.AlertDialog wait = new Dialogs.Builder(a).setTitle(title).setMessage("Looking up where it's available…").setNegativeButton("Cancel", null).show();
         new Thread(() -> {
@@ -357,19 +364,6 @@ final class Showcase {
         }, "showcase-where").start();
     }
 
-    /** Opens the chosen copy's details page, switching to its playlist first if needed; Back returns to the main screen. */
-    private static void play(MainActivity a, String type, JSONObject item, JSONObject poster) {
-        String pid = item.optString("playlist");
-        if (!pid.isEmpty() && !pid.equals(a.library.activeId())) {
-            JSONObject p = a.library.find(pid);
-            if (p == null) { Menus.alert(a, "This title's playlist was removed."); return; }
-            a.switchPlaylist(p);
-        }
-        JSONArray list = new JSONArray();
-        list.put(item);
-        Details.open(a, type, item, "", list, a::home);
-    }
-
     private static File file(MainActivity a) { return new File(a.getFilesDir(), "showcase.json"); }
 
     private static JSONObject readSaved(MainActivity a) {
@@ -388,5 +382,5 @@ final class Showcase {
     }
 
     /** Forgets the saved rows (e.g. when playlists update), so the next visit looks them up again. */
-    static void forget(MainActivity a) { file(a).delete(); }
+    static void forget(MainActivity a) { file(a).delete(); PosterDetails.forget(); }
 }
