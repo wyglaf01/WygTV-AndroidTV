@@ -161,7 +161,9 @@ final class PosterGrid {
         art.addView(poster, new FrameLayout.LayoutParams(-1, -1));
         Details.image(poster, m.optString("poster"), a.dp(140), generation, a);
 
-        boolean mine = a.inMyList(type, id), watched = series && Watch.complete(a, id);
+        JSONObject home = otherPlaylist(a, item);
+        String pre = home == null ? a.accountPrefix() : Library.prefixOf(home);
+        boolean mine = a.inMyListIn(pre, type, id), watched = series && Watch.complete(a, id);
         TextView label = a.label((mine ? "☰ " : "") + (watched ? "✓ " : "") + name, 14);
         label.setSingleLine(true);
         label.setEllipsize(TextUtils.TruncateAt.END);
@@ -174,6 +176,11 @@ final class PosterGrid {
             if (!m.optString("rating").isEmpty()) b.append(b.length() > 0 ? "   ★ " : "★ ").append(m.optString("rating"));
             sub = b.toString();
         } else if (!sub.startsWith("✓")) sub = "▶ " + sub;
+        // Search results from several playlists say which playlist each one is in.
+        if (!item.optString("playlist").isEmpty() && a.library.inUse().length() > 1) {
+            String from = Library.nameOf(a.library.find(item.optString("playlist")));
+            sub = sub.isEmpty() ? from : sub + "  ·  " + from;
+        }
         TextView under = a.label(sub.isEmpty() ? " " : sub, 12);
         under.setTextColor(Theme.MUTED);
         under.setSingleLine(true);
@@ -181,10 +188,23 @@ final class PosterGrid {
         t.addView(under, new LinearLayout.LayoutParams(-1, -2));
 
         t.setTag(id);
-        t.setOnClickListener(v -> a.select(item));
+        t.setOnClickListener(v -> {
+            if (home == null) { a.select(item); return; }
+            // A Search result from another playlist: switch to that playlist first, keeping the results to come back to.
+            JSONArray same = new JSONArray(), shown = a.items;
+            String pid = item.optString("playlist"), cat = a.category;
+            for (int i = 0; shown != null && i < shown.length(); i++) {
+                JSONObject o = shown.optJSONObject(i);
+                if (o != null && o.optString("playlist").equals(pid)) same.put(o);
+            }
+            a.switchPlaylist(home);
+            a.category = cat;
+            a.items = shown;
+            Details.open(a, type, item, cat, same);
+        });
         // Hold OK (or Menu): add to / remove from My List without opening the details.
         t.setOnLongClickListener(v -> {
-            boolean added = a.toggleMyList(type, item);
+            boolean added = a.toggleMyListIn(pre, type, item);
             Toast.makeText(a, (added ? "Added to My List: " : "Removed from My List: ") + name, Toast.LENGTH_SHORT).show();
             if (!added && "mylist".equals(a.category)) a.showMyList();
             return true;
@@ -196,7 +216,8 @@ final class PosterGrid {
     private static void describe(MainActivity a, String type, JSONObject item, String id, TextView title, TextView facts, TextView plot,
                                  String[] focused, int generation, int list) {
         boolean series = type.equals("series");
-        String cacheKey = a.accountPrefix() + type + id;
+        JSONObject home = otherPlaylist(a, item);
+        String cacheKey = (home == null ? a.accountPrefix() : Library.prefixOf(home)) + type + id;
         Runnable[] render = new Runnable[1];
         JSONObject[] meta = {META.containsKey(cacheKey) ? META.get(cacheKey) : Tmdb.fromProvider(item, null)};
         render[0] = () -> {
@@ -210,7 +231,8 @@ final class PosterGrid {
             plot.setText(p.isEmpty() ? (m.has("source") || m.has("fetched") ? "No description." : "") : p);
         };
         render[0].run();
-        if (META.containsKey(cacheKey) || a.library.activeIsM3u()) return;
+        // Details come from the playing playlist's server, so a title from another playlist shows its list data here.
+        if (META.containsKey(cacheKey) || a.library.activeIsM3u() || home != null) return;
         a.apiQuiet((series ? "get_series_info&series_id=" : "get_vod_info&vod_id=") + a.enc(id), answer -> {
             JSONObject provider = Tmdb.fromProvider(item, answer);
             try { provider.put("fetched", true); } catch (Exception ignored) { }
@@ -226,6 +248,13 @@ final class PosterGrid {
                 });
             });
         });
+    }
+
+    /** The playlist a Search result comes from when it isn't the playing one; null otherwise (or when it was removed). */
+    static JSONObject otherPlaylist(MainActivity a, JSONObject item) {
+        String pid = item.optString("playlist");
+        if (pid.isEmpty() || pid.equals(a.library.activeId())) return null;
+        return a.library.find(pid);
     }
 
     private static TextView line(MainActivity a, LinearLayout parent, int size, int color, int lines) {
