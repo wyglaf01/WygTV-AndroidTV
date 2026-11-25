@@ -474,8 +474,9 @@ final class Menus {
         String addr = existing == null ? "" : hostOf(existing.optString("url"));
         EditText host = a.field(form, "Tablo's IP address, e.g. 192.168.1.60", addr);
         host.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-        EditText epg = a.field(form, "TV guide (XMLTV) link, optional: a Tablo shares channels but not its guide", existing == null ? "" : existing.optString("epg"));
-        note(a, form, "For the black Tablo models (DUAL, QUAD, LITE, 2013–2023). Channels come from the Tablo's last channel scan and play right here; "
+        EditText epg = a.field(form, "TV guide (XMLTV) link, optional: leave empty to use the Tablo's own guide", existing == null ? "" : existing.optString("epg"));
+        note(a, form, "For the black Tablo models (DUAL, QUAD, LITE, 2013–2023). Channels come from the Tablo's last channel scan and play right here, "
+                + "and the TV guide comes from the Tablo's own guide (an XMLTV link, if you add one, is used first); "
                 + "each one uses one of the Tablo's tuners while it plays. Find my Tablo asks Tablo's servers which Tablo is on this network, "
                 + "or type its IP address (shown in your router, or in the Tablo app's settings). "
                 + "For the white 4th Gen Tablo, go back and pick \"White 4th Gen Tablo\" instead: it only plays in the Tablo app.");
@@ -633,7 +634,7 @@ final class Menus {
             final int guideRow = list.getChildCount();
             String custom = a.saved("epg_url");
             String guideState = a.library.guideStatus();
-            String source = !custom.isEmpty() ? hostOf(custom) + " (your link)" : a.library.activeIsHdhr() ? "HDHomeRun guide (from the tuner)" : m3u ? (a.library.guideUrl().isEmpty() ? "none in this playlist" : hostOf(a.library.guideUrl()) + " (from the playlist)") : "the provider's guide";
+            String source = !custom.isEmpty() ? hostOf(custom) + " (your link)" : a.library.activeIsHdhr() ? (Library.isTablo(active) ? "Tablo guide (from the Tablo)" : "HDHomeRun guide (from the tuner)") : m3u ? (a.library.guideUrl().isEmpty() ? "none in this playlist" : hostOf(a.library.guideUrl()) + " (from the playlist)") : "the provider's guide";
             row(a, list, "TV guide source", source + (guideState.isEmpty() ? "" : "  •  " + guideState), () -> guideSource(a, active, () -> settings(a, guideRow)));
             final int reloadRow = list.getChildCount();
             if ((!custom.isEmpty() || m3u) && active != null) row(a, list, "Reload TV guide", "download this playlist and its guide again now", () ->

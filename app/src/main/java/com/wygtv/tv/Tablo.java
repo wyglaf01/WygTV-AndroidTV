@@ -29,6 +29,9 @@ import java.util.regex.Pattern;
  * http://IP:8885/guide/channels/ID/watch.m3u8, and the player swaps it for the real one as it opens it
  * (see {@link #resolveWatch} and Players).
  *
+ * The TV guide comes from the Tablo too: it keeps its own program guide (GET /guide/airings, then /batch for the
+ * details), read into the same form as the HDHomeRun guide (see {@link #loadGuide}).
+ *
  * The white 4th Gen Tablo has no open local API (it only talks to Tablo's own apps), so it isn't handled here:
  * {@link TabloApp} puts a button in the menus that opens the Tablo app instead.
  *
@@ -244,6 +247,118 @@ final class Tablo {
         return url;
     }
 
+    // ------------------------------------------------------------------ program guide
+
+    /** "4.1" for a channel record ({"channel":{"major":4,"minor":1,…}}), "" when it has no number. */
+    static String numberOf(JSONObject channelRecord) {
+        JSONObject c = channelRecord == null ? null : channelRecord.optJSONObject("channel");
+        if (c == null || !c.has("major")) return "";
+        return c.has("minor") ? c.optInt("major") + "." + c.optInt("minor") : String.valueOf(c.optInt("major"));
+    }
+
+    /** "2023-01-03T01:00Z", "2023-01-03T01:00:30Z" or with an offset → ms since 1970; -1 when unreadable. */
+    static long parseTime(String s) {
+        if (s == null || s.trim().isEmpty()) return -1;
+        String t = s.trim();
+        for (String f : new String[]{"yyyy-MM-dd'T'HH:mm:ssX", "yyyy-MM-dd'T'HH:mmX", "yyyy-MM-dd'T'HH:mm:ss.SSSX"}) {
+            try {
+                java.text.SimpleDateFormat p = new java.text.SimpleDateFormat(f, Locale.ROOT);
+                p.setLenient(false);
+                java.text.ParsePosition pos = new java.text.ParsePosition(0);
+                java.util.Date d = p.parse(t, pos);
+                if (d != null && pos.getIndex() == t.length()) return d.getTime();
+            } catch (Exception ignored) { }
+        }
+        return -1;
+    }
+
+    /**
+     * Adds one airing record (an episode, movie airing, sports event or program airing, each with an
+     * "airing_details" block) to {@code into}, keyed by channel number like the HDHomeRun guide.
+     * {@code numbers} maps a channel's path ("/guide/channels/767579") to its number, for records without an
+     * embedded channel. Returns false when the record isn't a usable airing.
+     */
+    static boolean addAiring(JSONObject rec, Map<String, String> numbers, Map<String, List<Xmltv.Program>> into) {
+        JSONObject ad = rec == null ? null : rec.optJSONObject("airing_details");
+        if (ad == null) return false;
+        String number = numberOf(ad.optJSONObject("channel"));
+        if (number.isEmpty()) {
+            String path = ad.optString("channel_path");
+            if (path.isEmpty() && ad.optJSONObject("channel") != null) path = ad.optJSONObject("channel").optString("path");
+            String n = numbers.get(path);
+            number = n == null ? "" : n;
+        }
+        long start = parseTime(ad.optString("datetime"));
+        long dur = ad.optLong("duration", 0);
+        if (number.isEmpty() || start <= 0 || dur <= 0) return false;
+        String title = ad.optString("show_title").trim(), episode = "", desc = "";
+        for (String k : new String[]{"episode", "event", "program", "movie_airing", "movie"}) {
+            JSONObject o = rec.optJSONObject(k);
+            if (o == null) continue;
+            if (episode.isEmpty() && k.equals("episode")) episode = clean(o.optString("title"));
+            if (episode.isEmpty() && k.equals("event")) episode = clean(o.optString("title"));
+            if (desc.isEmpty()) desc = clean(o.optString("description"));
+            if (title.isEmpty()) title = clean(o.optString("title"));
+        }
+        if (episode.equals(title)) episode = "";
+        if (!episode.isEmpty()) desc = desc.isEmpty() ? episode : episode + " — " + desc;
+        List<Xmltv.Program> list = into.get(number);
+        if (list == null) { list = new ArrayList<>(); into.put(number, list); }
+        for (Xmltv.Program have : list) if (have.start == start) return true; // the same airing twice
+        list.add(new Xmltv.Program(start, start + dur * 1000, title.isEmpty() ? "Program" : title, desc));
+        return true;
+    }
+
+    private static String clean(String s) { return s == null || s.equals("null") ? "" : s.trim(); }
+
+    /** /guide/airings: ["/guide/series/episodes/123", "/guide/movies/airings/456", …]. */
+    static List<String> parseAiringPaths(String json) throws Exception {
+        String t = json.trim();
+        if (t.startsWith("{")) { if (isRefusal(new JSONObject(t))) throw new LockedException(); throw new IllegalStateException("no airings"); }
+        JSONArray list = new JSONArray(t);
+        List<String> out = new ArrayList<>();
+        for (int i = 0; i < list.length(); i++) { String p = list.optString(i); if (p.startsWith("/")) out.add(p); }
+        return out;
+    }
+
+    /** POSTs paths to /batch, 50 at a time, and hands each record to {@code each}. */
+    private interface Each { void take(String path, JSONObject rec) throws Exception; }
+
+    private static void batch(String base, List<String> paths, Each each) throws Exception {
+        for (int i = 0; i < paths.size(); i += 50) {
+            if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+            JSONArray b = new JSONArray();
+            for (int j = i; j < Math.min(paths.size(), i + 50); j++) b.put(paths.get(j));
+            JSONObject got = new JSONObject(http("POST", base + "/batch", b.toString(), 30000).trim());
+            if (isRefusal(got)) throw new LockedException();
+            for (java.util.Iterator<String> k = got.keys(); k.hasNext(); ) { String key = k.next(); each.take(key, got.optJSONObject(key)); }
+        }
+    }
+
+    /**
+     * The Tablo's own program guide: about {@code hours} ahead for every channel, keyed by channel number
+     * ("4.1"), sorted by start. Programmes that already ended are left out. Blocking: call off the UI thread.
+     */
+    static Map<String, List<Xmltv.Program>> loadGuide(String base, int hours) throws Exception {
+        Map<String, String> numbers = new HashMap<>();
+        batch(base, parseChannelPaths(http("GET", channelsUrl(base), null, 20000)), (path, rec) -> {
+            String n = numberOf(rec);
+            if (!n.isEmpty()) numbers.put(path, n);
+        });
+        Map<String, List<Xmltv.Program>> out = new LinkedHashMap<>();
+        long now = System.currentTimeMillis(), until = now + hours * 3600_000L;
+        Map<String, List<Xmltv.Program>> all = new LinkedHashMap<>();
+        batch(base, parseAiringPaths(http("GET", base + "/guide/airings", null, 30000)), (path, rec) -> addAiring(rec, numbers, all));
+        for (Map.Entry<String, List<Xmltv.Program>> e : all.entrySet()) {
+            List<Xmltv.Program> keep = new ArrayList<>();
+            for (Xmltv.Program p : e.getValue()) if (p.stop > now && p.start < until) keep.add(p);
+            if (keep.isEmpty()) continue;
+            java.util.Collections.sort(keep, (x, y) -> Long.compare(x.start, y.start));
+            out.put(e.getKey(), keep);
+        }
+        return out;
+    }
+
     // ------------------------------------------------------------------ network (blocking: call off the UI thread)
 
     /** GET or POST (with a JSON body) to the Tablo. 401/403 throw {@link LockedException}. */
@@ -308,13 +423,7 @@ final class Tablo {
         String base = baseOf(channelsUrl);
         List<String> paths = parseChannelPaths(http("GET", channelsUrl, null, 20000));
         JSONObject details = new JSONObject();
-        for (int i = 0; i < paths.size(); i += 50) {
-            JSONArray batch = new JSONArray();
-            for (int j = i; j < Math.min(paths.size(), i + 50); j++) batch.put(paths.get(j));
-            JSONObject got = new JSONObject(http("POST", base + "/batch", batch.toString(), 30000).trim());
-            if (isRefusal(got)) throw new LockedException();
-            for (java.util.Iterator<String> k = got.keys(); k.hasNext(); ) { String key = k.next(); details.put(key, got.get(key)); }
-        }
+        batch(base, paths, (path, rec) -> { if (rec != null) details.put(path, rec); });
         return channelsToM3u(base, paths, details);
     }
 

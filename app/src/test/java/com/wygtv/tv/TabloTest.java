@@ -86,4 +86,34 @@ public class TabloTest {
     @Test(expected = IllegalStateException.class) public void watchWithoutLink() throws Exception {
         Tablo.parseWatch("{\"error\":{\"code\":\"no_tuners\",\"description\":\"All tuners are in use\"}}", "http://x:8885");
     }
+
+    @Test public void guideTimes() {
+        assertEquals(1672707600000L, Tablo.parseTime("2023-01-03T01:00Z"));
+        assertEquals(1672707630000L, Tablo.parseTime("2023-01-03T01:00:30Z"));
+        assertEquals(-1, Tablo.parseTime("soon"));
+    }
+
+    @Test public void guideAirings() throws Exception {
+        java.util.Map<String, String> numbers = new java.util.HashMap<>();
+        numbers.put("/guide/channels/9", "7.1");
+        java.util.Map<String, List<Xmltv.Program>> g = new java.util.LinkedHashMap<>();
+        // An episode with its channel embedded.
+        assertTrue(Tablo.addAiring(new JSONObject("{\"airing_details\":{\"datetime\":\"2023-01-03T01:00Z\",\"duration\":1800,\"show_title\":\"Jeopardy!\","
+                + "\"channel\":{\"object_id\":1,\"channel\":{\"major\":4,\"minor\":1}}},\"episode\":{\"title\":\"Finals\",\"description\":\"The big one.\"}}"), numbers, g));
+        // A movie that only names its channel path.
+        assertTrue(Tablo.addAiring(new JSONObject("{\"airing_details\":{\"datetime\":\"2023-01-03T02:00Z\",\"duration\":7200,\"show_title\":\"Heat\","
+                + "\"channel_path\":\"/guide/channels/9\"},\"movie_airing\":{\"description\":\"Cops and robbers.\"}}"), numbers, g));
+        assertFalse(Tablo.addAiring(new JSONObject("{\"airing_details\":{\"datetime\":\"x\",\"duration\":60}}"), numbers, g));
+        assertFalse(Tablo.addAiring(null, numbers, g));
+        Xmltv.Program ep = g.get("4.1").get(0);
+        assertEquals("Jeopardy!", ep.title);
+        assertEquals("Finals — The big one.", ep.desc);
+        assertEquals(1672707600000L + 1800_000L, ep.stop);
+        assertEquals("Cops and robbers.", g.get("7.1").get(0).desc);
+        // The same airing again is not added twice.
+        Tablo.addAiring(new JSONObject("{\"airing_details\":{\"datetime\":\"2023-01-03T01:00Z\",\"duration\":1800,\"show_title\":\"Jeopardy!\","
+                + "\"channel\":{\"channel\":{\"major\":4,\"minor\":1}}}}"), numbers, g);
+        assertEquals(1, g.get("4.1").size());
+        assertEquals(java.util.Arrays.asList("/guide/series/episodes/1"), Tablo.parseAiringPaths("[\"/guide/series/episodes/1\"]"));
+    }
 }
