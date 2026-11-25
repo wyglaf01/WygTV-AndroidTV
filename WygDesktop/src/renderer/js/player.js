@@ -45,6 +45,13 @@
     video.addEventListener('ended', onEnded);
     video.addEventListener('error', () => fail('video', video.error && video.error.message));
     video.addEventListener('dblclick', () => { if (full) W.api.win.fullscreen(); else P.enterFull(); });
+    // Touch screens: a double-tap on the picture does the same (not every system turns two taps into a double-click).
+    let lastTap = 0;
+    video.addEventListener('touchend', (e) => {
+      const now = Date.now();
+      if (now - lastTap < 320) { e.preventDefault(); lastTap = 0; if (full) { if (W.api.win && W.api.win.fullscreen && !W.isIOS) W.api.win.fullscreen(); } else P.enterFull(); return; }
+      lastTap = now;
+    }, { passive: false });
     video.addEventListener('click', () => { if (full) { if (overlay.hidden) showOsd(); else if (!isLiveItem()) togglePause(); } });
     root.addEventListener('mousemove', () => { if (full) showOsd(true); });
     setInterval(() => { const c = W.$('.osd-clock', root); if (c) c.textContent = W.fmtTime(Date.now()); }, 1000 * 15);

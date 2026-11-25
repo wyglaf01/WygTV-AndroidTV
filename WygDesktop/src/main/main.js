@@ -20,6 +20,8 @@ if (MAC) app.setName(BRAND);
 const smokeTest = smoke.prepare(app);
 
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+// Touch screens (Windows and Linux touch PCs): make sure the screens get touch events (tap, touch and hold, swipe).
+app.commandLine.appendSwitch('touch-events', 'enabled');
 // Hardware HEVC decoding where the graphics card supports it (Windows).
 app.commandLine.appendSwitch('enable-features', 'PlatformHEVCDecoderSupport');
 
