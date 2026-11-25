@@ -478,7 +478,7 @@ final class Menus {
         note(a, form, "For the black Tablo models (DUAL, QUAD, LITE, 2013–2023). Channels come from the Tablo's last channel scan and play right here; "
                 + "each one uses one of the Tablo's tuners while it plays. Find my Tablo asks Tablo's servers which Tablo is on this network, "
                 + "or type its IP address (shown in your router, or in the Tablo app's settings). "
-                + "For the white 4th Gen Tablo, go back and pick "White 4th Gen Tablo" instead: it only plays in the Tablo app.");
+                + "For the white 4th Gen Tablo, go back and pick \"White 4th Gen Tablo\" instead: it only plays in the Tablo app.");
         TextView connect = a.button("Save & load channels", form, () -> connectTablo(a, existing, title.getText().toString().trim(), host.getText().toString(), epg.getText().toString().trim()));
         a.button("⌕  Find my Tablo", form, () -> findTablos(a, existing, title, host, epg));
         a.button("Cancel", form, () -> { if (!a.library.isEmpty()) backToTuners(a); else a.setup(); });

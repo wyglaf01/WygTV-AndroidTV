@@ -15,7 +15,7 @@ dependencies {
 }
 
 // The plain-Java HDHomeRun files shared with the Android app (copied at build time, never edited here).
-def shared = ['Hdhr.java', 'Xmltv.java', 'XtreamProtocol.java']
+def shared = ['Hdhr.java', 'Tablo.java', 'Xmltv.java', 'XtreamProtocol.java']
 def sharedDir = layout.buildDirectory.dir('shared-src')
 tasks.register('copySharedSources', Sync) {
     from('../app/src/main/java/com/wygtv/tv') { include shared }

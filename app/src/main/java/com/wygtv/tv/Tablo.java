@@ -42,7 +42,7 @@ final class Tablo {
     static final String DEFAULT_NAME = "Tablo";
     /** Shown when the Tablo answers but refuses other apps (newer firmware locked the API on some units). */
     static final String LOCKED = "This Tablo answered but refuses other apps (its firmware locked the API that WygTV uses). "
-            + "Its channels can still be watched in the Tablo app: turn on \"Tablo 4th Gen / Tablo app\" in the Tablo settings to put a button for it in the menus.";
+            + "Its channels can still be watched in the Tablo app: turn on \"White 4th Gen Tablo\" in the Tablo settings to put a button for it in the menus.";
 
     private static final Pattern WATCH = Pattern.compile("^/guide/channels/(\\d+)/watch\\.m3u8$");
     /** How long a tuned channel's real link is reused (the player re-reads it every few seconds while playing). */
