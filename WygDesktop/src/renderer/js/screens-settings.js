@@ -238,6 +238,7 @@
         W.api.app.info().then((i) => { ver.textContent = 'Version ' + i.version + ' · ' + (i.platform === 'win32' ? 'Windows' : i.platform === 'linux' ? 'Linux' : i.platform === 'darwin' ? 'macOS' : i.platform === 'ios' ? i.device : i.platform); });
         return [
           h('div', { class: 'about' }, h('img', { src: 'assets/icon.png', alt: '' }), h('div', null, h('div', { class: 'brand' }, W.brand), ver, h('div', { class: 'set-sub' }, W.isIOS ? 'WygTV for iPhone and iPad.' : 'The desktop copy of WygTV.'))),
+          h('div', { class: 'about maker' }, h('img', { src: 'assets/wyglaf.png', alt: 'Wyglaf' }), h('div', null, h('div', { class: 'brand' }, 'Made by Wyglaf'), h('div', { class: 'set-sub' }, 'The person behind WygTV.'))),
           h('div', { class: 'set-buttons' },
             btn({ class: 'button primary', onclick: () => W.checkUpdates(true) }, '⟳ Check for updates'),
             W.isIOS ? null : btn({ class: 'button', onclick: () => W.api.win.quit() }, '⏻ Quit')),
