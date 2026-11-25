@@ -49,6 +49,16 @@ final class NavRail {
         return (target != null ? target : r.items.get(0)).requestFocus();
     }
 
+    /**
+     * Back on a top screen (Home, or the TV Guide in Live TV only mode): the first press moves the highlight into the
+     * side menu; Back again from the side menu is what asks Quit WygTV?. True when the menu was opened by this press.
+     */
+    static boolean openFromScreen(MainActivity a) {
+        NavRail r = showing.get();
+        if (r == null || !r.rail.isAttachedToWindow() || !r.rail.isShown() || r.rail.hasFocus()) return false;
+        return open(a);
+    }
+
     /** Wraps {@code content} in a frame with the rail on its left and returns the frame to show. */
     static FrameLayout wrap(MainActivity a, View content, String current) {
         FrameLayout frame = new FrameLayout(a);
