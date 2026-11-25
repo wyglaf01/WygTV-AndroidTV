@@ -655,7 +655,7 @@ final class Menus {
             });
             String version = Updater.installedName(a);
             final String about = Brand.NAME + " " + version + (Brand.OTA ? "  •  antenna TV from HDHomeRun" : " for Android TV");
-            row(a, list, "About", about, () -> Toast.makeText(a, about, Toast.LENGTH_SHORT).show());
+            row(a, list, "About", about + "  •  made by Wyglaf", () -> aboutDialog(a, about));
         }
         int i = Math.max(0, Math.min(focusIndex, list.getChildCount() - 1));
         list.getChildAt(i).requestFocus();
@@ -1043,6 +1043,30 @@ final class Menus {
         t.setTextColor(Theme.MUTED);
         t.setPadding(a.dp(8), a.dp(4), a.dp(8), a.dp(8));
         parent.addView(t, new LinearLayout.LayoutParams(-1, -2));
+    }
+
+    /** About: the version, and Wyglaf (who makes WygTV) with his avatar. */
+    private static void aboutDialog(MainActivity a, String about) {
+        LinearLayout box = new LinearLayout(a);
+        box.setOrientation(LinearLayout.HORIZONTAL);
+        box.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        box.setPadding(a.dp(22), a.dp(16), a.dp(22), a.dp(8));
+        android.widget.ImageView pic = new android.widget.ImageView(a);
+        pic.setImageResource(R.drawable.wyglaf_avatar);
+        pic.setContentDescription("Wyglaf");
+        box.addView(pic, new LinearLayout.LayoutParams(a.dp(120), a.dp(120)));
+        LinearLayout text = new LinearLayout(a);
+        text.setOrientation(LinearLayout.VERTICAL);
+        text.setPadding(a.dp(18), 0, 0, 0);
+        TextView made = a.label("Made by Wyglaf", 20);
+        made.setTypeface(null, android.graphics.Typeface.BOLD);
+        made.setTextColor(Theme.ACCENT);
+        text.addView(made);
+        TextView ver = a.label(about, 15);
+        ver.setTextColor(Theme.MUTED);
+        text.addView(ver);
+        box.addView(text, new LinearLayout.LayoutParams(0, -2, 1));
+        new Dialogs.Builder(a).setTitle("About " + Brand.NAME).setView(box).setPositiveButton("OK", null).show();
     }
 
     private static void row(MainActivity a, LinearLayout list, String name, String value, Runnable action) {
