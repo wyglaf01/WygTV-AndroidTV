@@ -336,7 +336,9 @@ final class Tablo {
         String base = baseOf(standIn);
         String real = parseWatch(http("POST", base + "/guide/channels/" + m.group(1) + "/watch", "{}", 20000), base);
         synchronized (tuned) {
-            tuned.entrySet().removeIf(e -> now - (Long) e.getValue()[1] >= REUSE_MS); // links nothing is playing any more
+            // Forget links nothing is playing any more (an iterator, not removeIf: Android 6 has no removeIf).
+            for (java.util.Iterator<Map.Entry<String, Object[]>> it = tuned.entrySet().iterator(); it.hasNext(); )
+                if (now - (Long) it.next().getValue()[1] >= REUSE_MS) it.remove();
             tuned.put(standIn, new Object[]{real, now});
         }
         return real;
