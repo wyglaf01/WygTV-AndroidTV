@@ -1,0 +1,35 @@
+plugins { id 'application' }
+
+group = 'com.wygtv.ota'
+version = System.getenv('GITHUB_RUN_NUMBER') ? "1.0.${System.getenv('GITHUB_RUN_NUMBER')}" : '1.0.0'
+
+tasks.withType(JavaCompile).configureEach { options.release = 17; options.encoding = 'UTF-8' }
+
+repositories { mavenCentral() }
+
+dependencies {
+    implementation 'uk.co.caprica:vlcj:4.8.3'          // libVLC player (VLC plays MPEG-2, H.264 and AC-3)
+    implementation 'org.json:json:20231013'
+    implementation 'net.sf.kxml:kxml2:2.3.0'           // XmlPullParser for the shared Xmltv code
+    testImplementation 'junit:junit:4.13.2'
+}
+
+// The plain-Java HDHomeRun files shared with the Android app (copied at build time, never edited here).
+def shared = ['Hdhr.java', 'Xmltv.java', 'XtreamProtocol.java']
+def sharedDir = layout.buildDirectory.dir('shared-src')
+tasks.register('copySharedSources', Sync) {
+    from('../app/src/main/java/com/wygtv/tv') { include shared }
+    into sharedDir.map { it.dir('com/wygtv/tv') }
+}
+sourceSets.main.java.srcDir(files(sharedDir).builtBy('copySharedSources'))
+tasks.named('compileJava') { dependsOn 'copySharedSources' }
+
+application {
+    mainClass = 'com.wygtv.tv.OtaDesktop'
+    applicationName = 'wygota'
+}
+
+tasks.named('jar') {
+    archiveFileName = 'wygota.jar'
+    manifest { attributes('Main-Class': 'com.wygtv.tv.OtaDesktop', 'Implementation-Version': project.version) }
+}

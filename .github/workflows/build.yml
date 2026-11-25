@@ -1,4 +1,4 @@
-name: Build WygTV Android TV APK
+name: Build WygTV and WygOTA
 
 on:
   workflow_dispatch:
@@ -94,6 +94,115 @@ jobs:
           path: app/build/reports/
           if-no-files-found: ignore
 
+  # WygOTA for Android TV and tablets: the same app/ code built with WYGOTA=1 (com.wygtv.ota, antenna TV only).
+  wygota:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Load the signing key
+        env:
+          WYGTV_KEYSTORE_B64: ${{ secrets.WYGTV_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$WYGTV_KEYSTORE_B64" ]; then
+            echo "$WYGTV_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/wygtv-release.jks"
+            echo "WYGTV_KEYSTORE=$RUNNER_TEMP/wygtv-release.jks" >> "$GITHUB_ENV"
+          else
+            echo "::warning::WYGTV_KEYSTORE_B64 secret not set; signing with a temporary debug key."
+          fi
+
+      - name: Check and build WygOTA
+        env:
+          WYGTV_KEY_PASSWORD: ${{ secrets.WYGTV_KEY_PASSWORD }}
+          WYGOTA: '1'
+        run: gradle --no-daemon :app:lintDebug :app:testDebugUnitTest :app:assembleDebug
+
+      - name: Name the APK wygota.apk
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/*.apk dist/wygota.apk
+          # WygOTA's in-app updater reads this to know whether a newer build exists.
+          echo "{\"versionCode\": ${GITHUB_RUN_NUMBER}, \"versionName\": \"1.0.${GITHUB_RUN_NUMBER}\"}" > dist/version.json
+
+      - name: Upload WygOTA APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: wygota
+          path: |
+            dist/wygota.apk
+            dist/version.json
+          if-no-files-found: error
+
+      - name: Upload check reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: WygOTA-check-reports
+          path: app/build/reports/
+          if-no-files-found: ignore
+
+  # WygOTA for Ubuntu: a .deb built with jpackage (bundles its own Java; needs VLC, which apt installs with it).
+  # Built on the oldest supported Ubuntu so the package installs on 22.04 and newer.
+  linux:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Test and build WygOTA for Linux
+        run: gradle --no-daemon -p desktop test installDist
+
+      - name: Package wygota.deb
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q fakeroot
+          mkdir -p dist
+          jpackage --type deb --dest dist --name wygota --app-version "1.0.${GITHUB_RUN_NUMBER}" \
+            --input desktop/build/install/wygota/lib --main-jar wygota.jar --main-class com.wygtv.tv.OtaDesktop \
+            --icon desktop/packaging/wygota.png --description "WygOTA: live antenna TV from an HDHomeRun tuner" \
+            --vendor WygTV --linux-shortcut --linux-menu-group "AudioVideo;Video;TV" --linux-app-category video \
+            --linux-package-deps vlc --linux-deb-maintainer "wygota@users.noreply.github.com"
+          mv dist/wygota_*.deb dist/wygota_amd64.deb
+          dpkg-deb -I dist/wygota_amd64.deb
+
+      - name: Upload Linux package
+        uses: actions/upload-artifact@v4
+        with:
+          name: wygota-linux
+          path: dist/wygota_amd64.deb
+          if-no-files-found: error
+
   # Every build on `app` goes to the WygTV Beta pre-release (tag wygtv-beta) as
   # wygtv-beta-<version>.apk and wygtv-beta.apk. It is a separate app (com.wygtv.tv.beta) that installs next to
   # the release and updates itself from here; the release's updater and Downloader link never get a beta.
@@ -142,3 +251,47 @@ jobs:
             gh release create "$TAG" --title "WygTV Beta ${VERSION}" --notes "$NOTES" --prerelease --latest=false
           fi
           gh release upload "$TAG" "dist/$APK" dist/wygtv-beta.apk dist/version.json --clobber
+
+  # WygOTA's own release (never marked latest, so WygTV's links keep working):
+  # https://github.com/wyglaf01/WygTV-AndroidTV/releases/download/wygota-latest/wygota.apk
+  # https://github.com/wyglaf01/WygTV-AndroidTV/releases/download/wygota-latest/wygota_amd64.deb
+  publish-wygota:
+    needs: [wygota, linux]
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/app')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Download WygOTA APK
+        uses: actions/download-artifact@v4
+        with:
+          name: wygota
+          path: dist
+
+      - name: Download WygOTA for Linux
+        uses: actions/download-artifact@v4
+        with:
+          name: wygota-linux
+          path: dist
+
+      - name: Update the WygOTA release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: wygota-latest
+        run: |
+          git tag -f "$TAG"
+          git push -f origin "refs/tags/$TAG"
+          URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/$TAG"
+          NOTES="Latest WygOTA build 1.0.${GITHUB_RUN_NUMBER} from ${GITHUB_REF_NAME} (${GITHUB_SHA::7}), $(date -u '+%Y-%m-%d %H:%M UTC').
+
+          Android TV and tablets: $URL/wygota.apk
+          Ubuntu 22.04 or newer: $URL/wygota_amd64.deb (install with: sudo apt install ./wygota_amd64.deb)"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "WygOTA 1.0.${GITHUB_RUN_NUMBER}" --notes "$NOTES" --latest=false
+          else
+            gh release create "$TAG" --title "WygOTA 1.0.${GITHUB_RUN_NUMBER}" --notes "$NOTES" --latest=false
+          fi
+          gh release upload "$TAG" dist/wygota.apk dist/version.json dist/wygota_amd64.deb --clobber

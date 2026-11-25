@@ -33,3 +33,13 @@ WygTV can watch free over-the-air channels from a SiliconDust HDHomeRun network 
 - Each playing channel uses one of the tuner's tuners; the TV guide's preview window uses one too. When every tuner is busy the app says so.
 - The tuner is saved by its IP address, so give it a fixed address (DHCP reservation) in your router.
 - **Where it lives:** add, edit, refresh or remove tuners in **Settings → HDHomeRun antenna TV**. Each tuner shows in Live TV as its own category, **📡 Antenna TV** (new tuners get that name automatically; rename it in Settings), next to Favorites and your own categories. Playing an antenna channel uses the tuner; Home, Movies and Series switch back to your main playlist automatically.
+
+## WygOTA — antenna TV only (Android TV, tablets and Ubuntu)
+**WygOTA** is a second app built from this repository that does only live over-the-air TV from an HDHomeRun tuner: no IPTV playlists, movies or series. It installs next to WygTV (its own app id `com.wygtv.ota`, name and antenna icon).
+
+- **Android TV and tablets:** `app/` built with `WYGOTA=1` (the same way `WYGTV_BETA=1` makes the beta). It shares all of WygTV's antenna code: first run goes straight to adding the tuner (`hdhomerun.local`, *Find tuners*, or an IP address), it opens on the TV guide of the tuner's channels, and Settings has no playlist, app-mode, TMDb or OMDb rows. Updates come from WygOTA's own release.
+- **Ubuntu (desktop Linux):** `desktop/` is a small Java (Swing) app that compiles the same `Hdhr.java` from the Android app, so tuners, lineups, sub-channel groups and the 12-hour HDHomeRun guide work the same way. Video plays through VLC (libVLC), which handles MPEG-2, H.264 and AC-3 natively, with deinterlacing for 1080i/480i. Keys: ▲▼ pick, Enter play, Page Up/Down change channel, type a number like `4.1` to jump, F full screen, M mute.
+- **Downloads** (rebuilt on every push to `app`):
+  - Android: https://github.com/wyglaf01/WygTV-AndroidTV/releases/download/wygota-latest/wygota.apk
+  - Ubuntu 22.04 or newer: https://github.com/wyglaf01/WygTV-AndroidTV/releases/download/wygota-latest/wygota_amd64.deb — install with `sudo apt install ./wygota_amd64.deb` (this also installs VLC), then open **WygOTA** from the app menu.
+- Build locally: `WYGOTA=1 gradle :app:assembleDebug` for Android, `gradle -p desktop installDist` then `desktop/build/install/wygota/bin/wygota` for Linux.

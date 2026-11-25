@@ -302,7 +302,7 @@ final class Menus {
                 + "(shown in your router, or at my.hdhomerun.com).");
         TextView connect = a.button("Save & load channels", form, () -> connectTuner(a, existing, title.getText().toString().trim(), host.getText().toString(), epg.getText().toString().trim()));
         a.button("⌕  Find tuners on my network", form, () -> findTuners(a, existing, title, host, epg));
-        a.button("Cancel", form, () -> { if (a.library.isEmpty()) setup(a); else backToTuners(a); });
+        a.button("Cancel", form, () -> { if (!a.library.isEmpty()) backToTuners(a); else if (Brand.OTA) a.finish(); else setup(a); });
         (existing == null ? connect : host).requestFocus();
     }
 
@@ -449,11 +449,11 @@ final class Menus {
             row(a, list, groupIcon(GROUP_PLAYLISTS) + "  " + groupTitle(GROUP_PLAYLISTS), "playlists, HDHomeRun, AirTV, manage categories, hide and show channels, channel groups, TV guides (EPG)", () -> settingsGroup(a, GROUP_PLAYLISTS));
             row(a, list, groupIcon(GROUP_PLAYER) + "  " + groupTitle(GROUP_PLAYER), "built-in or external player, live stream format, buffer, video decoder, subtitles, watched series, play next", () -> settingsGroup(a, GROUP_PLAYER));
             row(a, list, groupIcon(GROUP_APPEARANCE) + "  " + groupTitle(GROUP_APPEARANCE), "theme, glass effect, app mode, main screen, start-up screen, side menu order, Exit button, guide rows, channel order, live preview, movie and series info, IMDb ratings", () -> settingsGroup(a, GROUP_APPEARANCE));
-            row(a, list, groupIcon(GROUP_BACKUP) + "  " + groupTitle(GROUP_BACKUP), "back up, restore, check for updates  •  WygTV " + Updater.installedName(a), () -> settingsGroup(a, GROUP_BACKUP));
+            row(a, list, groupIcon(GROUP_BACKUP) + "  " + groupTitle(GROUP_BACKUP), "back up, restore, check for updates  •  " + Brand.NAME + " " + Updater.installedName(a), () -> settingsGroup(a, GROUP_BACKUP));
         } else if (g.equals(GROUP_PLAYLISTS)) {
-            row(a, list, "Manage playlists", Manage.playlistSummary(a) + "  •  press OK to add, edit, refresh, delete or turn playlists on and off", () -> { playlistsFromSettings = true; playlists(a); });
+            if (!Brand.OTA) row(a, list, "Manage playlists", Manage.playlistSummary(a) + "  •  press OK to add, edit, refresh, delete or turn playlists on and off", () -> { playlistsFromSettings = true; playlists(a); });
             final int onOffRow = list.getChildCount();
-            row(a, list, "Turn playlists on or off", Manage.playlistSummary(a) + "  •  press OK to tick the playlists to use. Unticked ones are skipped in menus, guides, Search and updates",
+            if (!Brand.OTA) row(a, list, "Turn playlists on or off", Manage.playlistSummary(a) + "  •  press OK to tick the playlists to use. Unticked ones are skipped in menus, guides, Search and updates",
                     () -> Manage.playlistsOnOff(a, () -> settings(a, onOffRow)));
             java.util.List<JSONObject> tuners = Antenna.allTuners(a);
             row(a, list, "HDHomeRun antenna TV", tuners.isEmpty()
@@ -591,7 +591,7 @@ final class Menus {
                 settings(a, glassRow);
             });
             final int modeRow = list.getChildCount();
-            row(a, list, "App mode", liveOnly ? "Live TV only  •  opens on the TV guide; press OK for the full app" : "Full  •  press OK for Live TV only (opens on the TV guide, hides Movies and Series)", () -> {
+            if (!Brand.OTA) row(a, list, "App mode", liveOnly ? "Live TV only  •  opens on the TV guide; press OK for the full app" : "Full  •  press OK for Live TV only (opens on the TV guide, hides Movies and Series)", () -> {
                 a.prefs.edit().putBoolean("live_only", !a.liveOnly()).apply();
                 Toast.makeText(a, a.liveOnly() ? "Live TV only. Settings stays in the side menu to switch back." : "Full app is back.", Toast.LENGTH_LONG).show();
                 settings(a, modeRow);
@@ -640,21 +640,21 @@ final class Menus {
                         settings(a, previewRow);
                     }));
             final int tmdbRow = list.getChildCount();
-            keyRow(a, list, "Movie & series info (TMDb)", Tmdb.PREF_KEY, Tmdb.builtInKey(), "TMDb", "posters, plots, cast and ratings", tmdbRow);
+            if (!Brand.OTA) keyRow(a, list, "Movie & series info (TMDb)", Tmdb.PREF_KEY, Tmdb.builtInKey(), "TMDb", "posters, plots, cast and ratings", tmdbRow);
             final int omdbRow = list.getChildCount();
-            keyRow(a, list, "IMDb ratings (OMDb)", Omdb.PREF_KEY, Omdb.builtInKey(), "OMDb", "IMDb, Rotten Tomatoes and Metacritic ratings, plus plots and cast", omdbRow);
+            if (!Brand.OTA) keyRow(a, list, "IMDb ratings (OMDb)", Omdb.PREF_KEY, Omdb.builtInKey(), "OMDb", "IMDb, Rotten Tomatoes and Metacritic ratings, plus plots and cast", omdbRow);
         } else {
-            row(a, list, "Back up playlists", "save playlists, favorites, your categories, My List, hidden items and all settings to a dated WygTV backup file", () -> Backup.backup(a));
-            row(a, list, "Restore from a backup", "reload everything from a WygTV backup file", () -> Backup.restore(a));
-            row(a, list, "Check for updates", "WygTV " + Updater.installedName(a) + "  •  press OK to look for a newer version and install it over this one", () -> Updater.check(a, true));
+            row(a, list, "Back up playlists", "save playlists, favorites, your categories, My List, hidden items and all settings to a dated " + Brand.NAME + " backup file", () -> Backup.backup(a));
+            row(a, list, "Restore from a backup", "reload everything from a " + Brand.NAME + " backup file", () -> Backup.restore(a));
+            row(a, list, "Check for updates", Brand.NAME + " " + Updater.installedName(a) + "  •  press OK to look for a newer version and install it over this one", () -> Updater.check(a, true));
             final int autoRow = list.getChildCount();
             boolean auto = a.prefs.getBoolean(Updater.PREF_AUTO, true);
-            row(a, list, "Look for updates at start-up", auto ? "On  •  offers new versions when WygTV opens" : "Off", () -> {
+            row(a, list, "Look for updates at start-up", auto ? "On  •  offers new versions when " + Brand.NAME + " opens" : "Off", () -> {
                 a.prefs.edit().putBoolean(Updater.PREF_AUTO, !a.prefs.getBoolean(Updater.PREF_AUTO, true)).apply();
                 settings(a, autoRow);
             });
             String version = Updater.installedName(a);
-            final String about = "WygTV " + version + " for Android TV";
+            final String about = Brand.NAME + " " + version + (Brand.OTA ? "  •  antenna TV from HDHomeRun" : " for Android TV");
             row(a, list, "About", about, () -> Toast.makeText(a, about, Toast.LENGTH_SHORT).show());
         }
         int i = Math.max(0, Math.min(focusIndex, list.getChildCount() - 1));

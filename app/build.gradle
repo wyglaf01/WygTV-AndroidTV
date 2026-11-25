@@ -1,15 +1,20 @@
 plugins { id 'com.android.application' }
+// WYGOTA=1 builds WygOTA instead of WygTV: the antenna-TV-only app (com.wygtv.ota), with the antenna
+// icons in src/wygota/res and the WygOTA name. It installs next to WygTV and WygTV Beta.
+def wygota = System.getenv('WYGOTA') == '1'
 android { namespace 'com.wygtv.tv'; compileSdk 35
-    defaultConfig { applicationId System.getenv('WYGTV_BETA') == '1' ? 'com.wygtv.tv.beta' : 'com.wygtv.tv'; minSdk 23; targetSdk 28; versionCode((System.getenv('WYGTV_VERSION_CODE') ?: System.getenv('GITHUB_RUN_NUMBER') ?: '1') as int); versionName "1.0.${System.getenv('WYGTV_VERSION_CODE') ?: System.getenv('GITHUB_RUN_NUMBER') ?: '0'}"
+    defaultConfig { applicationId wygota ? 'com.wygtv.ota' : System.getenv('WYGTV_BETA') == '1' ? 'com.wygtv.tv.beta' : 'com.wygtv.tv'; minSdk 23; targetSdk 28; versionCode((System.getenv('WYGTV_VERSION_CODE') ?: System.getenv('GITHUB_RUN_NUMBER') ?: '1') as int); versionName "1.0.${System.getenv('WYGTV_VERSION_CODE') ?: System.getenv('GITHUB_RUN_NUMBER') ?: '0'}"
         // Beta builds (WYGTV_BETA=1) are labelled "WygTV Beta" and use the burnt-orange icons in src/beta/res.
         // They are a separate app (com.wygtv.tv.beta), so the beta and the release can be installed side by side.
-        manifestPlaceholders = [appLabel: System.getenv('WYGTV_BETA') == '1' ? 'WygTV Beta' : 'WygTV']
+        manifestPlaceholders = [appLabel: wygota ? 'WygOTA' : System.getenv('WYGTV_BETA') == '1' ? 'WygTV Beta' : 'WygTV']
+        buildConfigField 'boolean', 'OTA', wygota ? 'true' : 'false'
         // Optional TMDb key for movie/series details, from the GitHub secret TMDB_API_KEY (Settings can override it).
         buildConfigField 'String', 'TMDB_API_KEY', "\"${(System.getenv('TMDB_API_KEY') ?: '').replaceAll('[^A-Za-z0-9._-]', '')}\""
         // Eddie's OMDb key is the default (a GitHub secret OMDB_API_KEY replaces it; Settings overrides both).
         buildConfigField 'String', 'OMDB_API_KEY', "\"${(System.getenv('OMDB_API_KEY') ?: '5b5c4d64').replaceAll('[^A-Za-z0-9._-]', '')}\"" }
     buildFeatures { buildConfig true }
-    if (System.getenv('WYGTV_BETA') == '1') { sourceSets { debug { res.srcDirs = ['src/beta/res'] } } }
+    if (wygota) { sourceSets { debug { res.srcDirs = ['src/wygota/res'] } } }
+    else if (System.getenv('WYGTV_BETA') == '1') { sourceSets { debug { res.srcDirs = ['src/beta/res'] } } }
     // Preserve the existing sideloaded TV runtime behavior; Play target migration needs device testing.
     lint { warning 'ExpiredTargetSdkVersion' }
     // Permanent WygTV signing key, given to CI as GitHub secrets (never committed), so each
