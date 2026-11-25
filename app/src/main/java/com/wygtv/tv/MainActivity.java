@@ -19,7 +19,7 @@ public class MainActivity extends Activity {
  final TvRemote remote=new TvRemote(this); JSONArray zapList, searchHits=new JSONArray(); String resumeStreamId, resumeCategory; boolean previewOnly;
  // Live TV search: channel list is loaded once per account and filtered locally as the user types.
  JSONArray liveIndex; String[] liveIndexNames=new String[0]; String liveIndexAccount="", searchQuery=""; LinearLayout searchResults; TextView searchSummary; EditText searchField; final Handler searchHandler=new Handler(Looper.getMainLooper()); final Runnable searchRender=()->renderSearch();
- @Override public boolean dispatchKeyEvent(KeyEvent e){if(remote.handleKey(e))return true;return super.dispatchKeyEvent(e);}
+ @Override public boolean dispatchKeyEvent(KeyEvent e){if(remote.handleKey(e))return true;/* Arrows stay inside the screen; Back opens the side menu. */if(NavRail.blocksArrow(this,e))return true;return super.dispatchKeyEvent(e);}
  String streamUrl(String type,String id,String ext){if(library.activeIsM3u()){String u=library.m3uStreamUrl(id);return u==null?"":u;}if(type.equals("live")){String f=prefs.getString("live_format","auto");if(!f.equals("auto"))ext=f;}String path=type.equals("live")?"live":type.equals("vod")?"movie":"series";return saved("host")+"/"+path+"/"+enc(saved("user"))+"/"+enc(saved("pass"))+"/"+id+"."+ext;}
  /** Puts focus on the row tagged with the channel/movie the player just closed, and keeps it on screen. */
  boolean focusResume(ViewGroup list){String id=resumeStreamId;resumeStreamId=null;if(id==null)return false;for(int i=0;i<list.getChildCount();i++){View v=list.getChildAt(i);if(id.equals(v.getTag())){v.requestFocus();return true;}}return false;}

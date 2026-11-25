@@ -214,6 +214,28 @@ final class NavRail {
         labels.add(new String[]{icon, label});
     }
 
+    /**
+     * Arrow keys never jump from a screen into the main side menu: at the edge of a screen the highlight stays where
+     * it is (Back opens the side menu). True when this arrow press would have moved into the side menu, so it is
+     * used up instead. Touch is unaffected.
+     */
+    static boolean blocksArrow(MainActivity a, android.view.KeyEvent e) {
+        int k = e.getKeyCode();
+        if (k != android.view.KeyEvent.KEYCODE_DPAD_LEFT && k != android.view.KeyEvent.KEYCODE_DPAD_RIGHT
+                && k != android.view.KeyEvent.KEYCODE_DPAD_UP && k != android.view.KeyEvent.KEYCODE_DPAD_DOWN) return false;
+        NavRail r = showing.get();
+        if (r == null || !r.rail.isAttachedToWindow() || !r.rail.isShown()) return false;
+        View f = a.getCurrentFocus();
+        if (f == null || r.inRail(f)) return false;
+        if (e.getAction() != android.view.KeyEvent.ACTION_DOWN) return false;
+        int dir = k == android.view.KeyEvent.KEYCODE_DPAD_LEFT ? View.FOCUS_LEFT : k == android.view.KeyEvent.KEYCODE_DPAD_RIGHT ? View.FOCUS_RIGHT
+                : k == android.view.KeyEvent.KEYCODE_DPAD_UP ? View.FOCUS_UP : View.FOCUS_DOWN;
+        View root = f.getRootView();
+        if (!(root instanceof android.view.ViewGroup)) return false;
+        View next = android.view.FocusFinder.getInstance().findNextFocus((android.view.ViewGroup) root, f, dir);
+        return next != null && r.inRail(next);
+    }
+
     /** This screen's entry in the menu (e.g. ▣ Live TV on the Live TV screen), or null when it has none. */
     private TextView hereItem() {
         for (int i = 0; i < items.size() && i < keys.size(); i++) if (keys.get(i).equals(current)) return items.get(i);
