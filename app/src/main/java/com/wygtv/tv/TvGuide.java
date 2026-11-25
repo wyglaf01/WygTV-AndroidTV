@@ -733,6 +733,7 @@ final class TvGuide {
     }
 
     private void startPreview(int row) {
+        if (MiniPlayer.active()) return; // the mini player is playing: no second stream (or tuner) for the preview
         String id = key(row);
         if (streamId(row).isEmpty() || (preview != null && id.equals(previewId))) return;
         String url = streamUrl(row);

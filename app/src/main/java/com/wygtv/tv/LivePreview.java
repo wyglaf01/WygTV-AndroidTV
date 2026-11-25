@@ -105,6 +105,8 @@ final class LivePreview {
 
     private static void start(MainActivity a, JSONObject item) {
         if (view == null || !view.isAttachedToWindow()) return;
+        // The mini player is playing: no preview, so it doesn't take a second tuner or play sound over it.
+        if (MiniPlayer.active()) { stopPlayer(); label.setText("Preview is off while the mini player plays"); label.setVisibility(View.VISIBLE); return; }
         String pid = item.optString("playlist"), sid = item.optString("stream_id");
         String key = keyOf(a, item);
         if (player != null && key.equals(playingKey)) return;
