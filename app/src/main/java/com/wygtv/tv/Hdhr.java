@@ -339,6 +339,7 @@ final class Hdhr {
 
     /** The playlist text for any M3U-type link: a tuner's lineup is converted, anything else is downloaded as is. */
     static String playlistText(String url) throws Exception {
+        if (Tablo.isChannelsUrl(url)) return Tablo.playlistText(url); // a legacy Tablo's channels
         if (isLineupUrl(url)) return lineupToM3u(Library.download(url, 30000));
         return Library.download(url, 60000);
     }

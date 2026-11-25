@@ -84,6 +84,7 @@ final class ExternalPlayer {
      * WygTV's own player instead (built-in chosen, or the external app is gone).
      */
     static boolean open(MainActivity a, String type, String url, String title) {
+        if (Tablo.isWatchUrl(url)) return false; // a Tablo channel gets its stream link as it plays, so only the built-in player can play it
         String c = choice(a.prefs);
         if (!usedFor(c, forKey(a.prefs), type)) return false;
         Intent i = viewIntent(url).putExtra("title", title).putExtra("itemTitle", title)

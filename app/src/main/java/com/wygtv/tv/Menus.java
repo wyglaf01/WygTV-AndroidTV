@@ -67,6 +67,7 @@ final class Menus {
         TextView xtream = a.homeTile("⚙", "Xtream Codes\nserver + username", tiles, () -> xtreamForm(a, null, null));
         a.homeTile("☰", "M3U link\nplaylist URL", tiles, () -> m3uForm(a, null));
         a.homeTile("📡", "HDHomeRun\nantenna TV tuner", tiles, () -> hdhrForm(a, null));
+        a.homeTile("📡", "Tablo\nantenna TV DVR", tiles, () -> tabloMenu(a, () -> setup(a)));
         a.homeTile("↺", "Restore\nfrom a backup", tiles, () -> Backup.restore(a));
         for (int i = 0; i < tiles.getChildCount(); i++) ((TextView) tiles.getChildAt(i)).setTextSize(21);
         xtream.requestFocus();
@@ -110,7 +111,14 @@ final class Menus {
 
     static String describe(JSONObject p) {
         StringBuilder s = new StringBuilder();
-        if (Library.isHdhr(p)) {
+        if (Library.isTablo(p)) {
+            s.append(p.optString("model").isEmpty() ? "Tablo" : p.optString("model"));
+            int n = p.optInt("count", -1);
+            if (n >= 0) s.append("  •  ").append(n).append(n == 1 ? " channel" : " channels");
+            s.append("  •  ").append(hostOf(p.optString("url")));
+            int t = p.optInt("tuners", 0);
+            if (t > 0) s.append("  •  ").append(t).append(t == 1 ? " tuner" : " tuners");
+        } else if (Library.isHdhr(p)) {
             s.append("HDHomeRun tuner");
             int n = p.optInt("count", -1);
             if (n >= 0) s.append("  •  ").append(n).append(n == 1 ? " channel" : " channels");
@@ -151,7 +159,7 @@ final class Menus {
         String[] items = {on ? "Turn off (skip it in menus, guides, Search and updates)" : "Turn on (show it everywhere again)", "Edit", "Refresh now", "Manage categories (hide or show)", "TV guide (EPG) link" + (p.optString("epg").isEmpty() ? "" : "  •  " + hostOf(p.optString("epg"))), "Delete"};
         new Dialogs.Builder(a).setTitle(p.optString("title", "Playlist") + (on ? "" : "   (off)")).setItems(items, (d, which) -> {
             if (which == 0) setOn(a, p, !on);
-            else if (which == 1) { if (Library.isHdhr(p)) hdhrForm(a, p); else if (Library.M3U.equals(p.optString("type"))) m3uForm(a, p); else xtreamForm(a, p, null); }
+            else if (which == 1) { if (Library.isTablo(p)) tabloForm(a, p); else if (Library.isHdhr(p)) hdhrForm(a, p); else if (Library.M3U.equals(p.optString("type"))) m3uForm(a, p); else xtreamForm(a, p, null); }
             else if (which == 2) refresh(a, p);
             else if (which == 3) Manage.categories(a, p, () -> playlists(a));
             else if (which == 4) guideSource(a, p, () -> playlists(a));
@@ -302,13 +310,14 @@ final class Menus {
                 + "(shown in your router, or at my.hdhomerun.com).");
         TextView connect = a.button("Save & load channels", form, () -> connectTuner(a, existing, title.getText().toString().trim(), host.getText().toString(), epg.getText().toString().trim()));
         a.button("⌕  Find tuners on my network", form, () -> findTuners(a, existing, title, host, epg));
+        if (existing == null) a.button("📡  I have a Tablo instead", form, () -> tabloMenu(a, () -> { if (a.library.isEmpty()) hdhrForm(a, null); else backToTuners(a); }));
         a.button("Cancel", form, () -> { if (!a.library.isEmpty()) backToTuners(a); else if (Brand.OTA) a.finish(); else setup(a); });
         (existing == null ? connect : host).requestFocus();
     }
 
     /** Settings > HDHomeRun antenna TV once a tuner is added: pick a tuner, or add another. */
     private static void tunerList(MainActivity a) {
-        java.util.List<JSONObject> tuners = Antenna.allTuners(a);
+        java.util.List<JSONObject> tuners = hdhrTuners(a);
         String[] names = new String[tuners.size() + 1];
         for (int i = 0; i < tuners.size(); i++) names[i] = Antenna.nameOf(tuners.get(i)) + (a.library.isOn(tuners.get(i)) ? "" : "  (off)") + "  •  " + describe(tuners.get(i));
         names[tuners.size()] = "+  Add another tuner";
@@ -319,7 +328,7 @@ final class Menus {
 
     private static void tunerActions(MainActivity a, JSONObject t) {
         new Dialogs.Builder(a).setTitle(Antenna.nameOf(t)).setItems(new String[]{"Edit name or address", "Refresh channels (after a channel scan)", "Remove"}, (d, w) -> {
-            if (w == 0) hdhrForm(a, t);
+            if (w == 0) { if (Library.isTablo(t)) tabloForm(a, t); else hdhrForm(a, t); }
             else if (w == 1) refresh(a, t);
             else new Dialogs.Builder(a).setTitle("Remove “" + Antenna.nameOf(t) + "”?")
                         .setMessage(Antenna.nameOf(t) + " disappears from Live TV. Its favorites stay saved, so they come back if you add the same tuner again.")
@@ -412,6 +421,150 @@ final class Menus {
         }).start();
     }
 
+    /** Saved HDHomeRun tuners (Tablos have their own settings row). */
+    private static java.util.List<JSONObject> hdhrTuners(MainActivity a) {
+        java.util.List<JSONObject> out = new java.util.ArrayList<>();
+        for (JSONObject t : Antenna.allTuners(a)) if (!Library.isTablo(t)) out.add(t);
+        return out;
+    }
+
+    // ------------------------------------------------------------------ Tablo
+
+    private static java.util.List<JSONObject> tablos(MainActivity a) {
+        java.util.List<JSONObject> out = new java.util.ArrayList<>();
+        for (JSONObject t : Antenna.allTuners(a)) if (Library.isTablo(t)) out.add(t);
+        return out;
+    }
+
+    /** Settings line for Tablo: legacy Tablos added, and whether the 4th Gen (Tablo app) button is on. */
+    static String tabloSummary(MainActivity a) {
+        java.util.List<JSONObject> t = tablos(a);
+        String legacy = t.isEmpty() ? "" : (t.size() == 1 ? describe(t.get(0)) : t.size() + " Tablos") + "  •  ";
+        String app = TabloApp.isOn(a.prefs) ? "📡 " + TabloApp.nameOf(a.prefs) + " opens the Tablo app  •  " : "";
+        if (legacy.isEmpty() && app.isEmpty()) return "not added  •  press OK to add a Tablo (black models play here; the white 4th Gen opens the Tablo app)";
+        return legacy + app + "press OK to add, edit or remove";
+    }
+
+    /**
+     * Tablo: which kind you have decides how it works. The black Tablos (2013–2023) share their channels on the
+     * home network, so they play right here like an HDHomeRun. The white 4th Gen only talks to Tablo's own app, so
+     * it gets a button that opens that app. {@code back} redraws the screen this was opened from.
+     */
+    static void tabloMenu(MainActivity a, Runnable back) {
+        java.util.List<JSONObject> have = tablos(a);
+        String[] items = new String[have.size() + 3];
+        for (int i = 0; i < have.size(); i++) items[i] = "📡 " + Antenna.nameOf(have.get(i)) + (a.library.isOn(have.get(i)) ? "" : "  (off)") + "  •  " + describe(have.get(i));
+        items[have.size()] = "+  Add a black Tablo (DUAL, QUAD, LITE: 2013–2023)  •  plays in " + Brand.NAME;
+        items[have.size() + 1] = "📡  White 4th Gen Tablo  •  " + TabloApp.summary(a);
+        items[have.size() + 2] = "Close";
+        new Dialogs.Builder(a).setTitle("Tablo antenna TV").setItems(items, (d, w) -> {
+            if (w < have.size()) tunerActions(a, have.get(w));
+            else if (w == have.size()) tabloForm(a, null);
+            else if (w == have.size() + 1) TabloApp.settings(a, back);
+        }).show();
+    }
+
+    /** Add or edit a legacy (black) Tablo: its IP address, or "Find my Tablo" through Tablo's cloud lookup. */
+    static void tabloForm(MainActivity a, JSONObject existing) {
+        a.mode = "hdhr";
+        a.shell(existing == null ? "ADD TABLO" : "EDIT TABLO");
+        LinearLayout form = column(a);
+        form.setPadding(a.dp(80), a.dp(4), a.dp(80), 0);
+        EditText title = a.field(form, "Name (shows in Live TV)", existing == null ? Tablo.DEFAULT_NAME : Antenna.nameOf(existing));
+        String addr = existing == null ? "" : hostOf(existing.optString("url"));
+        EditText host = a.field(form, "Tablo's IP address, e.g. 192.168.1.60", addr);
+        host.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        EditText epg = a.field(form, "TV guide (XMLTV) link, optional: a Tablo shares channels but not its guide", existing == null ? "" : existing.optString("epg"));
+        note(a, form, "For the black Tablo models (DUAL, QUAD, LITE, 2013–2023). Channels come from the Tablo's last channel scan and play right here; "
+                + "each one uses one of the Tablo's tuners while it plays. Find my Tablo asks Tablo's servers which Tablo is on this network, "
+                + "or type its IP address (shown in your router, or in the Tablo app's settings). "
+                + "For the white 4th Gen Tablo, go back and pick "White 4th Gen Tablo" instead: it only plays in the Tablo app.");
+        TextView connect = a.button("Save & load channels", form, () -> connectTablo(a, existing, title.getText().toString().trim(), host.getText().toString(), epg.getText().toString().trim()));
+        a.button("⌕  Find my Tablo", form, () -> findTablos(a, existing, title, host, epg));
+        a.button("Cancel", form, () -> { if (!a.library.isEmpty()) backToTuners(a); else a.setup(); });
+        (existing == null ? host : connect).requestFocus();
+    }
+
+    private static void findTablos(MainActivity a, JSONObject existing, EditText title, EditText host, EditText epg) {
+        a.status.setText("Looking for your Tablo…");
+        Toast.makeText(a, "Looking for your Tablo…", Toast.LENGTH_SHORT).show();
+        final int gen = a.screenGeneration;
+        new Thread(() -> {
+            java.util.List<Tablo.Device> found = Tablo.discoverAll();
+            a.runOnUiThread(() -> {
+                if (a.isFinishing() || a.isDestroyed() || gen != a.screenGeneration) return;
+                a.status.setText("");
+                if (found.isEmpty()) {
+                    alert(a, "No black Tablo was found on this network. Check it's on and connected, then type its IP address instead. "
+                            + "A white 4th Gen Tablo isn't found here: it only plays in the Tablo app (see White 4th Gen Tablo in the Tablo settings).");
+                    return;
+                }
+                String[] names = new String[found.size()];
+                for (int i = 0; i < names.length; i++) names[i] = found.get(i).summary();
+                new Dialogs.Builder(a).setTitle(found.size() == 1 ? "Found 1 Tablo" : "Found " + found.size() + " Tablos").setItems(names, (d, w) -> {
+                    Tablo.Device dev = found.get(w);
+                    host.setText(hostOf(dev.base));
+                    connectTablo(a, existing, title.getText().toString().trim(), hostOf(dev.base), epg.getText().toString().trim());
+                }).setNegativeButton("Cancel", null).show();
+            });
+        }).start();
+    }
+
+    /** Reads the Tablo's /server/info and channels, then saves it like a tuner. */
+    private static void connectTablo(MainActivity a, JSONObject existing, String name, String address, String epg) {
+        String base = Tablo.baseFromInput(address);
+        if (base.isEmpty()) { alert(a, "Enter the Tablo's IP address, like 192.168.1.60, or press Find my Tablo."); return; }
+        a.status.setText("Connecting to the Tablo…");
+        Toast.makeText(a, "Connecting to " + hostOf(base) + "…", Toast.LENGTH_SHORT).show();
+        final int gen = a.screenGeneration;
+        new Thread(() -> {
+            Tablo.Device dev = null;
+            M3u.Playlist m = null;
+            String problem = null;
+            boolean locked = false;
+            String link = Tablo.channelsUrl(base);
+            try { dev = Tablo.describe(base); } catch (Tablo.LockedException e) { locked = true; } catch (Exception e) {
+                problem = "No black Tablo answered at " + hostOf(base) + ". Check the address and that this device is on the same network. "
+                        + "A white 4th Gen Tablo can't be added here: turn on White 4th Gen Tablo in the Tablo settings instead.";
+            }
+            if (dev != null) {
+                try { m = a.library.downloadM3u(link); }
+                catch (Exception e) {
+                    if (e instanceof Tablo.LockedException) locked = true;
+                    else problem = "The Tablo answered but its channel list couldn't be read.";
+                }
+                if (m != null && m.channels.isEmpty()) problem = "The Tablo has no channels yet. Run a channel scan in the Tablo app, then try again.";
+            }
+            final Tablo.Device device = dev;
+            final M3u.Playlist loaded = m;
+            final String error = problem;
+            final boolean refused = locked;
+            a.runOnUiThread(() -> {
+                if (a.isFinishing() || a.isDestroyed() || gen != a.screenGeneration) return;
+                a.status.setText("");
+                if (refused) {
+                    new Dialogs.Builder(a).setTitle("This Tablo won't share its channels").setMessage(Tablo.LOCKED)
+                            .setPositiveButton("Use the Tablo app", (d, w) -> TabloApp.settings(a, () -> { if (!a.library.isEmpty()) backToTuners(a); else a.setup(); }))
+                            .setNegativeButton("Close", null).show();
+                    return;
+                }
+                if (error != null) { alert(a, error); return; }
+                JSONObject p = existing != null ? existing : Library.newPlaylist(Library.M3U);
+                if (existing != null && !existing.optString("url").equals(link)) a.library.m3uFile(existing.optString("url")).delete();
+                try {
+                    p.put("title", name.isEmpty() ? Tablo.DEFAULT_NAME : name)
+                            .put("url", link).put("epg", epg).put("count", loaded.channels.size())
+                            .put("tablo", true).put("device_id", device.id).put("model", device.model).put("tuners", device.tuners);
+                } catch (JSONException ignored) { }
+                boolean first = a.library.isEmpty();
+                a.library.put(p);
+                if (first || p.optString("id").equals(a.library.activeId())) a.switchPlaylist(p);
+                Toast.makeText(a, loaded.channels.size() + " Tablo channels added. Find them in Live TV under " + p.optString("title") + ".", Toast.LENGTH_LONG).show();
+                if (first) a.firstScreen(); else backToTuners(a);
+            });
+        }).start();
+    }
+
     // ------------------------------------------------------------------ settings
 
     /** Settings is four groups; each opens its own page. "" = the top page. */
@@ -446,7 +599,7 @@ final class Menus {
         JSONObject active = a.library.find(a.library.activeId());
         boolean liveOnly = a.liveOnly();
         if (g.isEmpty()) {
-            row(a, list, groupIcon(GROUP_PLAYLISTS) + "  " + groupTitle(GROUP_PLAYLISTS), "playlists, HDHomeRun, AirTV, manage categories, hide and show channels, channel groups, TV guides (EPG)", () -> settingsGroup(a, GROUP_PLAYLISTS));
+            row(a, list, groupIcon(GROUP_PLAYLISTS) + "  " + groupTitle(GROUP_PLAYLISTS), "playlists, HDHomeRun, AirTV, Tablo, manage categories, hide and show channels, channel groups, TV guides (EPG)", () -> settingsGroup(a, GROUP_PLAYLISTS));
             row(a, list, groupIcon(GROUP_PLAYER) + "  " + groupTitle(GROUP_PLAYER), "built-in or external player, live stream format, buffer, video decoder, subtitles, watched series, play next", () -> settingsGroup(a, GROUP_PLAYER));
             row(a, list, groupIcon(GROUP_APPEARANCE) + "  " + groupTitle(GROUP_APPEARANCE), "theme, glass effect, app mode, main screen, start-up screen, side menu order, Exit button, guide rows, channel order, live preview, movie and series info, IMDb ratings", () -> settingsGroup(a, GROUP_APPEARANCE));
             row(a, list, groupIcon(GROUP_BACKUP) + "  " + groupTitle(GROUP_BACKUP), "back up, restore, check for updates  •  " + Brand.NAME + " " + Updater.installedName(a), () -> settingsGroup(a, GROUP_BACKUP));
@@ -455,13 +608,15 @@ final class Menus {
             final int onOffRow = list.getChildCount();
             if (!Brand.OTA) row(a, list, "Turn playlists on or off", Manage.playlistSummary(a) + "  •  press OK to tick the playlists to use. Unticked ones are skipped in menus, guides, Search and updates",
                     () -> Manage.playlistsOnOff(a, () -> settings(a, onOffRow)));
-            java.util.List<JSONObject> tuners = Antenna.allTuners(a);
+            java.util.List<JSONObject> tuners = hdhrTuners(a);
             row(a, list, "HDHomeRun antenna TV", tuners.isEmpty()
                     ? "not added  •  press OK to add your tuner. Its channels show in Live TV as " + Antenna.DEFAULT_NAME
                     : (tuners.size() == 1 ? describe(tuners.get(0)) : tuners.size() + " tuners") + "  •  press OK to add, edit, refresh or remove",
                     () -> { if (tuners.isEmpty()) hdhrForm(a, null); else tunerList(a); });
             final int airRow = list.getChildCount();
             row(a, list, "AirTV antenna TV", AirTv.summary(a), () -> AirTv.settings(a, () -> settings(a, airRow)));
+            final int tabloRow = list.getChildCount();
+            row(a, list, "Tablo antenna TV", tabloSummary(a), () -> tabloMenu(a, () -> settings(a, tabloRow)));
             final int catsRow = list.getChildCount();
             row(a, list, "Manage categories", Manage.categorySummary(a) + "  •  press OK to tick the categories to show, playlist by playlist",
                     () -> Manage.categories(a, () -> settings(a, catsRow)));
@@ -654,7 +809,7 @@ final class Menus {
                 settings(a, autoRow);
             });
             String version = Updater.installedName(a);
-            final String about = Brand.NAME + " " + version + (Brand.OTA ? "  •  antenna TV from HDHomeRun" : " for Android TV");
+            final String about = Brand.NAME + " " + version + (Brand.OTA ? "  •  antenna TV from HDHomeRun and Tablo" : " for Android TV");
             row(a, list, "About", about + "  •  made by Wyglaf", () -> aboutDialog(a, about));
         }
         int i = Math.max(0, Math.min(focusIndex, list.getChildCount() - 1));

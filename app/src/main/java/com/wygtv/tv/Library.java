@@ -193,9 +193,18 @@ final class Library {
     boolean activeIsM3u() { return M3U.equals(prefs.getString("type", "")); }
 
     /** An HDHomeRun antenna tuner: saved as an M3U playlist whose link is the tuner's lineup.json. */
-    boolean activeIsHdhr() { return activeIsM3u() && Hdhr.isLineupUrl(prefs.getString("m3u_url", "")); }
+    boolean activeIsHdhr() { return activeIsM3u() && isTunerUrl(prefs.getString("m3u_url", "")); }
 
-    static boolean isHdhr(JSONObject p) { return p != null && M3U.equals(p.optString("type")) && Hdhr.isLineupUrl(p.optString("url")); }
+    /**
+     * An antenna tuner: an HDHomeRun, or a legacy Tablo (saved as an M3U playlist whose link is the Tablo's
+     * http://IP:8885/guide/channels). Both show in Live TV as their own 📡 category.
+     */
+    static boolean isHdhr(JSONObject p) { return p != null && M3U.equals(p.optString("type")) && isTunerUrl(p.optString("url")); }
+
+    /** A legacy Tablo tuner (see {@link Tablo}). */
+    static boolean isTablo(JSONObject p) { return p != null && M3U.equals(p.optString("type")) && Tablo.isChannelsUrl(p.optString("url")); }
+
+    static boolean isTunerUrl(String url) { return Hdhr.isLineupUrl(url) || Tablo.isChannelsUrl(url); }
 
     // ------------------------------------------------------------------ M3U
 
@@ -378,7 +387,7 @@ final class Library {
     /** The player pop-up's source line: the playlist's name and what kind of source it is. */
     static String sourceLabel(JSONObject p) {
         if (p == null) return "";
-        if (isHdhr(p)) return "📡 " + Antenna.nameOf(p) + "  ·  HDHomeRun antenna";
+        if (isHdhr(p)) return "📡 " + Antenna.nameOf(p) + "  ·  " + (isTablo(p) ? "Tablo" : "HDHomeRun") + " antenna";
         return nameOf(p) + "  ·  " + (M3U.equals(p.optString("type")) ? "M3U playlist" : "Xtream Codes");
     }
 
@@ -521,6 +530,7 @@ final class Library {
      * matched by channel number. {@code other} is a saved tuner that isn't active, or null. Call off the UI thread.
      */
     JSONArray hdhrEpg(String lineupUrl, String streamId, int limit, JSONObject other) {
+        if (Tablo.isChannelsUrl(lineupUrl)) return new JSONArray(); // a Tablo's guide comes from an XMLTV link set on it
         M3u.Channel c;
         try { c = (other == null ? m3uBlocking() : m3uOf(other)).byId.get(streamId); } catch (Exception e) { return new JSONArray(); }
         if (c == null) return new JSONArray();
