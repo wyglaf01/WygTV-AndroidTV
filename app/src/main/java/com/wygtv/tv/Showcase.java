@@ -28,7 +28,8 @@ import java.util.Map;
  * from public sources that need no key (Rotten Tomatoes, Apple, TVmaze: see PopularSources). The rows don't depend
  * on any playlist. Choosing a poster looks for that title in your playlists and lists
  * every playlist (and every copy, e.g. HD or 4K) that has it, to pick one; it then opens the same details page as
- * Movies and Series. Live TV, Movies, Series, Search and antenna TV are in the side menu.
+ * Movies and Series. A row of shortcuts at the top has the classic Home's items (Live TV, TV Guide, Movies, Series,
+ * Search, antenna TV, Playlists, Settings, Exit); they're in the side menu too.
  * Option 2 is the classic Home with its tiles; Settings > Appearance > Main screen picks one.
  */
 final class Showcase {
@@ -80,6 +81,13 @@ final class Showcase {
         a.status.setTextColor(Theme.MUTED);
         header.addView(a.status, new LinearLayout.LayoutParams(0, -1, 1));
 
+        // The original Home's items as one row of shortcuts at the top.
+        LinearLayout shortcuts = shortcuts(a);
+        LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(-1, a.dp(46));
+        slp.setMargins(0, a.dp(2), 0, a.dp(8));
+        layout.addView(shortcuts, slp);
+        shortcuts.getChildAt(0).requestFocus(); // Live TV, as on the classic Home
+
         // Spotlight: what the highlighted poster is.
         TextView title = a.label("Popular this week", 22);
         title.setTypeface(null, Typeface.BOLD);
@@ -105,7 +113,7 @@ final class Showcase {
         rows.setOrientation(LinearLayout.VERTICAL);
         scroll.addView(rows, new FrameLayout.LayoutParams(-1, -2));
 
-        Spot spot = new Spot(a, generation, backdrop, title, facts, plot);
+        Spot spot = new Spot(a, generation, backdrop, title, facts, plot, shortcuts);
         JSONObject saved = readSaved(a);
         if (saved != null) fill(a, rows, saved, spot);
         else a.status.setText("Finding this week's popular movies and series in your playlists…");
@@ -116,9 +124,9 @@ final class Showcase {
 
     /** The spotlight texts and picture, updated as posters are highlighted. */
     private static final class Spot {
-        final MainActivity a; final int generation; final ImageView backdrop; final TextView title, facts, plot;
-        Spot(MainActivity a, int generation, ImageView backdrop, TextView title, TextView facts, TextView plot) {
-            this.a = a; this.generation = generation; this.backdrop = backdrop; this.title = title; this.facts = facts; this.plot = plot;
+        final MainActivity a; final int generation; final ImageView backdrop; final TextView title, facts, plot; final View top;
+        Spot(MainActivity a, int generation, ImageView backdrop, TextView title, TextView facts, TextView plot, View top) {
+            this.a = a; this.generation = generation; this.backdrop = backdrop; this.title = title; this.facts = facts; this.plot = plot; this.top = top;
         }
         void show(JSONObject it, boolean series) {
             title.setText(it.optString("_title", it.optString("name", "")));
@@ -180,7 +188,55 @@ final class Showcase {
             none.setPadding(0, a.dp(20), 0, 0);
             rows.addView(none);
         }
-        if (first != null && !a.isFinishing()) first.requestFocus();
+        // The rows load after the screen opens: don't pull the highlight off the shortcuts row.
+        if (first != null && !a.isFinishing() && !spot.top.hasFocus()) first.requestFocus();
+    }
+
+    /**
+     * The classic Home's items, small, in one row: Live TV, TV Guide, Movies, Series, Search, a 📡 tile for each
+     * antenna tuner (and AirTV), Playlists, Settings and Exit. Live TV is highlighted when the screen opens.
+     */
+    private static LinearLayout shortcuts(MainActivity a) {
+        LinearLayout row = new LinearLayout(a);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        shortcut(a, row, "▣  Live TV", () -> a.browse("live"));
+        shortcut(a, row, "▦  TV Guide", () -> a.openGuide(null));
+        if (a.library.hasVod()) {
+            shortcut(a, row, "▶  Movies", () -> a.browseVod("vod"));
+            shortcut(a, row, "▤  Series", () -> a.browseVod("series"));
+        }
+        shortcut(a, row, "⌕  Search", () -> MasterSearch.show(a));
+        for (JSONObject t : Antenna.tuners(a)) {
+            String aid = Antenna.PREFIX + t.optString("id");
+            shortcut(a, row, "📡  " + Antenna.nameOf(t), () -> a.showGuide(aid, null, true));
+        }
+        if (AirTv.isOn(a.prefs)) shortcut(a, row, "📡  " + AirTv.nameOf(a.prefs), () -> AirTv.open(a));
+        shortcut(a, row, "☰  Playlists", () -> { Menus.playlistsFromSettings = false; a.playlists(); });
+        shortcut(a, row, "⚙  Settings", a::settings);
+        if (MenuOrder.homeExit(a.prefs)) shortcut(a, row, "⏻  Exit", a::confirmExit);
+        return row;
+    }
+
+    private static TextView shortcut(MainActivity a, LinearLayout row, String text, Runnable action) {
+        TextView t = a.label(text, 15);
+        t.setGravity(Gravity.CENTER);
+        t.setTypeface(null, Typeface.BOLD);
+        t.setSingleLine(true);
+        t.setEllipsize(TextUtils.TruncateAt.END);
+        t.setPadding(a.dp(6), 0, a.dp(6), 0);
+        t.setFocusable(true);
+        t.setClickable(true);
+        t.setBackground(Skin.tile(a, false));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -1, 1);
+        lp.setMargins(a.dp(4), a.dp(3), a.dp(4), a.dp(3));
+        row.addView(t, lp);
+        t.setOnClickListener(v -> action.run());
+        t.setOnFocusChangeListener((v, focused) -> {
+            t.setBackground(Skin.tile(a, focused));
+            t.setTextColor(focused ? Theme.INK : Theme.TEXT);
+            t.animate().scaleX(focused ? 1.05f : 1f).scaleY(focused ? 1.05f : 1f).setDuration(120).start();
+        });
+        return t;
     }
 
     /** One titled row of posters that scrolls sideways. Returns its first poster. */
