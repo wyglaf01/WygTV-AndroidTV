@@ -259,26 +259,7 @@
   };
   window.wyg = api;
 
-  // ------------------------------------------------------------------ touch: long press = hold OK, swipe from the left edge = Back
-  let pressTimer = null, pressed = null, longFired = false, sx = 0, sy = 0;
-  document.addEventListener('touchstart', (e) => {
-    const t = e.touches[0];
-    sx = t.clientX; sy = t.clientY; longFired = false;
-    pressed = e.target.closest && e.target.closest('.f');
-    clearTimeout(pressTimer);
-    if (pressed && pressed._long) pressTimer = setTimeout(() => { longFired = true; pressed.focus({ preventScroll: true }); pressed._long(); }, 600);
-  }, { passive: true });
-  document.addEventListener('touchmove', (e) => {
-    const t = e.touches[0];
-    if (Math.abs(t.clientX - sx) > 10 || Math.abs(t.clientY - sy) > 10) clearTimeout(pressTimer);
-  }, { passive: true });
-  document.addEventListener('touchend', (e) => {
-    clearTimeout(pressTimer);
-    const t = e.changedTouches[0];
-    if (sx < 24 && t.clientX - sx > 90 && Math.abs(t.clientY - sy) < 60 && window.W && W.back) W.back();
-  }, { passive: true });
-  // The tap that ends a long press must not also "click" the item.
-  document.addEventListener('click', (e) => { if (longFired) { longFired = false; e.stopPropagation(); e.preventDefault(); } }, true);
+  // Touch (tap, touch and hold, swipe from the left edge, double-tap) is handled by the shared screens: WygDesktop/src/renderer/js/nav.js.
 
   // ------------------------------------------------------------------ self-test used by CI in the iPad Simulator (see .github/workflows/ios.yml)
   window.addEventListener('load', async () => {

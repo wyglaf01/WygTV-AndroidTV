@@ -140,7 +140,36 @@
   /** Wraps a focus handler so it only runs for keyboard / remote focus, not for the mouse passing over. */
   W.keyOnly = (fn) => (e) => { if (W.inputMode === 'key') fn(e); };
 
+  // ------------------------------------------------------------------ touch screens (Windows, Linux, iPhone/iPad; Mac has none)
+  // Tap = click (open / play). Touch and hold = options (same as hold Enter / right-click). Swipe right from the left
+  // edge = Back (same as Esc). Double-tap the picture = full screen (see player.js). Lists scroll by dragging.
+  let pressTimer = null, pressed = null, longFired = false, sx = 0, sy = 0;
+  document.addEventListener('touchstart', (e) => {
+    W.inputMode = 'touch';
+    W.touchUsed = true;
+    document.body.classList.add('touch');
+    const t = e.touches[0];
+    sx = t.clientX; sy = t.clientY; longFired = false;
+    pressed = e.target.closest && e.target.closest('.f');
+    clearTimeout(pressTimer);
+    if (pressed && pressed._long) pressTimer = setTimeout(() => { longFired = true; pressed.focus({ preventScroll: true }); pressed._long(); }, 600);
+  }, { passive: true });
+  document.addEventListener('touchmove', (e) => {
+    const t = e.touches[0];
+    if (Math.abs(t.clientX - sx) > 10 || Math.abs(t.clientY - sy) > 10) clearTimeout(pressTimer);
+  }, { passive: true });
+  document.addEventListener('touchend', (e) => {
+    clearTimeout(pressTimer);
+    const t = e.changedTouches[0];
+    if (sx < 24 && t.clientX - sx > 90 && Math.abs(t.clientY - sy) < 60 && W.back) W.back();
+  }, { passive: true });
+  document.addEventListener('touchcancel', () => clearTimeout(pressTimer), { passive: true });
+  // The tap that ends a touch-and-hold must not also "click" the item.
+  document.addEventListener('click', (e) => { if (longFired) { longFired = false; e.stopPropagation(); e.preventDefault(); } }, true);
+
   document.addEventListener('contextmenu', (e) => {
+    // A touch-and-hold already opened the options (touch screens also send a right-click for it): don't open them twice.
+    if (longFired) { e.preventDefault(); return; }
     const el = e.target.closest && e.target.closest('.f');
     if (el && el._long) { e.preventDefault(); el._long(); }
   });

@@ -87,7 +87,7 @@
         h('div', { class: 'tiles small' }, row2.map(([k, icon, label, fn]) => btn({ class: 'tile small', 'data-k': k, onclick: fn },
           h('div', { class: 'tile-icon' }, icon), h('div', { class: 'tile-label' }, label)))),
         recentRow, contRow, status,
-        h('div', { class: 'keys-hint' }, W.isIOS ? 'Tap to open or play · touch and hold for options · ‹ or swipe from the left edge goes back' : 'Arrows move · Enter plays · hold Enter or right-click for options · Esc goes back · S searches · F11 full screen'));
+        h('div', { class: 'keys-hint' }, W.isIOS || W.touchScreen ? 'Tap to open or play · touch and hold for options · ‹ or swipe from the left edge goes back' : 'Arrows move · Enter plays · hold Enter or right-click for options · Esc goes back · S searches · F11 full screen'));
     },
     welcome() {
       return h('div', { class: 'home welcome' },
