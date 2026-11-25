@@ -110,7 +110,7 @@ final class Manage {
         if (groups.isEmpty()) { Menus.alert(a, "No playlist has these categories."); return; }
         String heading = onlySection == null ? "MANAGE CATEGORIES" : "HIDE AND SHOW " + SECTION_NAMES[java.util.Arrays.asList(SECTIONS).indexOf(onlySection)].toUpperCase(java.util.Locale.ROOT) + " CATEGORIES";
         Page page = new Page(a, heading, "categories", groups, start, after);
-        page.onSaved = () -> { a.otherLive.clear(); MasterSearch.clear(); };
+        page.onSaved = () -> { a.otherLive.clear(); MasterSearch.clear(); VodSearch.clear(); };
         page.open();
     }
 
@@ -264,6 +264,7 @@ final class Manage {
     static void applyPlaylistsOnOff(MainActivity a) {
         JSONObject next = a.library.replacementForActive();
         MasterSearch.clear();
+        VodSearch.clear();
         LiveMenu.forgetOthers();
         // Switched-off playlists are never loaded or updated; their saved lists are deleted to free space.
         JSONArray all = a.library.all();
