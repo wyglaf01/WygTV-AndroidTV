@@ -811,12 +811,7 @@ final class Library {
         if (M3U.equals(p.optString("type"))) return out;
         String id = p.optString("id");
         java.util.Set<String> hiddenCats = prefs.getStringSet(prefixOf(p) + "hidden_categories_" + type, java.util.Collections.<String>emptySet());
-        File f = new File(a.getCacheDir(), "vod_" + type + "_" + id.replaceAll("[^A-Za-z0-9_-]", "_") + ".json");
-        if (!f.exists() || System.currentTimeMillis() - f.lastModified() > LIVE_CACHE_MS) {
-            saveToFile(p.optString("host") + "/player_api.php?username=" + java.net.URLEncoder.encode(p.optString("user"), "UTF-8")
-                    + "&password=" + java.net.URLEncoder.encode(p.optString("pass"), "UTF-8")
-                    + "&action=" + (type.equals("series") ? "get_series" : "get_vod_streams"), 90000, f);
-        }
+        File f = vodFile(p, type);
         try (InputStream in = new java.io.BufferedInputStream(new FileInputStream(f), 65536);
              android.util.JsonReader r = new android.util.JsonReader(new java.io.InputStreamReader(in, StandardCharsets.UTF_8))) {
             r.setLenient(true);
@@ -852,6 +847,60 @@ final class Library {
         return out;
     }
 
+
+    /**
+     * An Xtream playlist's whole movie or series list saved as a file (downloaded when it's missing or
+     * {@link #LIVE_CACHE_MS} old), so it can be read item by item instead of held in memory. Call off the UI thread.
+     */
+    private File vodFile(JSONObject p, String type) throws Exception {
+        File f = new File(a.getCacheDir(), "vod_" + type + "_" + p.optString("id").replaceAll("[^A-Za-z0-9_-]", "_") + ".json");
+        if (!f.exists() || System.currentTimeMillis() - f.lastModified() > LIVE_CACHE_MS) {
+            saveToFile(p.optString("host") + "/player_api.php?username=" + java.net.URLEncoder.encode(p.optString("user"), "UTF-8")
+                    + "&password=" + java.net.URLEncoder.encode(p.optString("pass"), "UTF-8")
+                    + "&action=" + (type.equals("series") ? "get_series" : "get_vod_streams"), 90000, f);
+        }
+        return f;
+    }
+
+    /**
+     * Movies / Series search in one playlist, the same way as {@link #searchLiveIn}: the list is saved to a file and read
+     * item by item, keeping only the titles whose name matches {@code queryKey}. Names starting with the search come
+     * first, then names containing every word; at most {@code max}. Each is tagged with "playlist". Titles in hidden
+     * categories are left out. M3U playlists have no movies or series. Call off the UI thread.
+     */
+    JSONArray searchVodIn(JSONObject p, String type, String queryKey, int max) throws Exception {
+        JSONArray starts = new JSONArray(), contains = new JSONArray();
+        if (M3U.equals(p.optString("type"))) return starts;
+        String id = p.optString("id");
+        java.util.Set<String> hiddenCats = prefs.getStringSet(prefixOf(p) + "hidden_categories_" + type, java.util.Collections.<String>emptySet());
+        File f = vodFile(p, type);
+        try (InputStream in = new java.io.BufferedInputStream(new FileInputStream(f), 65536);
+             android.util.JsonReader r = new android.util.JsonReader(new java.io.InputStreamReader(in, StandardCharsets.UTF_8))) {
+            r.setLenient(true);
+            if (r.peek() != android.util.JsonToken.BEGIN_ARRAY) { f.delete(); return starts; }
+            r.beginArray();
+            while (r.hasNext() && starts.length() < max) {
+                if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+                if (r.peek() != android.util.JsonToken.BEGIN_OBJECT) { r.skipValue(); continue; }
+                JSONObject o = new JSONObject();
+                r.beginObject();
+                while (r.hasNext()) {
+                    String name = r.nextName();
+                    if (!VOD_FIELDS.contains(name)) { r.skipValue(); continue; }
+                    Object v = readJson(r);
+                    if (v != null) o.put(name, v);
+                }
+                r.endObject();
+                int rank = XtreamProtocol.searchRank(XtreamProtocol.searchKey(o.optString("name")), queryKey);
+                if (rank < 0 || rank > 1) continue; // not a match: dropped straight away
+                if (hiddenCats.contains(o.optString("category_id"))) continue;
+                o.put("playlist", id);
+                if (rank == 0) starts.put(o); else if (contains.length() < max) contains.put(o);
+            }
+        }
+        for (int i = 0; i < contains.length() && starts.length() < max; i++) starts.put(contains.opt(i));
+        return starts;
+    }
 
     /** How long a saved channel list is used for search before it's downloaded again. */
     static final long LIVE_CACHE_MS = 6L * 60 * 60 * 1000;

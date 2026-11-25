@@ -161,7 +161,7 @@ final class PosterGrid {
         art.addView(poster, new FrameLayout.LayoutParams(-1, -1));
         Details.image(poster, m.optString("poster"), a.dp(140), generation, a);
 
-        boolean mine = a.inMyList(type, id), watched = series && Watch.complete(a, id);
+        boolean mine = a.inMyListIn(a.prefixFor(item), type, id), watched = series && Watch.complete(a, id);
         TextView label = a.label((mine ? "☰ " : "") + (watched ? "✓ " : "") + name, 14);
         label.setSingleLine(true);
         label.setEllipsize(TextUtils.TruncateAt.END);
@@ -196,7 +196,10 @@ final class PosterGrid {
     private static void describe(MainActivity a, String type, JSONObject item, String id, TextView title, TextView facts, TextView plot,
                                  String[] focused, int generation, int list) {
         boolean series = type.equals("series");
-        String cacheKey = a.accountPrefix() + type + id;
+        String pre = a.prefixFor(item), cacheKey = pre + type + id;
+        // A Search result from another playlist: its details come from the list (the provider is asked once it's opened).
+        boolean other = !pre.equals(a.accountPrefix());
+        String where = item.has("playlist") ? a.playlistTag(item) : "";
         Runnable[] render = new Runnable[1];
         JSONObject[] meta = {META.containsKey(cacheKey) ? META.get(cacheKey) : Tmdb.fromProvider(item, null)};
         render[0] = () -> {
@@ -205,12 +208,13 @@ final class PosterGrid {
             title.setText(m.optString("title", item.optString("name")));
             String f = Details.facts(m, series), g = m.optString("genres");
             if (series) { String w = Watch.summary(Watch.load(a, id)); if (!w.isEmpty()) f = f + (f.isEmpty() ? "" : "   •   ") + "▶ " + w; }
-            facts.setText(g.isEmpty() ? f : f.isEmpty() ? g : f + "   •   " + g);
+            String fg = g.isEmpty() ? f : f.isEmpty() ? g : f + "   •   " + g;
+            facts.setText(where.isEmpty() ? fg : fg.isEmpty() ? where.replaceFirst("^\\s*·\\s*", "") : fg + where);
             String p = m.optString("plot");
             plot.setText(p.isEmpty() ? (m.has("source") || m.has("fetched") ? "No description." : "") : p);
         };
         render[0].run();
-        if (META.containsKey(cacheKey) || a.library.activeIsM3u()) return;
+        if (META.containsKey(cacheKey) || other || a.library.activeIsM3u()) return;
         a.apiQuiet((series ? "get_series_info&series_id=" : "get_vod_info&vod_id=") + a.enc(id), answer -> {
             JSONObject provider = Tmdb.fromProvider(item, answer);
             try { provider.put("fetched", true); } catch (Exception ignored) { }
