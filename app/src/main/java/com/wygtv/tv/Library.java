@@ -193,9 +193,18 @@ final class Library {
     boolean activeIsM3u() { return M3U.equals(prefs.getString("type", "")); }
 
     /** An HDHomeRun antenna tuner: saved as an M3U playlist whose link is the tuner's lineup.json. */
-    boolean activeIsHdhr() { return activeIsM3u() && Hdhr.isLineupUrl(prefs.getString("m3u_url", "")); }
+    boolean activeIsHdhr() { return activeIsM3u() && isTunerUrl(prefs.getString("m3u_url", "")); }
 
-    static boolean isHdhr(JSONObject p) { return p != null && M3U.equals(p.optString("type")) && Hdhr.isLineupUrl(p.optString("url")); }
+    /**
+     * An antenna tuner: an HDHomeRun, or a legacy Tablo (saved as an M3U playlist whose link is the Tablo's
+     * http://IP:8885/guide/channels). Both show in Live TV as their own 📡 category.
+     */
+    static boolean isHdhr(JSONObject p) { return p != null && M3U.equals(p.optString("type")) && isTunerUrl(p.optString("url")); }
+
+    /** A legacy Tablo tuner (see {@link Tablo}). */
+    static boolean isTablo(JSONObject p) { return p != null && M3U.equals(p.optString("type")) && Tablo.isChannelsUrl(p.optString("url")); }
+
+    static boolean isTunerUrl(String url) { return Hdhr.isLineupUrl(url) || Tablo.isChannelsUrl(url); }
 
     // ------------------------------------------------------------------ M3U
 
@@ -378,7 +387,7 @@ final class Library {
     /** The player pop-up's source line: the playlist's name and what kind of source it is. */
     static String sourceLabel(JSONObject p) {
         if (p == null) return "";
-        if (isHdhr(p)) return "📡 " + Antenna.nameOf(p) + "  ·  HDHomeRun antenna";
+        if (isHdhr(p)) return "📡 " + Antenna.nameOf(p) + "  ·  " + (isTablo(p) ? "Tablo" : "HDHomeRun") + " antenna";
         return nameOf(p) + "  ·  " + (M3U.equals(p.optString("type")) ? "M3U playlist" : "Xtream Codes");
     }
 
@@ -517,21 +526,22 @@ final class Library {
     private final Object hdhrGuideLock = new Object();
 
     /**
-     * A tuner channel's upcoming programmes from SiliconDust's guide (the one the HDHomeRun app shows),
+     * A tuner channel's upcoming programmes from SiliconDust's guide (the one the HDHomeRun app shows), or a
+     * Tablo's own guide,
      * matched by channel number. {@code other} is a saved tuner that isn't active, or null. Call off the UI thread.
      */
     JSONArray hdhrEpg(String lineupUrl, String streamId, int limit, JSONObject other) {
         M3u.Channel c;
         try { c = (other == null ? m3uBlocking() : m3uOf(other)).byId.get(streamId); } catch (Exception e) { return new JSONArray(); }
         if (c == null) return new JSONArray();
-        Map<String, List<Xmltv.Program>> g = hdhrGuide(Hdhr.baseOfLineup(lineupUrl));
+        Map<String, List<Xmltv.Program>> g = hdhrGuide(Hdhr.baseOfLineup(lineupUrl), Tablo.isChannelsUrl(lineupUrl));
         List<Xmltv.Program> progs = g == null ? null : g.get(c.number.isEmpty() ? c.tvgId : c.number);
         if (progs == null || progs.isEmpty()) return new JSONArray();
         return listings(Xmltv.upcoming(progs, System.currentTimeMillis(), Math.max(1, limit)));
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, List<Xmltv.Program>> hdhrGuide(String base) {
+    private Map<String, List<Xmltv.Program>> hdhrGuide(String base, boolean tablo) {
         if (base.isEmpty()) return null;
         synchronized (hdhrGuideLock) {
             long now = System.currentTimeMillis();
@@ -542,7 +552,8 @@ final class Library {
                 if (have[1] == null && age < 5 * 60_000L) return null;
             }
             Map<String, List<Xmltv.Program>> got;
-            try { got = Hdhr.loadGuide(base, 12); } catch (Exception e) { got = null; }
+            // A Tablo keeps its own guide; an HDHomeRun's comes from SiliconDust.
+            try { got = tablo ? Tablo.loadGuide(base, 12) : Hdhr.loadGuide(base, 12); } catch (Exception e) { got = null; }
             if (got == null && have != null && have[1] != null) got = (Map<String, List<Xmltv.Program>>) have[1];
             hdhrGuides.put(base, new Object[]{now, got});
             return got;

@@ -14,9 +14,15 @@ import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.common.Tracks;
 import androidx.media3.common.util.UnstableApi;
+import android.net.Uri;
+
+import java.io.IOException;
+
+import androidx.media3.datasource.DataSource;
 import androidx.media3.datasource.DefaultDataSource;
 import androidx.media3.datasource.DefaultHttpDataSource;
 import androidx.media3.datasource.HttpDataSource;
+import androidx.media3.datasource.ResolvingDataSource;
 import androidx.media3.exoplayer.DefaultLoadControl;
 import androidx.media3.exoplayer.DefaultRenderersFactory;
 import androidx.media3.exoplayer.ExoPlaybackException;
@@ -100,9 +106,31 @@ final class Players {
                 .setPrioritizeTimeOverSizeThresholds(true)
                 .build();
         return new ExoPlayer.Builder(c, renderers)
-                .setMediaSourceFactory(new DefaultMediaSourceFactory(new DefaultDataSource.Factory(c, http), liveExtractors()))
+                .setMediaSourceFactory(new DefaultMediaSourceFactory(tabloResolving(new DefaultDataSource.Factory(c, http)), liveExtractors()))
                 .setLoadControl(load)
                 .build();
+    }
+
+    /**
+     * A legacy Tablo channel's playlist link is a stand-in (…/guide/channels/ID/watch.m3u8): as the player opens it, ask
+     * the Tablo to tune the channel and read its real HLS link instead. Every other link passes through unchanged.
+     */
+    static DataSource.Factory tabloResolving(DataSource.Factory upstream) {
+        return new ResolvingDataSource.Factory(upstream, spec -> {
+            String u = spec.uri.toString();
+            if (!Tablo.isWatchUrl(u)) return spec;
+            try { return spec.withUri(Uri.parse(Tablo.resolveWatch(u))); }
+            catch (IOException e) { throw e; }
+            catch (Exception e) { throw new IOException(new TabloTuneException(e)); }
+        });
+    }
+
+    /** Tuning a Tablo channel failed; its message is shown to the person. */
+    static final class TabloTuneException extends Exception {
+        TabloTuneException(Exception cause) {
+            super(cause instanceof Tablo.LockedException ? Tablo.LOCKED
+                    : "The Tablo couldn't tune this channel (" + cause.getMessage() + "). All of its tuners may be in use, or it may be off.", cause);
+        }
     }
 
     /**
@@ -182,6 +210,7 @@ final class Players {
     }
 
     static String tunerMessage(PlaybackException error) {
+        for (Throwable x = error; x != null; x = x.getCause()) if (x instanceof TabloTuneException) return x.getMessage();
         Throwable t = error;
         while (t != null && !(t instanceof HttpDataSource.InvalidResponseCodeException)) t = t.getCause();
         if (t != null) {

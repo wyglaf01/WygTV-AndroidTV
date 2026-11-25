@@ -9,7 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * HDHomeRun tuners as a category. A tuner is added in Settings and saved like a playlist (see {@link Hdhr}),
+ * Antenna tuners (HDHomeRun, or a legacy Tablo: see {@link Tablo}) as a category. A tuner is added in Settings and saved like a playlist (see {@link Hdhr}),
  * but it shows in Live TV as its own category, "📡 Antenna TV" (or the name you give the tuner), next to Favorites and your categories, instead
  * of in the playlist list. Its channels play the same way a favorite from another playlist does: the tuner
  * becomes the active source while it plays, and Home, Movies and Series switch back to your main playlist.
@@ -46,6 +46,9 @@ final class Antenna {
         return t.substring(0, 1).toUpperCase(java.util.Locale.getDefault()) + t.substring(1); // "local" shows as "Local"
     }
 
+    /** "HDHomeRun" or "Tablo": the kind of tuner, for messages. */
+    static String kindOf(JSONObject tuner) { return Library.isTablo(tuner) ? "Tablo" : "HDHomeRun"; }
+
     /** "📡 Antenna TV", or whatever name the tuner was given. */
     static String label(MainActivity a, JSONObject tuner) {
         return "📡 " + nameOf(tuner);
@@ -69,7 +72,7 @@ final class Antenna {
             a.runOnUiThread(() -> {
                 if (a.isFinishing() || a.isDestroyed() || ticket != a.listGeneration) return;
                 if (got == null || got.length() == 0) {
-                    Toast.makeText(a, got == null ? "Couldn't reach the HDHomeRun at " + Menus.hostOf(tuner.optString("url")) + ". Showing all channels."
+                    Toast.makeText(a, got == null ? "Couldn't reach the " + kindOf(tuner) + " at " + Menus.hostOf(tuner.optString("url")) + ". Showing all channels."
                             : nameOf(tuner) + " has no channels. Showing all channels.", Toast.LENGTH_LONG).show();
                     a.showGuide("all", focusId, false);
                     return;
@@ -98,8 +101,8 @@ final class Antenna {
                 if (a.isFinishing() || a.isDestroyed() || ticket != a.listGeneration) return;
                 a.updateStatus();
                 if (got == null) {
-                    Menus.alert(a, "Couldn't reach the HDHomeRun at " + Menus.hostOf(tuner.optString("url"))
-                            + ". Check it's on, or change its address in Settings > HDHomeRun antenna TV.");
+                    Menus.alert(a, "Couldn't reach the " + kindOf(tuner) + " at " + Menus.hostOf(tuner.optString("url"))
+                            + ". Check it's on, or change its address in Settings > " + kindOf(tuner) + " antenna TV.");
                     a.items = new JSONArray();
                 } else a.items = got;
                 a.showItems();
