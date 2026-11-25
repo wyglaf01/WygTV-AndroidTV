@@ -70,6 +70,50 @@ final class TvRemote {
     TvRemote(MainActivity a) { this.a = a; }
 
     String currentId() { return id; }
+    String currentType() { return type; }
+    String currentExt() { return ext; }
+    String currentTitle() { return title; }
+    /** The channel list CH+/CH- walks through (null for movies and episodes). */
+    JSONArray currentList() { return zapList; }
+    PlayerView currentView() { return view; }
+
+    /** Picture-in-picture: no banner, number box, Up next or playback controls in the small window. */
+    void pictureInPicture(boolean in) {
+        if (view == null) return;
+        if (in) {
+            ui.removeCallbacksAndMessages(null);
+            view.hideController();
+            view.setUseController(false);
+            if (banner != null) banner.setVisibility(View.GONE);
+            if (numberBox != null) numberBox.setVisibility(View.GONE);
+            if (upNext != null) upNext.setVisibility(View.GONE);
+            typed = "";
+        } else {
+            view.setUseController(true);
+            if (isLive()) view.setControllerAutoShow(false);
+            view.requestFocus();
+        }
+    }
+
+    /** The player menu's window choices: the in-app mini player, and picture-in-picture where the device has it. */
+    private String[] windowItems() {
+        return Pip.supported(a) ? new String[]{"▣  Mini player (keep watching while you browse)", "⧉  Picture-in-picture (keep watching outside " + Brand.NAME + ")"}
+                : new String[]{"▣  Mini player (keep watching while you browse)"};
+    }
+
+    private static String[] join(String[] first, String[] then) {
+        String[] out = new String[first.length + then.length];
+        System.arraycopy(first, 0, out, 0, first.length);
+        System.arraycopy(then, 0, out, first.length, then.length);
+        return out;
+    }
+
+    /** True (and done) when a player-menu pick was a window choice. */
+    private boolean windowPick(String pick) {
+        if (pick.startsWith("▣")) { MiniPlayer.shrink(a); return true; }
+        if (pick.startsWith("⧉")) { if (!Pip.enter(a)) toast("Picture-in-picture isn't available on this device."); return true; }
+        return false;
+    }
 
     // ---------------------------------------------------------------- player screen
 
@@ -287,6 +331,9 @@ final class TvRemote {
                 return isLive();
             case KeyEvent.KEYCODE_MENU:
                 if (down) playerMenu();
+                return true;
+            case KeyEvent.KEYCODE_WINDOW: // the Window / PiP key some remotes have: shrink to the mini player
+                if (down && e.getRepeatCount() == 0) MiniPlayer.shrink(a);
                 return true;
             case KeyEvent.KEYCODE_CAPTIONS:
                 if (down && e.getRepeatCount() == 0 && a.subs != null) a.subs.toggle();
@@ -531,8 +578,11 @@ final class TvRemote {
             String[] items = {mine ? "Remove from My List" : "Add to My List", subtitlesItem(), "Exit player"};
             if (next != null) items = new String[]{"▶  Play next episode   " + next, items[0], items[1], items[2]};
             final int shift = next != null ? 1 : 0;
+            final String[] base = items, windows = windowItems();
             new Dialogs.Builder(a).setTitle(title)
-                    .setItems(items, (d, which) -> {
+                    .setItems(join(windows, base), (d, picked) -> {
+                        if (picked < windows.length) { windowPick(windows[picked]); return; }
+                        int which = picked - windows.length;
                         if (shift == 1 && which == 0) { Episodes.playNext(a); return; }
                         int w = which - shift;
                         if (w == 0) { if (!listId.isEmpty()) toast(a.toggleMyList(listType, listItem) ? "Added to My List" : "Removed from My List"); }
@@ -542,8 +592,11 @@ final class TvRemote {
             return;
         }
         boolean fav = a.isFavorite("live", id);
+        final String[] windows = windowItems();
         new Dialogs.Builder(a).setTitle(title)
-                .setItems(new String[]{fav ? "Remove from Favorites" : "Add to Favorites", subtitlesItem(), "What's on (program guide)", "TV guide", "Channel list", "Exit player"}, (d, w) -> {
+                .setItems(join(windows, new String[]{fav ? "Remove from Favorites" : "Add to Favorites", subtitlesItem(), "What's on (program guide)", "TV guide", "Channel list", "Exit player"}), (d, picked) -> {
+                    if (picked < windows.length) { windowPick(windows[picked]); return; }
+                    int w = picked - windows.length;
                     if (w == 0) toast(a.toggleFavorite("live", id, title, ext) ? "Added to Favorites" : "Removed from Favorites");
                     else if (w == 1) { if (a.subs != null) a.subs.choose(); }
                     else if (w == 2) a.guide(id, title);
