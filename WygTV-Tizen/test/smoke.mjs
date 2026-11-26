@@ -462,12 +462,13 @@ try {
   // ---------------------------------------------------------------- typing on a phone: QR code → phone page → encrypted relay → TV
   {
     const { page: tv, errors } = await open('', true);
+    // (Matched by host: older Playwright globs miss URLs with a query string, like the TV's ?since=.)
     // A stand-in for ntfy.sh: the phone's POST is kept, and the TV's listening request gets it (or ends after a
     // moment, as a quiet relay connection would, and the TV listens again).
     const relay = { posted: [], trace: [] };
     const warns = [];
     tv.on('console', (m) => { if (m.type() === 'warning' || m.type() === 'error') warns.push(m.text().slice(0, 120)); });
-    await tv.route('https://ntfy.sh/**', async (route) => {
+    await tv.route((u) => u.hostname === 'ntfy.sh', async (route) => {
       const topic = new URL(route.request().url()).pathname.split('/')[1];
       let msg = relay.posted.find((p) => p.topic === topic);
       if (!msg) { await new Promise((r) => setTimeout(r, 700)); msg = relay.posted.find((p) => p.topic === topic); }
@@ -496,7 +497,7 @@ try {
 
     // The phone: open the page the QR code points to, type, and send.
     const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true });
-    await phone.route('https://ntfy.sh/**', async (route) => {
+    await phone.route((u) => u.hostname === 'ntfy.sh', async (route) => {
       const topic = new URL(route.request().url()).pathname.split('/')[1];
       relay.posted.push({ topic, body: route.request().postData() || '' });
       await route.fulfill({ status: 200, headers: { 'Access-Control-Allow-Origin': '*' }, body: '{}' });
