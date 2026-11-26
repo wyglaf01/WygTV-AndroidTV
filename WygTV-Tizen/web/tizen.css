@@ -1,0 +1,2 @@
+/* WygTV on a Samsung TV: the mini player sized for a TV across the room (older TVs lack aspect-ratio). */
+#player.mini { width: 26vw; height: calc(26vw * 9 / 16); }
