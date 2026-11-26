@@ -79,7 +79,8 @@ async function open(query, playlist, page) {
         seekTo(ms, ok) { t = ms; log.push(['seek', ms]); if (ok) ok(); },
         suspend() { log.push(['suspend']); }, restore() { log.push(['restore']); },
       };
-      window.webapis = { avplay: A };
+      const productinfo = { getRealModel: () => 'QN55Q80T', getModel: () => '20_KANTSU2E_QTV', getFirmware: () => 'T-KSU2EAKUC-1500.2', isUdPanelSupported: () => true };
+      window.webapis = { avplay: A, productinfo };
     }
     // The TV's key service: which keys exist, and which the app registered.
     const SUPPORTED = { 0: 48, 1: 49, 2: 50, 3: 51, 4: 52, 5: 53, 6: 54, 7: 55, 8: 56, 9: 57, Minus: 189, ChannelUp: 427, ChannelDown: 428,
@@ -90,7 +91,7 @@ async function open(query, playlist, page) {
       getSupportedKeys: () => Object.entries(SUPPORTED).map(([name, code]) => ({ name, code })),
       registerKey: (n) => { window.__registered.push(n); },
     };
-    window.tizen = { tvinputdevice, application: { getAppInfo: () => ({ version: '1.0.42' }), getCurrentApplication: () => ({ exit() { window.__exited = true; } }) } };
+    window.tizen = { tvinputdevice, systeminfo: { getCapability: (k) => (/platform\.version/.test(k) ? '5.5' : '') }, application: { getAppInfo: () => ({ version: '1.0.42' }), getCurrentApplication: () => ({ exit() { window.__exited = true; } }) } };
     // Only the first time: reloads keep what the app saved, as on a TV.
     if (pl && !localStorage.getItem('wyg.settings')) localStorage.setItem('wyg.settings', JSON.stringify({ playlists: [{ id: 'demo', type: 'm3u', name: 'Demo', url: b + 'demo.m3u', epgUrl: b + 'guide.xml.gz' }] }));
   }, [playlist, base]);
@@ -368,6 +369,33 @@ try {
     check(JSON.stringify(last(l, 'silent')) === JSON.stringify(['silent', true]) && await page.evaluate(() => document.querySelector('.player-subs').hidden), 'CC again turns them off');
 
     check(errors.length === 0, `phase 4: no script errors ${errors.length ? JSON.stringify(errors.slice(0, 3)) : ''}`);
+    await page.close();
+  }
+
+  // ---------------------------------------------------------------- phase 6: Diagnostics, for reporting problems from a TV
+  {
+    const { page, errors } = await open('?avplay=1', true);
+    // A broken stream and a warning that carries a playlist login: both should be listed, the login masked.
+    await page.evaluate(() => {
+      console.warn('player', 'hls', 'http://example.com:8080/live/alice/secretpass/123.m3u8 failed');
+      console.warn('m3u', 'http://example.com/get.php?username=alice&password=secretpass&type=m3u');
+      W.player.play({ kind: 'live', key: 'x|fail', name: 'Broken', url: 'http://127.0.0.1:1/fail.ts' }, { full: false });
+    });
+    await page.waitForTimeout(1200);
+    await page.evaluate(() => { W.player.stop(); W.go('settings', { section: 'about' }); });
+    await page.waitForTimeout(300);
+    const has = await page.evaluate(() => [...document.querySelectorAll('.button')].some((b) => /Diagnostics/.test(b.textContent)));
+    check(has, 'Settings → About has a Diagnostics button on the TV');
+    await page.evaluate(() => [...document.querySelectorAll('.button')].find((b) => /Diagnostics/.test(b.textContent)).click());
+    await page.waitForSelector('.dialog.menu.wide');
+    const text = await page.evaluate(() => document.querySelector('.dialog.menu.wide .dialog-text').innerText);
+    fs.writeFileSync(path.join(shots, 'diagnostics.txt'), text);
+    await page.screenshot({ path: path.join(shots, 'diagnostics.png') });
+    check(/WygTV 1\.0\.42 · Samsung TV QN55Q80T/.test(text) && /Firmware T-KSU2EAKUC-1500\.2 · Tizen 5\.5 · web engine Chrome \d+/.test(text), 'Diagnostics names the app, the TV, its firmware and Tizen version');
+    check(/Player: AVPlay · remote keys registered: \d+/.test(text) && /Playlists: m3u/.test(text), 'Diagnostics shows the player, the remote keys and the playlists');
+    check(/PLAYER_ERROR_CONNECTION_FAILED/.test(text) && /Recent problems/.test(text), 'Diagnostics lists the broken stream');
+    check(!/secretpass|alice/.test(text) && /\/live\/…\/…\//.test(text) && /password=…/.test(text), 'playlist logins are masked in Diagnostics');
+    check(errors.length === 0, `phase 6: no script errors ${errors.length ? JSON.stringify(errors.slice(0, 3)) : ''}`);
     await page.close();
   }
 

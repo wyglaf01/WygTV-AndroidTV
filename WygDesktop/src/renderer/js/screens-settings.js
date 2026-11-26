@@ -274,7 +274,9 @@
           h('div', { class: 'about maker' }, h('img', { src: 'assets/wyglaf.png', alt: 'Wyglaf' }), h('div', null, h('div', { class: 'brand' }, 'Made by Wyglaf'), h('div', { class: 'set-sub' }, 'The person behind WygTV.'))),
           h('div', { class: 'set-buttons' },
             W.isTV ? null : btn({ class: 'button primary', onclick: () => W.checkUpdates(true) }, '⟳ Check for updates'),
-            W.isIOS ? null : btn({ class: 'button', onclick: () => W.api.win.quit() }, '⏻ Quit')),
+            W.isIOS ? null : btn({ class: 'button', onclick: () => W.api.win.quit() }, '⏻ Quit'),
+            // Samsung TVs: the TV, its software and WygTV's recent errors, for reporting problems.
+            W.isTV && W.api.diag ? btn({ class: 'button', onclick: () => W.menu('Diagnostics', [{ label: 'OK' }], { text: W.api.diag.report(), wide: true }) }, '🛠 Diagnostics') : null),
         ];
       },
     },

@@ -15,3 +15,6 @@ html.av-full #backdrop, html.av-full #screen { visibility: hidden; }
 
 /* A channel number typed with the remote outside the player (tizen-bridge.js). */
 .tv-num { position: fixed; top: 30px; right: 40px; z-index: 50; font-size: 56px; font-weight: 700; color: var(--accent, #c9a14a); text-shadow: 0 2px 12px #000; pointer-events: none; }
+
+/* Settings → About → Diagnostics: one fact per line, small enough to fit on one screen for a photo. */
+html.tizen .dialog.menu.wide .dialog-text { white-space: pre-line; font-size: 16px; line-height: 1.45; max-width: 1400px; }

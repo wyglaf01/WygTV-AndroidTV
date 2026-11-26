@@ -19,6 +19,26 @@
  * the TV Guide, Search and Settings, and typing a channel number anywhere tunes it.
  */
 (function () {
+  // ------------------------------------------------------------------ recent problems, for Settings → About → Diagnostics
+  const problems = [];
+  const note = (kind, text) => {
+    // People photograph this to report problems: playlist logins in stream addresses are masked.
+    const clean = String(text).replace(/\s+/g, ' ')
+      .replace(/\b(username|password|user|pass|token)=[^&\s]+/gi, '$1=…')
+      .replace(/\/(live|movie|series|timeshift)\/[^/\s]+\/[^/\s]+\//gi, '/$1/…/…/');
+    problems.push(new Date().toTimeString().slice(0, 8) + ' ' + kind + ': ' + clean.slice(0, 160));
+    if (problems.length > 12) problems.shift();
+  };
+  window.addEventListener('error', (e) => note('error', (e.message || e.error) + (e.filename ? ' (' + e.filename.split('/').pop() + ':' + e.lineno + ')' : '')));
+  window.addEventListener('unhandledrejection', (e) => note('promise', e.reason && (e.reason.message || e.reason)));
+  for (const level of ['error', 'warn']) {
+    const orig = console[level];
+    console[level] = function () {
+      note(level, Array.prototype.map.call(arguments, (a) => (a && a.message) || (typeof a === 'object' ? JSON.stringify(a) : a)).join(' '));
+      return orig.apply(console, arguments);
+    };
+  }
+
   const req = window.__wygRequire;
   const tz = window.tizen || null;
   const BRAND = 'WygTV';
@@ -252,6 +272,28 @@
   function tvModel() {
     try { return window.webapis && webapis.productinfo ? webapis.productinfo.getRealModel() : ''; } catch (e) { return ''; }
   }
+  /** The TV, its software and WygTV's state as plain text (Settings → About → Diagnostics; photograph it to report a problem). */
+  function diagnostics() {
+    const pi = window.webapis && webapis.productinfo;
+    const get = (fn) => { try { const v = fn(); return v == null || v === '' ? '?' : String(v); } catch (e) { return '?'; } };
+    const cap = (k) => get(() => tz.systeminfo.getCapability(k));
+    const chrome = (navigator.userAgent.match(/Chrome\/([\d.]+)/) || [])[1] || '?';
+    const cls = document.documentElement.className;
+    const lists = (W.settings && W.settings.playlists) || [];
+    const guide = (W.guide && W.guide.status) || {};
+    const lines = [
+      'WygTV ' + appVersion() + ' · Samsung TV ' + get(() => pi.getRealModel()) + ' (' + get(() => pi.getModel()) + ')',
+      'Firmware ' + get(() => pi.getFirmware()) + ' · Tizen ' + cap('http://tizen.org/feature/platform.version') + ' · web engine Chrome ' + chrome,
+      'Screen ' + window.innerWidth + '×' + window.innerHeight + ' at ' + (window.devicePixelRatio || 1) + '× · 4K panel: ' + get(() => pi.isUdPanelSupported()),
+      '2020-TV fallbacks: ' + ((/no-flex-gap|no-aspect-ratio/.test(cls) ? cls.split(' ').filter((c) => /^no-/.test(c)).join(', ') : 'none needed')),
+      'Player: ' + (window.wygAvVideo ? 'AVPlay' : 'none (not on a TV)') + ' · remote keys registered: ' + Object.keys(byCode).length,
+      'Playlists: ' + (lists.map((p) => p.type).join(', ') || 'none') + ' · guides: ' + Object.keys(guide).map((u) => (guide[u].channels || 0) + (guide[u].error ? ' (' + guide[u].error.slice(0, 40) + ')' : '')).join(', '),
+      '',
+      problems.length ? 'Recent problems:\n' + problems.join('\n') : 'No problems recorded since WygTV started.',
+    ];
+    return lines.join('\n');
+  }
+
   function exitApp() {
     try { tz.application.getCurrentApplication().exit(); } catch (e) { window.close(); }
   }
@@ -374,6 +416,7 @@
     ext: { play: no('Samsung TVs have no external players.'), pick: () => ok('') },
     file: { save: fileSave, open: fileOpen },
     // The TV app is installed from a computer (or, later, the Samsung store), so there is nothing to check here.
+    diag: { report: diagnostics },
     update: { check: () => ok({ current: appVersion(), latest: appVersion(), available: false, kind: 'tizen' }), install: no('Updates are installed from a computer.') },
   };
   window.wyg = api;
