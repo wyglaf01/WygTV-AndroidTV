@@ -83,8 +83,9 @@ jobs:
           else
             echo "::warning::The Samsung certificate secrets aren't set, so WygTV.wgt is signed with a test certificate that Samsung TVs refuse. See .github/workflows/tizen.yml."
           fi
+          set -o pipefail
           scripts/sign.sh | tee "$RUNNER_TEMP/sign.log"
-          tail -1 "$RUNNER_TEMP/sign.log" >> "$GITHUB_OUTPUT"
+          grep '^signed-with=' "$RUNNER_TEMP/sign.log" >> "$GITHUB_OUTPUT"
           rm -f "$RUNNER_TEMP/author.p12" "$RUNNER_TEMP/distributor.p12"
 
       - name: Keep WygTV.wgt

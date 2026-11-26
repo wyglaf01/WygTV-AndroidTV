@@ -19,6 +19,8 @@ DATA="${TIZEN_DATA:-$HOME/tizen-studio-data}"
 [ -f www/config.xml ] || { echo "Build www/ first: npm run build" >&2; exit 1; }
 
 PROFILE=wygtv-sign
+# Where `tizen package` looks for signing profiles (Tizen Studio's GUI sets this; the command line doesn't).
+"$TIZEN" cli-config "profiles.path=$DATA/profile/profiles.xml" >/dev/null
 "$TIZEN" security-profiles remove -n "$PROFILE" >/dev/null 2>&1 || true
 if [ -n "${TIZEN_AUTHOR_P12:-}" ] && [ -n "${TIZEN_DISTRIBUTOR_P12:-}" ]; then
   KIND=samsung
@@ -36,8 +38,13 @@ fi
 # Package from a clean copy, so nothing but the app goes in.
 rm -rf dist && mkdir -p dist/app
 cp -r www/. dist/app/
-"$TIZEN" package -t wgt -s "$PROFILE" -- "$PWD/dist/app"
-WGT=$(ls dist/app/*.wgt | head -1)
+if ! "$TIZEN" package -t wgt -s "$PROFILE" -- "$PWD/dist/app"; then
+  echo "--- end of $DATA/cli/logs/cli.log ---" >&2
+  tail -40 "$DATA/cli/logs/cli.log" >&2 || true
+  exit 1
+fi
+WGT=$(ls dist/app/*.wgt 2>/dev/null | head -1)
+[ -n "$WGT" ] || { echo "tizen package made no .wgt" >&2; exit 1; }
 mv "$WGT" dist/WygTV.wgt
 rm -rf dist/app
 
