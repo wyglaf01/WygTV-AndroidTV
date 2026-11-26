@@ -1,0 +1,7 @@
+/* WygTV for Samsung TVs: small changes on top of WygDesktop's styles.css (loaded after it). */
+
+/* Chromium 69 ignores `scrollbar-width: none`; hide those scrollbars the older way. */
+html.tizen .strip::-webkit-scrollbar { display: none; }
+
+/* Samsung remotes have no mouse pointer on most screens; never leave an arrow over the picture. */
+html.tizen #player.full { cursor: none; }

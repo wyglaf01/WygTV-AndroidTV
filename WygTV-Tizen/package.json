@@ -1,0 +1,21 @@
+{
+  "name": "wygtv-tizen",
+  "version": "1.0.0",
+  "private": true,
+  "description": "WygTV for Samsung Smart TVs (Tizen 5.5 and newer): the WygDesktop screens in a Tizen TV web app",
+  "author": "Eddie <wyglaf01@users.noreply.github.com>",
+  "license": "MIT",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node scripts/build.mjs && node --test test/*.test.mjs",
+    "smoke": "node scripts/build.mjs && node test/smoke.mjs"
+  },
+  "dependencies": {
+    "hls.js": "1.5.20",
+    "mpegts.js": "1.8.0"
+  },
+  "devDependencies": {
+    "acorn": "8.14.0",
+    "esbuild": "0.24.2"
+  }
+}

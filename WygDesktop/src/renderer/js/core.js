@@ -148,6 +148,8 @@ W.brand = (W.api && W.api.brand) || 'WygDesktop';
 W.isMac = !!(W.api && W.api.platform === 'darwin');
 // WygTV-iOS (iPhone and iPad) runs this same screen code; it has no FFmpeg and hands hard streams to VLC.
 W.isIOS = !!(W.api && W.api.platform === 'ios');
+// WygTV for Samsung Smart TVs (WygTV-Tizen) runs this same screen code too, driven by the TV remote.
+W.isTV = !!(W.api && W.api.platform === 'tizen');
 /** A touch screen is present (Windows / Linux touch PCs, iPhone, iPad): tap, touch and hold, swipe back all work. */
 W.touchScreen = W.isIOS || (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0);
 W.extLabel = W.isIOS ? 'VLC' : 'VLC / mpv';
