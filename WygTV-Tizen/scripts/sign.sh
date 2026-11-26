@@ -19,21 +19,43 @@ DATA="${TIZEN_DATA:-$HOME/tizen-studio-data}"
 [ -f www/config.xml ] || { echo "Build www/ first: npm run build" >&2; exit 1; }
 
 PROFILE=wygtv-sign
+PROFILES="$DATA/profile/profiles.xml"
+# The profile ends up holding plain passwords (below), so it never outlives this script.
+trap '"$TIZEN" security-profiles remove -n "$PROFILE" >/dev/null 2>&1 || true' EXIT
 # Where `tizen package` looks for signing profiles (Tizen Studio's GUI sets this; the command line doesn't).
-"$TIZEN" cli-config "profiles.path=$DATA/profile/profiles.xml" >/dev/null
+"$TIZEN" cli-config "profiles.path=$PROFILES" >/dev/null
 "$TIZEN" security-profiles remove -n "$PROFILE" >/dev/null 2>&1 || true
 if [ -n "${TIZEN_AUTHOR_P12:-}" ] && [ -n "${TIZEN_DISTRIBUTOR_P12:-}" ]; then
   KIND=samsung
+  AUTHOR_PW="${TIZEN_AUTHOR_PASSWORD:-}"
+  DIST_PW="${TIZEN_DISTRIBUTOR_PASSWORD:-}"
   "$TIZEN" security-profiles add -n "$PROFILE" \
     -a "$TIZEN_AUTHOR_P12" -p "${TIZEN_AUTHOR_PASSWORD:-}" \
     -d "$TIZEN_DISTRIBUTOR_P12" -dp "${TIZEN_DISTRIBUTOR_PASSWORD:-}"
 else
   KIND=test
   PW="wygtv-test-$RANDOM$RANDOM"
+  AUTHOR_PW="$PW"
+  DIST_PW=tizenpkcs12passfordsigner # Tizen's own test distributor certificate (published with Tizen Studio)
   rm -f "$DATA/keystore/author/wygtv-test.p12"
   "$TIZEN" certificate -a wygtv-test -p "$PW" -c US -n "WygTV test" -f wygtv-test
   "$TIZEN" security-profiles add -n "$PROFILE" -a "$DATA/keystore/author/wygtv-test.p12" -p "$PW"
 fi
+
+# Tizen's command line keeps the passwords in files encrypted with the desktop keyring, which a server (or a
+# GitHub runner) doesn't have, so `tizen package` then fails with "Invaild password". Put them in the profile
+# instead: distributor="0" is the author certificate, distributor="1" the distributor certificate.
+AUTHOR_PW="$AUTHOR_PW" DIST_PW="$DIST_PW" python3 - "$PROFILES" "$PROFILE" <<'PY'
+import os, sys, xml.etree.ElementTree as ET
+path, name = sys.argv[1], sys.argv[2]
+tree = ET.parse(path)
+prof = next(p for p in tree.getroot().iter('profile') if p.get('name') == name)
+pw = {'0': os.environ['AUTHOR_PW'], '1': os.environ['DIST_PW']}
+for item in prof.iter('profileitem'):
+    if item.get('distributor') in pw and item.get('key'):
+        item.set('password', pw[item.get('distributor')])
+tree.write(path, encoding='UTF-8', xml_declaration=True)
+PY
 
 # Package from a clean copy, so nothing but the app goes in.
 rm -rf dist && mkdir -p dist/app
