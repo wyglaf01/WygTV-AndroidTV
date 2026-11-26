@@ -8,17 +8,25 @@
  * Add ?legacy=1 to the page address (or set localStorage wyg.legacy = 1) to try both on a newer browser.
  */
 (function () {
-  // How big everything is drawn on the TV (Settings → Appearance → Size of text and menus). The page is laid out
-  // narrower than the 1920-pixel screen and the TV scales it up, so text, buttons and spacing all grow together:
-  // xlarge lays out 1097 wide (1.75×), large 1280 (1.5×, the usual size for TV apps and the default), medium 1536
-  // (1.25×), small 1920 (as on a computer).
-  const SIZES = { xlarge: 1097, large: 1280, medium: 1536, small: 1920 };
+  // How big everything is drawn on the TV (Settings → Appearance → Size of text and menus). WygTV lays the app
+  // out smaller than the screen and magnifies it (html.tv-zoom in tizen.css: #app at 1/z of the screen, scaled
+  // z×), so text, buttons and spacing all grow together, the same on every TV (some TVs ignore a page's viewport
+  // width) and without reloading when the size changes: xlarge 1.75× (laid out 1097 wide), large 1.5× (1280, the
+  // usual size for TV apps and the default), medium 1.25× (1536), small 1× (1920, as on a computer).
+  const ZOOM = { xlarge: 1.75, large: 1.5, medium: 1.25, small: 1 };
   let tvSize = 'large';
   try { tvSize = JSON.parse(localStorage.getItem('wyg.tvSize') || '"large"'); } catch (e) { }
-  if (!SIZES[tvSize]) tvSize = 'large';
-  const vp = document.querySelector('meta[name=viewport]');
-  if (vp) vp.setAttribute('content', 'width=' + SIZES[tvSize] + ', user-scalable=no');
-  window.__wygTvSize = tvSize;
+  window.__wygTvApply = function (size) {
+    if (!ZOOM[size]) size = 'large';
+    const z = ZOOM[size], r = document.documentElement;
+    r.classList.toggle('tv-zoom', z !== 1);
+    r.style.setProperty('--tvz', String(z));
+    window.__wygTvSize = size;
+    window.__wygTvZoom = z;
+    // The layout changed size: let screens that measure themselves (the guide, the player's place) catch up.
+    try { window.dispatchEvent(new Event('resize')); } catch (e) { }
+  };
+  window.__wygTvApply(tvSize);
 
   // [selector, width ÷ height] from styles.css in stylesheet order; 0 means `aspect-ratio: auto`. Filled in by the build.
   const ASPECT = /*@ASPECT@*/[];
