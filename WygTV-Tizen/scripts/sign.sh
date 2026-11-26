@@ -75,6 +75,8 @@ LIST=$(unzip -Z1 dist/WygTV.wgt)
 for f in author-signature.xml signature1.xml config.xml index.html js/tizen-bridge.js; do
   grep -qx "$f" <<<"$LIST" || { echo "dist/WygTV.wgt has no $f" >&2; exit 1; }
 done
+# …and never a certificate or a password.
+if grep -qiE '\.(p12|pfx|pwd|jks)$|profiles\.xml$' <<<"$LIST"; then echo "dist/WygTV.wgt contains certificate files" >&2; exit 1; fi
 VERSION=$(grep -o 'version="1\.0\.[0-9]*"' www/config.xml | head -1 | cut -d'"' -f2)
 echo "{\"version\": \"$VERSION\", \"signedWith\": \"$KIND\"}" > dist/tizen-version.json
 echo "dist/WygTV.wgt: WygTV $VERSION, $(du -h dist/WygTV.wgt | cut -f1), signed with the $KIND certificate"
