@@ -9,10 +9,10 @@ https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_exam
 #EXTINF:-1 tvg-id="demo.bbb" tvg-chno="3" group-title="Demo channels",Big Buck Bunny (CC BY, Blender Foundation)
 https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8
 #EXTINF:-1 tvg-id="demo.sintel" tvg-chno="4" group-title="Demo channels",Sintel (CC BY, Blender Foundation)
-https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8
+https://bitmovin-a.akamaihd.net/content/sintel/hls/playlist.m3u8
 #EXTINF:-1 tvg-id="demo.tos" tvg-chno="5" group-title="Demo channels",Tears of Steel (CC BY, Blender Foundation)
 https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8
-#EXTINF:-1 tvg-logo="https://storage.googleapis.com/gtv-videos-bucket/sample/images/BigBuckBunny.jpg" group-title="Demo movies",Big Buck Bunny (movie file, CC BY)
-https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4
-#EXTINF:-1 tvg-logo="https://storage.googleapis.com/gtv-videos-bucket/sample/images/ElephantsDream.jpg" group-title="Demo movies",Elephants Dream (movie file, CC BY)
-https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4
+#EXTINF:-1 tvg-logo="https://wyglaf01.github.io/WygTV-AndroidTV/img/demo/sintel-trailer.png" group-title="Demo movies",Sintel trailer (movie file, CC BY)
+https://download.blender.org/durian/trailer/sintel_trailer-720p.mp4
+#EXTINF:-1 tvg-logo="https://wyglaf01.github.io/WygTV-AndroidTV/img/demo/big-buck-bunny.png" group-title="Demo movies",Big Buck Bunny (movie file, CC BY)
+https://download.blender.org/peach/bigbuckbunny_movies/BigBuckBunny_320x180.mp4

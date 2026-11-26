@@ -74,7 +74,7 @@ Seller Office asks how to test the app. WygTV needs something to play, so give t
 > 2. Playlist link: `https://wyglaf01.github.io/WygTV-AndroidTV/demo.m3u` (Name and TV guide can stay empty).
 > 3. **Live TV** lists 5 demo channels: OK plays a channel in the preview, OK again plays it full screen,
 >    CH ▲▼ change channel, number keys 1–5 tune a channel, INFO shows the on-screen bar.
-> 4. **Movies** has 2 films: they play with pause, rewind and fast-forward, and resume where they were stopped.
+> 4. **Movies** has 2 films (the Sintel trailer and Big Buck Bunny): they play with pause, rewind and fast-forward, and resume where they were stopped.
 > 5. Back goes back; Back on Home asks to exit. Colour keys: red Live TV, green TV Guide, yellow Search,
 >    blue Settings.
 >
