@@ -106,6 +106,7 @@ try {
   }
   // ---------------------------------------------------------------- phase 2: gzip guides kept between starts, backups
   {
+    const before = hits.guide;
     const { page, errors } = await open('', true);
     const guideNow = () => page.evaluate(async () => {
       for (let i = 0; i < 40 && !Object.values(W.guide.status || {}).some((s) => s.channels); i++) await new Promise((r) => setTimeout(r, 250));
@@ -113,7 +114,6 @@ try {
       const now = W.guide.nowNext(g['demo|0'] || []).now;
       return { status: W.guide.status, now: now ? now[2] : '' };
     });
-    const before = hits.guide;
     const g1 = await guideNow();
     check(/^Show 1 on 1$/.test(g1.now), `gzip guide streams in and gives what's on now ("${g1.now}")`);
     check(hits.guide === before + 1, 'the guide was downloaded once');
@@ -136,7 +136,7 @@ try {
     check(await page.evaluate(() => !W.settings.userAgent), 'restoring the TV backup brought the old settings back');
 
     // Restore from a link (e.g. a desktop backup put online).
-    await page.evaluate(() => W.restoreBackup());
+    await page.evaluate(() => { W.restoreBackup(); }); // don't wait: it resolves only once a choice is made
     await page.waitForSelector('.menu-item');
     await page.click('.menu-item >> text=web link');
     await page.waitForSelector('.dialog.form input');
