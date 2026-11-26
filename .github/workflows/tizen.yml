@@ -100,7 +100,12 @@ jobs:
             echo "$TIZEN_DISTRIBUTOR_P12_B64" | base64 -d > "$RUNNER_TEMP/distributor.p12"
             export TIZEN_AUTHOR_P12="$RUNNER_TEMP/author.p12" TIZEN_DISTRIBUTOR_P12="$RUNNER_TEMP/distributor.p12"
           else
-            echo "::warning::The Samsung certificate secrets aren't set, so WygTV.wgt is signed with a test certificate that Samsung TVs refuse. See .github/workflows/tizen.yml."
+            # Name exactly which of the four repository secrets this run can't see (never their values).
+            missing=""
+            for n in TIZEN_AUTHOR_P12_B64 TIZEN_AUTHOR_PASSWORD TIZEN_DISTRIBUTOR_P12_B64 TIZEN_DISTRIBUTOR_PASSWORD; do
+              [ -n "${!n}" ] || missing="$missing $n"
+            done
+            echo "::warning::WygTV.wgt is signed with a test certificate that Samsung TVs refuse: this run can't see the repository secrets$missing. Add them under Settings → Secrets and variables → Actions → Repository secrets (not Variables, Environments or Dependabot), with exactly these names. See WygTV-Tizen/README.md."
           fi
           set -o pipefail
           scripts/sign.sh | tee "$RUNNER_TEMP/sign.log"
