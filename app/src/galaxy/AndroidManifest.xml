@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Galaxy Store build (WYGTV_GALAXY=1): the store installs and updates WygTV, so the in-app updater's
+     permission and parts are left out (Galaxy Store doesn't allow apps that update or install apps themselves). -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+ <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" tools:node="remove"/>
+ <application>
+  <receiver android:name=".UpdateResultReceiver" tools:node="remove"/>
+  <receiver android:name=".UpdatedReceiver" tools:node="remove"/>
+  <provider android:name=".ApkProvider" android:authorities="${applicationId}.update" tools:node="remove"/>
+ </application>
+</manifest>
