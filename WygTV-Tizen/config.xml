@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- WygTV for Samsung Smart TVs (Tizen 5.5 and newer: 2020 and later TVs). Built by scripts/build.mjs. -->
+<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" id="http://github.com/wyglaf01/WygTV" version="@VERSION@" viewmodes="maximized">
+  <tizen:application id="WygTVApp01.WygTV" package="WygTVApp01" required_version="5.5"/>
+  <tizen:profile name="tv-samsung"/>
+  <content src="index.html"/>
+  <icon src="icon.png"/>
+  <name>WygTV</name>
+  <author email="wyglaf333@gmail.com" href="https://github.com/wyglaf01/WygTV-AndroidTV">Wyglaf</author>
+  <description>IPTV (Xtream Codes, M3U) and antenna TV (HDHomeRun, Tablo) player with a TV guide.</description>
+  <feature name="http://tizen.org/feature/screen.size.all"/>
+  <!-- Any server: playlists, guides and streams come from the user's own providers and tuners. -->
+  <access origin="*" subdomains="true"/>
+  <tizen:allow-navigation>*</tizen:allow-navigation>
+  <tizen:privilege name="http://tizen.org/privilege/internet"/>
+  <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+  <tizen:setting screen-orientation="landscape" context-menu="disable" background-support="disable" encryption="disable" install-location="auto" hwkey-event="enable"/>
+</widget>

@@ -207,16 +207,16 @@
       label: '▶ Player',
       render() {
         return [
-          btn({ class: 'set-row', onclick: () => { W.settings.autoPip = W.settings.autoPip === false; W.saveSettings(); W.refresh(); } },
+          W.isTV ? null : btn({ class: 'set-row', onclick: () => { W.settings.autoPip = W.settings.autoPip === false; W.saveSettings(); W.refresh(); } },
             h('div', { class: 'set-label' }, 'Picture-in-picture'), h('div', { class: 'set-sub' }, (W.settings.autoPip === false ? 'Off' : 'On') + ': ' + (W.isIOS ? 'leaving the app while something plays keeps it playing in a small window' : 'minimizing the window while something plays keeps it playing in a small window') + '. The player’s ▣ Mini player and ⧉ buttons work either way')),
-          W.isIOS ? null : btn({ class: 'set-row', onclick: () => { W.settings.alwaysConvert = !W.settings.alwaysConvert; W.saveSettings(); W.refresh(); } },
+          W.isIOS || W.isTV ? null : btn({ class: 'set-row', onclick: () => { W.settings.alwaysConvert = !W.settings.alwaysConvert; W.saveSettings(); W.refresh(); } },
             h('div', { class: 'set-label' }, 'Convert every live channel with FFmpeg'), h('div', { class: 'set-sub' }, W.settings.alwaysConvert ? 'On: steadier sound on some services, uses more CPU' : 'Off: only when a channel won’t play directly (recommended)')),
           btn({ class: 'set-row', onclick: async () => {
             const opts = [['auto', 'Automatic'], ['hls', 'HLS (.m3u8)'], ['ts', 'MPEG-TS (.ts)']];
             const i = await W.menu('Xtream live stream format', opts.map(([k, l]) => ({ label: l, checked: (W.settings.liveFormat || 'auto') === k })));
             if (i >= 0) { W.settings.liveFormat = opts[i][0]; W.saveSettings(); savePlaylists().then(() => W.refresh()); }
           } }, h('div', { class: 'set-label' }, 'Xtream live stream format'), h('div', { class: 'set-sub' }, { auto: 'Automatic', hls: 'HLS (.m3u8)', ts: 'MPEG-TS (.ts)' }[W.settings.liveFormat || 'auto'])),
-          btn({ class: 'set-row', onclick: async () => {
+          W.isTV ? null : btn({ class: 'set-row', onclick: async () => {
             const p = await W.api.ext.pick();
             if (p) { W.settings.extPlayer = p; W.saveSettings(); W.refresh(); }
           } }, h('div', { class: 'set-label' }, W.isIOS ? 'External player' : 'External player (VLC or mpv)'), h('div', { class: 'set-sub' }, W.settings.extPlayer || (W.isIOS ? 'VLC' : W.isMac ? 'Not set: VLC (in Applications) is used when installed' : 'Not set: VLC is found automatically when installed'))),

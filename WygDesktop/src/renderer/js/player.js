@@ -242,7 +242,7 @@
       if (item !== it) return;
     }
     if (it.kind === 'live') {
-      if (W.api.noFFmpeg && it.convert) { spinner.hidden = true; showError('Antenna channels need converting, which ' + W.brand + ' can’t do. Open them in VLC instead.'); }
+      if (W.api.noFFmpeg && it.convert) { spinner.hidden = true; showError('Antenna channels need converting, which ' + W.brand + ' can’t do' + (W.isTV ? ' on a TV. Tablo channels, and HDHomeRun channels in H.264, play here.' : '. Open them in VLC instead.')); }
       else if (!W.api.noFFmpeg && (it.convert || W.settings.alwaysConvert)) { attempt = 1; convert(it.convert || 'copy'); }
       else startEngine(it.url);
     } else {
@@ -437,7 +437,7 @@
     }
     if (probeInfo && probeInfo.audio.length > 1) osdButtons.append(b('🔊 Sound', pickAudio));
     osdButtons.append(...[b('🔉 Volume', pickVolume), b('▣ Mini player', () => { P.mini(); }, 'Keep watching in a corner while you browse'),
-      P.pipSupported() ? b('⧉ Picture-in-picture', () => P.pip(), 'Keep watching in a floating window') : null, W.isIOS ? null : b('⛶ Window', () => W.api.win.fullscreen()), b('↗ ' + W.extLabel, P.external), b('✕ Close', () => W.back())].filter(Boolean));
+      P.pipSupported() ? b('⧉ Picture-in-picture', () => P.pip(), 'Keep watching in a floating window') : null, W.isIOS || W.isTV ? null : b('⛶ Window', () => W.api.win.fullscreen()), W.isTV ? null : b('↗ ' + W.extLabel, P.external), b('✕ Close', () => W.back())].filter(Boolean));
     updateNow();
   }
 

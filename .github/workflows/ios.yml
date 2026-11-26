@@ -7,10 +7,10 @@ on:
   workflow_dispatch:
   push:
     branches: [app, "claude/**"]
-    paths: ["WygTV-iOS/**", "WygDesktop/src/renderer/**", "WygDesktop/src/main/m3u.js", "WygDesktop/src/main/xmltv.js", "WygDesktop/src/main/hdhr.js", ".github/workflows/ios.yml"]
+    paths: ["WygTV-iOS/**", "WygDesktop/src/renderer/**", "WygDesktop/src/main/m3u.js", "WygDesktop/src/main/xmltv.js", "WygDesktop/src/main/hdhr.js", "WygDesktop/src/main/tablo.js", ".github/workflows/ios.yml"]
   pull_request:
     branches: [app]
-    paths: ["WygTV-iOS/**", "WygDesktop/src/renderer/**", "WygDesktop/src/main/m3u.js", "WygDesktop/src/main/xmltv.js", "WygDesktop/src/main/hdhr.js", ".github/workflows/ios.yml"]
+    paths: ["WygTV-iOS/**", "WygDesktop/src/renderer/**", "WygDesktop/src/main/m3u.js", "WygDesktop/src/main/xmltv.js", "WygDesktop/src/main/hdhr.js", "WygDesktop/src/main/tablo.js", ".github/workflows/ios.yml"]
 
 jobs:
   build:
