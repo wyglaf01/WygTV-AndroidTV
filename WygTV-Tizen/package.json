@@ -14,7 +14,9 @@
   "dependencies": {
     "fflate": "0.8.2",
     "hls.js": "1.5.20",
-    "mpegts.js": "1.8.0"
+    "mpegts.js": "1.8.0",
+    "qrcode-generator": "1.4.4",
+    "tweetnacl": "1.0.3"
   },
   "devDependencies": {
     "acorn": "8.14.0",

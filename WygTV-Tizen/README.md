@@ -34,6 +34,13 @@ page's viewport width as it loads (Extra large 1097: 1.75×; Large 1280, the def
 1920) and the TV scales the page up to the screen. AVPlay's position is scaled the same way. **Settings →
 Appearance → Size of text and menus** is a toggle: each OK goes to the next size.
 
+**Typing on a phone.** Every form on the TV has **📱 Type on your phone** (`web/tizen-phone.js`): it shows a QR code
+for `docs/send.html` (GitHub Pages), which shows the same fields on the phone. What's typed there is encrypted on
+the phone (tweetnacl secretbox) with a one-time key that only the QR code carries, after "#" in the address so it
+never reaches a server, and sent through the free ntfy.sh relay to that QR code's own random channel; the TV
+decrypts it and fills the form. Passwords are never put in the QR code. Samsung's SmartThings phone app (remote →
+keyboard) also types into WygTV's text boxes.
+
 **2020 TVs** run Chromium 69, which is older than the desktop app's Electron. The build lowers all JavaScript to
 Chrome 69 with esbuild, and `scripts/legacy-css.mjs` adds fallbacks for CSS that Chromium 69 lacks: flex `gap`,
 `aspect-ratio`, `min()` and `:has()`. `web/tizen-legacy.js` switches them on only when the TV needs them, so

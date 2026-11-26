@@ -14,5 +14,5 @@ https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_
 https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8
 #EXTINF:-1 tvg-logo="https://wyglaf01.github.io/WygTV-AndroidTV/img/demo/sintel-trailer.png" group-title="Demo movies",Sintel trailer (movie file, CC BY)
 https://download.blender.org/durian/trailer/sintel_trailer-720p.mp4
-#EXTINF:-1 tvg-logo="https://wyglaf01.github.io/WygTV-AndroidTV/img/demo/big-buck-bunny.png" group-title="Demo movies",Big Buck Bunny (movie file, CC BY)
-https://download.blender.org/demo/movies/BBB/bbb_sunflower_1080p_30fps_normal.mp4
+#EXTINF:-1 tvg-logo="https://wyglaf01.github.io/WygTV-AndroidTV/img/demo/big-buck-bunny.png" group-title="Demo movies",Big Buck Bunny trailer (movie file, CC BY)
+https://download.blender.org/peach/trailer/trailer_iphone.m4v

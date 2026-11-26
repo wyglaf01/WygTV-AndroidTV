@@ -10,6 +10,7 @@ import zlib from 'node:zlib';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
+const nacl = require('tweetnacl');
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const www = path.join(root, 'www');
 const shots = path.join(root, 'smoke');
@@ -30,6 +31,12 @@ const server = http.createServer((q, r) => {
   const u = new URL(q.url, 'http://x');
   if (u.pathname === '/guide.xml.gz') { hits.guide++; r.writeHead(200, { 'Content-Type': 'application/gzip', 'Access-Control-Allow-Origin': '*' }); r.end(GUIDE); return; }
   if (u.pathname === '/backup.json') { r.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }); r.end(BACKUP); return; }
+  // The phone page and its encryption library, as GitHub Pages serves them (docs/).
+  if (u.pathname === '/send.html' || u.pathname === '/vendor/nacl-fast.min.js') {
+    r.writeHead(200, { 'Content-Type': u.pathname.endsWith('.html') ? 'text/html' : 'text/javascript' });
+    r.end(fs.readFileSync(path.join(root, '..', 'docs', u.pathname)));
+    return;
+  }
   if (u.pathname === '/demo.m3u') { r.writeHead(200, { 'Content-Type': 'audio/x-mpegurl', 'Access-Control-Allow-Origin': '*' }); r.end(M3U); return; }
   const f = path.join(www, decodeURIComponent(u.pathname === '/' ? '/index.html' : u.pathname));
   if (!f.startsWith(www) || !fs.existsSync(f)) { r.writeHead(404); r.end(); return; }
@@ -450,6 +457,83 @@ try {
     check(d.w === 1920 && d.size === 'small', `Small lays the page out 1920 wide (${JSON.stringify(d)})`);
     check(errors.length === 0, `text size: no script errors ${errors.length ? JSON.stringify(errors.slice(0, 3)) : ''}`);
     await page.close();
+  }
+
+  // ---------------------------------------------------------------- typing on a phone: QR code → phone page → encrypted relay → TV
+  {
+    const { page: tv, errors } = await open('', true);
+    // A stand-in for ntfy.sh: the phone's POST is kept, and the TV's listening request gets it (or ends after a
+    // moment, as a quiet relay connection would, and the TV listens again).
+    const relay = { posted: [] };
+    await tv.route('https://ntfy.sh/**', async (route) => {
+      const topic = new URL(route.request().url()).pathname.split('/')[1];
+      let msg = relay.posted.find((p) => p.topic === topic);
+      if (!msg) { await new Promise((r) => setTimeout(r, 700)); msg = relay.posted.find((p) => p.topic === topic); }
+      const line = msg ? { id: 'x', event: 'message', topic, message: msg.body } : { event: 'open', topic };
+      await route.fulfill({ status: 200, headers: { 'Content-Type': 'application/x-ndjson', 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(line) + '\n' });
+    });
+    await tv.evaluate(() => {
+      W.form('Add an M3U playlist', [
+        { key: 'name', label: 'Name (optional)', value: 'Kitchen' },
+        { key: 'url', label: 'Playlist link', type: 'url' },
+        { key: 'pass', label: 'Password', type: 'password', value: 'old-secret' },
+      ]);
+    });
+    await tv.waitForSelector('.dialog.form');
+    const hasBtn = await tv.evaluate(() => [...document.querySelectorAll('.dialog.form .button')].some((b) => /Type on your phone/.test(b.textContent)));
+    check(hasBtn, 'forms on the TV have "📱 Type on your phone"');
+    await tv.evaluate(() => [...document.querySelectorAll('.dialog.form .button')].find((b) => /Type on your phone/.test(b.textContent)).click());
+    await tv.waitForSelector('.phone-dialog canvas.phone-qr');
+    await tv.screenshot({ path: path.join(shots, 'phone-qr.png') });
+    const qr = await tv.evaluate(() => window.__wygPhoneLast);
+    const frag = qr.url.split('#')[1];
+    const fieldsSent = Buffer.from(decodeURIComponent(frag.match(/f=([^&]+)/)[1]), 'base64url').toString();
+    check(qr.url.startsWith('https://wyglaf01.github.io/WygTV-AndroidTV/send.html#v=1&t=wygtv-'), 'the QR code opens the phone page on GitHub Pages');
+    check(!qr.url.includes('old-secret') && !fieldsSent.includes('old-secret'), 'passwords are never put in the QR code');
+
+    // The phone: open the page the QR code points to, type, and send.
+    const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true });
+    await phone.route('https://ntfy.sh/**', async (route) => {
+      const topic = new URL(route.request().url()).pathname.split('/')[1];
+      relay.posted.push({ topic, body: route.request().postData() || '' });
+      await route.fulfill({ status: 200, headers: { 'Access-Control-Allow-Origin': '*' }, body: '{}' });
+    });
+    await phone.goto(base + 'send.html#' + frag);
+    await phone.waitForSelector('form:not([hidden]) input');
+    const labels = await phone.$$eval('form label span', (els) => els.map((e) => e.textContent));
+    const prefilled = await phone.$$eval('form input', (els) => els.map((e) => e.value));
+    check(JSON.stringify(labels) === JSON.stringify(['Name (optional)', 'Playlist link', 'Password']) && prefilled[0] === 'Kitchen' && prefilled[2] === '',
+      `the phone shows the TV's fields, the name filled in and no password (${JSON.stringify(labels)})`);
+    check(await phone.evaluate(() => !location.hash), 'the phone page drops the key from its address once read');
+    const inputs = await phone.$$('form input');
+    await inputs[1].fill('http://example.com/get.php?username=alice&password=hunter2');
+    await inputs[2].fill('hunter2');
+    await phone.screenshot({ path: path.join(shots, 'phone-page.png') });
+    await phone.click('form button');
+    await phone.waitForSelector('.status.ok');
+    const sent = relay.posted[0] || { body: '' };
+    check(relay.posted.length === 1 && sent.topic === qr.topic && /^[A-Za-z0-9_-]{60,}$/.test(sent.body), "the phone sends one message, to that QR code's own channel");
+    check(!/hunter2|alice|example\.com|Kitchen/.test(sent.body + Buffer.from(sent.body, 'base64url').toString('latin1')), 'the relay only sees scrambled data (no link, login or name)');
+
+    // Back on the TV: the form fills in and the QR code closes.
+    await tv.waitForFunction(() => !document.querySelector('.phone-dialog'), null, { timeout: 8000 }).catch(() => { });
+    const vals = await tv.evaluate(() => [...document.querySelectorAll('.dialog.form input')].map((i) => i.value));
+    check(JSON.stringify(vals) === JSON.stringify(['Kitchen', 'http://example.com/get.php?username=alice&password=hunter2', 'hunter2']),
+      `the TV's form fills in from the phone (${JSON.stringify(vals.map((v) => v.slice(0, 24)))})`);
+    check(await tv.evaluate(() => !document.querySelector('.phone-dialog')), 'the QR code closes once it has');
+    await tv.screenshot({ path: path.join(shots, 'phone-filled.png') });
+
+    // A message sealed with another key (someone else's QR code) is ignored.
+    const t2 = await tv.evaluate(() => { W.api.phone.fill('Test', [{ key: 'a', label: 'A' }], { a: document.createElement('input') }); return window.__wygPhoneLast.topic; });
+    const k2 = nacl.randomBytes(32), n2 = nacl.randomBytes(24);
+    const fake = nacl.secretbox(Buffer.from(JSON.stringify({ v: 1, values: { a: 'evil' } })), n2, k2);
+    relay.posted.push({ topic: t2, body: Buffer.concat([Buffer.from(n2), Buffer.from(fake)]).toString('base64url') });
+    await tv.waitForTimeout(2500);
+    check(await tv.evaluate(() => !!document.querySelector('.phone-dialog')), 'a message sealed with another key is ignored (the QR code stays up)');
+    await tv.evaluate(() => W.back());
+    check(errors.length === 0, `phone typing: no script errors ${errors.length ? JSON.stringify(errors.slice(0, 3)) : ''}`);
+    await phone.close();
+    await tv.close();
   }
 
   // The fallbacks should look like the real thing: same tile sizes, header items in about the same places.

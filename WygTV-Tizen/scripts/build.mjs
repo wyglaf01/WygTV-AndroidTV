@@ -27,6 +27,10 @@ fs.mkdirSync(path.join(www, 'vendor'), { recursive: true });
 fs.copyFileSync(nm('hls.js/dist/hls.min.js'), path.join(www, 'vendor', 'hls.min.js'));
 fs.copyFileSync(nm('mpegts.js/dist/mpegts.js'), path.join(www, 'vendor', 'mpegts.js'));
 fs.copyFileSync(nm('fflate/umd/index.js'), path.join(www, 'vendor', 'fflate.js'));
+// Typing on a phone (web/tizen-phone.js): the QR code, and the encryption shared with docs/send.html.
+fs.copyFileSync(nm('qrcode-generator/qrcode.js'), path.join(www, 'vendor', 'qrcode.js'));
+fs.copyFileSync(nm('tweetnacl/nacl-fast.min.js'), path.join(www, 'vendor', 'nacl-fast.min.js'));
+fs.copyFileSync(path.join(root, 'web', 'tizen-phone.js'), path.join(www, 'js', 'tizen-phone.js'));
 fs.copyFileSync(path.join(root, 'web', 'tizen-bridge.js'), path.join(www, 'js', 'tizen-bridge.js'));
 fs.copyFileSync(path.join(root, 'web', 'tizen-avplay.js'), path.join(www, 'js', 'tizen-avplay.js'));
 fs.copyFileSync(path.join(root, 'web', 'tizen.css'), path.join(www, 'tizen.css'));
@@ -68,8 +72,8 @@ html = html
   .replace('../../node_modules/mpegts.js/dist/mpegts.js', 'vendor/mpegts.js')
   // Samsung's TV APIs (AVPlay, product info); $WEBAPIS is filled in by the TV.
   .replace('<script src="js/core.js"></script>',
-    '<script src="$WEBAPIS/webapis/webapis.js"></script>\n  <script src="vendor/fflate.js"></script>\n  <script src="js/desktop-modules.js"></script>\n  <script src="js/tizen-avplay.js"></script>\n  <script src="js/tizen-bridge.js"></script>\n  <script src="js/core.js"></script>');
-for (const need of ['vendor/fflate.js', 'vendor/hls.min.js', 'vendor/mpegts.js', 'js/tizen-avplay.js', 'js/tizen-bridge.js', 'js/tizen-legacy.js', 'tizen.css', 'name="viewport"', '$WEBAPIS']) {
+    '<script src="$WEBAPIS/webapis/webapis.js"></script>\n  <script src="vendor/fflate.js"></script>\n  <script src="js/desktop-modules.js"></script>\n  <script src="js/tizen-avplay.js"></script>\n  <script src="vendor/qrcode.js"></script>\n  <script src="vendor/nacl-fast.min.js"></script>\n  <script src="js/tizen-phone.js"></script>\n  <script src="js/tizen-bridge.js"></script>\n  <script src="js/core.js"></script>');
+for (const need of ['vendor/fflate.js', 'vendor/hls.min.js', 'vendor/mpegts.js', 'js/tizen-avplay.js', 'js/tizen-phone.js', 'vendor/qrcode.js', 'vendor/nacl-fast.min.js', 'js/tizen-bridge.js', 'js/tizen-legacy.js', 'tizen.css', 'name="viewport"', '$WEBAPIS']) {
   if (!html.includes(need)) throw new Error('index.html did not get ' + need);
 }
 fs.writeFileSync(path.join(www, 'index.html'), html);

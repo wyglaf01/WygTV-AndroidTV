@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Send to WygTV</title>
+<meta name="description" content="Type into WygTV on your Samsung TV from your phone.">
+<meta name="robots" content="noindex">
+<link rel="icon" href="img/favicon.png">
+<style>
+  :root { --bg: #060c24; --panel: #0e1a44; --line: #2a3a78; --text: #eef2ff; --muted: #a9b4dd; --accent: #c9a14a; --ok: #6fd08c; --err: #ff8a80; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 520px; margin: 0 auto; padding: 24px 16px 40px; }
+  .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+  .brand img { width: 44px; height: 44px; border-radius: 10px; }
+  .brand b { font-size: 22px; color: var(--accent); letter-spacing: .3px; }
+  h1 { font-size: 21px; margin: 0 0 4px; }
+  p { color: var(--muted); margin: 0 0 18px; }
+  form { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px 16px; }
+  label { display: block; margin-bottom: 14px; }
+  label span { display: block; font-size: 14px; color: var(--muted); margin-bottom: 5px; }
+  input { width: 100%; font: inherit; color: var(--text); background: #0a1333; border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+  input:focus { outline: 2px solid var(--accent); border-color: transparent; }
+  button { width: 100%; font: inherit; font-weight: 700; color: #1a1300; background: var(--accent); border: 0; border-radius: 10px; padding: 14px; margin-top: 4px; }
+  button:disabled { opacity: .6; }
+  .status { margin-top: 16px; min-height: 1.4em; }
+  .status.ok { color: var(--ok); } .status.err { color: var(--err); }
+  .note { font-size: 13px; color: var(--muted); margin-top: 22px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="brand"><img src="img/icon-512.png" alt=""><b>WygTV</b></div>
+  <h1 id="title">Send to WygTV</h1>
+  <p id="lead">Type here, press <b>Send</b>, and it fills in on your TV.</p>
+  <form id="form" autocomplete="off" hidden></form>
+  <div id="status" class="status" role="status"></div>
+  <p class="note">What you type is encrypted on this phone with a key from the TV's QR code, then passed to the TV
+    through ntfy.sh, a free message relay. Only your TV can read it; the relay, this website and anyone else only see
+    scrambled data. Nothing is kept here.</p>
+</main>
+<script src="vendor/nacl-fast.min.js"></script>
+<script>
+'use strict';
+(function () {
+  var RELAY = 'https://ntfy.sh';
+  var $ = function (id) { return document.getElementById(id); };
+  var status = function (t, cls) { var s = $('status'); s.textContent = t; s.className = 'status ' + (cls || ''); };
+  var fromB64 = function (s) { return Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), function (c) { return c.charCodeAt(0); }); };
+  var b64url = function (b) { var s = ''; for (var i = 0; i < b.length; i++) s += String.fromCharCode(b[i]); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+
+  // Everything comes from after "#" in the address, which the phone never sends to any server.
+  var q = {};
+  location.hash.slice(1).split('&').forEach(function (kv) { var i = kv.indexOf('='); if (i > 0) q[kv.slice(0, i)] = kv.slice(i + 1); });
+  var key, fields;
+  try {
+    if (q.v !== '1' || !/^wygtv-[A-Za-z0-9_-]{16,}$/.test(q.t || '')) throw new Error('no code');
+    key = fromB64(q.k);
+    if (key.length !== nacl.secretbox.keyLength) throw new Error('bad key');
+    fields = JSON.parse(new TextDecoder().decode(fromB64(q.f)));
+    if (!Array.isArray(fields) || !fields.length) throw new Error('no fields');
+  } catch (e) {
+    $('lead').textContent = 'Open this page by scanning the QR code that WygTV shows on your TV (“📱 Type on your phone” in any form).';
+    return;
+  }
+  // The key isn't needed in the address any more: keep it out of the phone's history.
+  try { history.replaceState(null, '', location.pathname); } catch (e) { }
+
+  var title = decodeURIComponent(q.n || '');
+  if (title) $('title').textContent = title;
+  var form = $('form'), inputs = {};
+  fields.forEach(function (f) {
+    if (!f || typeof f.k !== 'string') return;
+    var l = document.createElement('label'), s = document.createElement('span'), i = document.createElement('input');
+    s.textContent = f.l || f.k;
+    i.type = f.t === 'password' ? 'password' : f.t === 'url' ? 'url' : 'text';
+    i.value = typeof f.v === 'string' ? f.v : '';
+    i.autocapitalize = 'off'; i.spellcheck = false; i.setAttribute('autocorrect', 'off');
+    l.appendChild(s); l.appendChild(i); form.appendChild(l);
+    inputs[f.k] = i;
+  });
+  var send = document.createElement('button');
+  send.type = 'submit'; send.textContent = 'Send to TV';
+  form.appendChild(send);
+  form.hidden = false;
+  var first = form.querySelector('input'); if (first) first.focus();
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var values = {};
+    Object.keys(inputs).forEach(function (k) { values[k] = inputs[k].value; });
+    var nonce = nacl.randomBytes(nacl.secretbox.nonceLength);
+    var box = nacl.secretbox(new TextEncoder().encode(JSON.stringify({ v: 1, values: values })), nonce, key);
+    var all = new Uint8Array(nonce.length + box.length); all.set(nonce); all.set(box, nonce.length);
+    send.disabled = true;
+    status('Sending…');
+    fetch(RELAY + '/' + q.t, { method: 'POST', body: b64url(all) })
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        status('Sent ✓ It should fill in on your TV in a moment.', 'ok');
+        send.textContent = 'Send again';
+      })
+      .catch(function (err) { status('Couldn’t send (' + err.message + '). Check the phone’s internet connection and try again.', 'err'); })
+      .then(function () { send.disabled = false; });
+  });
+})();
+</script>
+</body>
+</html>
