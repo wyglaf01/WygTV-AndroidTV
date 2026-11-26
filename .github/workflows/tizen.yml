@@ -2,8 +2,15 @@ name: Build WygTV for Samsung TVs (Tizen)
 
 # WygTV-Tizen is WygDesktop's screens in a Samsung Smart TV web app (folder WygTV-Tizen/), for Tizen 5.5
 # (2020 TVs) and newer. This builds www/, checks it parses as Chromium 69 JavaScript, and opens it in a
-# browser at 1920×1080 (normally and with the 2020-TV CSS fallbacks on). The unsigned www/ is kept as an
-# artifact for Tizen Studio; signed .wgt packages come later (they need the Samsung certificate as secrets).
+# browser at 1920×1080 (normally and with the 2020-TV CSS fallbacks on), then signs it into WygTV.wgt with Tizen
+# Studio's command line (scripts/sign.sh).
+#
+# Signing uses the Samsung certificate from these repository secrets (Settings → Secrets and variables → Actions):
+#   TIZEN_AUTHOR_P12_B64, TIZEN_AUTHOR_PASSWORD, TIZEN_DISTRIBUTOR_P12_B64, TIZEN_DISTRIBUTOR_PASSWORD
+# (the .p12 files base64-encoded). With them, each build on `app` is published to the wygtv-tizen-latest release:
+#   https://github.com/wyglaf01/WygTV-AndroidTV/releases/download/wygtv-tizen-latest/WygTV.wgt
+# Without them, the .wgt is signed with a throwaway test certificate (Samsung TVs refuse it) and only kept as an
+# artifact, which still checks that packaging works.
 
 on:
   workflow_dispatch:
@@ -17,9 +24,11 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     permissions:
       contents: read
+    outputs:
+      signed-with: ${{ steps.sign.outputs.signed-with }}
     defaults:
       run:
         working-directory: WygTV-Tizen
@@ -46,6 +55,46 @@ jobs:
           npx playwright install --with-deps chromium
           node test/smoke.mjs
 
+      - name: Install Tizen Studio's command line
+        working-directory: ${{ runner.temp }}
+        run: |
+          # The newest Tizen Studio release, and its command-line installer for Ubuntu.
+          BASE=https://download.tizen.org/sdk/Installer
+          VER=$(curl -sfL --retry 3 "$BASE/" | grep -o 'tizen-studio_[0-9][0-9.]*' | sort -uV | tail -1)
+          BIN=$(curl -sfL --retry 3 "$BASE/$VER/" | grep -o 'web-cli_Tizen_Studio_[0-9.]*_ubuntu-64\.bin' | head -1)
+          echo "Installing $VER/$BIN"
+          curl -sfL --retry 3 -o cli.bin "$BASE/$VER/$BIN"
+          chmod +x cli.bin
+          ./cli.bin --accept-license "$HOME/tizen-studio"
+          "$HOME/tizen-studio/tools/ide/bin/tizen" version
+
+      - name: Sign WygTV.wgt
+        id: sign
+        env:
+          TIZEN_AUTHOR_P12_B64: ${{ secrets.TIZEN_AUTHOR_P12_B64 }}
+          TIZEN_AUTHOR_PASSWORD: ${{ secrets.TIZEN_AUTHOR_PASSWORD }}
+          TIZEN_DISTRIBUTOR_P12_B64: ${{ secrets.TIZEN_DISTRIBUTOR_P12_B64 }}
+          TIZEN_DISTRIBUTOR_PASSWORD: ${{ secrets.TIZEN_DISTRIBUTOR_PASSWORD }}
+        run: |
+          if [ -n "$TIZEN_AUTHOR_P12_B64" ] && [ -n "$TIZEN_DISTRIBUTOR_P12_B64" ]; then
+            echo "$TIZEN_AUTHOR_P12_B64" | base64 -d > "$RUNNER_TEMP/author.p12"
+            echo "$TIZEN_DISTRIBUTOR_P12_B64" | base64 -d > "$RUNNER_TEMP/distributor.p12"
+            export TIZEN_AUTHOR_P12="$RUNNER_TEMP/author.p12" TIZEN_DISTRIBUTOR_P12="$RUNNER_TEMP/distributor.p12"
+          else
+            echo "::warning::The Samsung certificate secrets aren't set, so WygTV.wgt is signed with a test certificate that Samsung TVs refuse. See .github/workflows/tizen.yml."
+          fi
+          set -o pipefail
+          scripts/sign.sh | tee "$RUNNER_TEMP/sign.log"
+          grep '^signed-with=' "$RUNNER_TEMP/sign.log" >> "$GITHUB_OUTPUT"
+          rm -f "$RUNNER_TEMP/author.p12" "$RUNNER_TEMP/distributor.p12"
+
+      - name: Keep WygTV.wgt
+        uses: actions/upload-artifact@v4
+        with:
+          name: wygtv-tizen-wgt-${{ github.run_number }}
+          path: WygTV-Tizen/dist/
+          if-no-files-found: error
+
       - name: Keep www/ and the screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -55,3 +104,37 @@ jobs:
             WygTV-Tizen/www/
             WygTV-Tizen/smoke/
           if-no-files-found: warn
+
+  # Builds on `app` signed with the Samsung certificate go to the wygtv-tizen-latest release (a pre-release, so it
+  # never replaces the Android APK as the repository's latest release).
+  publish:
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/app' && needs.build.outputs.signed-with == 'samsung'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Get WygTV.wgt
+        uses: actions/download-artifact@v4
+        with:
+          name: wygtv-tizen-wgt-${{ github.run_number }}
+          path: dist
+
+      - name: Update the wygtv-tizen-latest release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG=wygtv-tizen-latest
+          VERSION=$(jq -r .version dist/tizen-version.json)
+          URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/$TAG"
+          NOTES="WygTV ${VERSION} for Samsung Smart TVs (Tizen 5.5 / 2020 and newer), built $(date -u '+%Y-%m-%d %H:%M UTC') from ${GITHUB_SHA::7}.
+
+          Download: ${URL}/WygTV.wgt
+
+          It is signed with the repository's Samsung certificate, so it installs on the TVs whose DUIDs are in that certificate, in Developer mode. Install with Tizen Studio's command line: tizen install -n WygTV.wgt -t <TV>. See WygTV-Tizen/README.md."
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --title "WygTV for Samsung TVs ${VERSION}" --notes "$NOTES" --prerelease --latest=false
+          else
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "WygTV for Samsung TVs ${VERSION}" --notes "$NOTES" --prerelease --latest=false
+          fi
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" dist/WygTV.wgt dist/tizen-version.json --clobber
