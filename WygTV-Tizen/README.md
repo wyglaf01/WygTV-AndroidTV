@@ -29,6 +29,11 @@ blue Settings). It has been tested in a browser with a stand-in AVPlay, not yet 
   sends WygTV to the background. Antenna channels, which the desktop app converts with FFmpeg, play as they are.
 - `config.xml`: the app's Samsung manifest (`WygTVtizen.WygTV`, version `1.0.<build number>`)
 
+**Text size.** On the TV everything is drawn larger for viewing from the sofa: `web/tizen-legacy.js` sets the
+page's viewport width as it loads (Large 1280, the default: 1.5×; Medium 1536; Small 1920) and the TV scales the
+page up to the screen. AVPlay's position is scaled the same way. **Settings → Appearance → Size of text and
+menus** changes it.
+
 **2020 TVs** run Chromium 69, which is older than the desktop app's Electron. The build lowers all JavaScript to
 Chrome 69 with esbuild, and `scripts/legacy-css.mjs` adds fallbacks for CSS that Chromium 69 lacks: flex `gap`,
 `aspect-ratio`, `min()` and `:has()`. `web/tizen-legacy.js` switches them on only when the TV needs them, so

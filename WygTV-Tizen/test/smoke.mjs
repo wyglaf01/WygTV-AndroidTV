@@ -399,6 +399,43 @@ try {
     await page.close();
   }
 
+  // ---------------------------------------------------------------- the TV's text size: the page laid out narrower and scaled up
+  {
+    // isMobile makes Chromium honour the page's viewport width, as a TV's web engine does.
+    const page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, isMobile: true, deviceScaleFactor: 1 });
+    const { errors } = await open('?avplay=1', true, page);
+    const dims = () => page.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight, size: W.api.tv.size() }));
+    let d = await dims();
+    check(d.w === 1280 && d.size === 'large', `Large (the default) lays the page out 1280 wide, scaled 1.5× to the screen (${JSON.stringify(d)})`);
+    await page.screenshot({ path: path.join(shots, 'size-large-home.png') });
+    await page.evaluate(() => new Promise((r) => { const off = W.data.on('loaded', () => { off(); r(); }); setTimeout(r, 8000); }));
+    await page.evaluate(() => W.go('live'));
+    await page.waitForSelector('.chan');
+    await page.focus('.chan');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(1500);
+    const box = await page.evaluate(() => { const r = document.querySelector('.preview-box').getBoundingClientRect(); return [r.left, r.top, r.width, r.height].map((v) => Math.round(v * 1.5)); });
+    let rect = await page.evaluate(() => webapis.avplay.log.filter((e) => e[0] === 'rect').pop().slice(1));
+    check(rect.every((v, i) => Math.abs(v - box[i]) <= 4), `the preview plays exactly over the enlarged preview box (${JSON.stringify(rect)} vs ${JSON.stringify(box)})`);
+    await page.screenshot({ path: path.join(shots, 'size-large-live.png') });
+    await page.evaluate(() => W.player.enterFull());
+    await page.waitForTimeout(800);
+    rect = await page.evaluate(() => webapis.avplay.log.filter((e) => e[0] === 'rect').pop().slice(1));
+    check(JSON.stringify(rect) === '[0,0,1920,1080]', `full screen still fills the TV (${JSON.stringify(rect)})`);
+    await page.evaluate(() => { W.player.stop(); W.go('settings', { section: 'look' }); });
+    await page.waitForTimeout(300);
+    const row = await page.evaluate(() => [...document.querySelectorAll('.set-row')].map((r) => r.textContent).find((t) => /Size of text/.test(t)) || '');
+    check(/Size of text and menus\s*Large/.test(row), `Settings → Appearance offers the size ("${row}")`);
+    await page.screenshot({ path: path.join(shots, 'size-large-settings.png') });
+    // Small: back to a 1920-wide page, as on a computer.
+    await Promise.all([page.waitForNavigation(), page.evaluate(() => W.api.tv.setSize('small'))]);
+    await page.waitForSelector('#screen[data-screen="home"]');
+    d = await dims();
+    check(d.w === 1920 && d.size === 'small', `Small lays the page out 1920 wide (${JSON.stringify(d)})`);
+    check(errors.length === 0, `text size: no script errors ${errors.length ? JSON.stringify(errors.slice(0, 3)) : ''}`);
+    await page.close();
+  }
+
   // The fallbacks should look like the real thing: same tile sizes, header items in about the same places.
   const m = JSON.parse(fs.readFileSync(path.join(shots, 'layout-modern.json'))), g = JSON.parse(fs.readFileSync(path.join(shots, 'layout-legacy.json')));
   const near = (a, b, tol) => a.length === b.length && a.every((x, i) => x.every((v, j) => Math.abs(v - b[i][j]) <= tol));

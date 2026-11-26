@@ -93,7 +93,7 @@ Seller Office asks how to test the app. WygTV needs something to play, so give t
 | Privacy policy | ✔ docs/privacy.html covers the TV app |
 | Network lost | messages when a playlist can't load; live channels reconnect. **Check on your TV**: unplug the network while a channel plays, then plug it back in |
 | Content rights | ✔ no built-in channels; the demo playlist is free test streams and CC films |
-| Text readable from the sofa | ⚠ some small text (13–17 px at 1080p) in lists and hints. If Samsung flags it, the TV app can be enlarged |
+| Text readable from the sofa | ✔ the TV app is drawn 1.5× larger by default (laid out at 1280×720 and scaled up); Medium and Small in Settings → Appearance |
 | Starts quickly, no crash | check on your TV (TESTING.md section 1) |
 
 ## After approval

@@ -60,8 +60,12 @@ Tick each item that works as described.
 - [ ] Change a setting, then **Restore a backup** → the saved one: the setting comes back.
 - [ ] Themes in **Settings → Appearance** change the look everywhere.
 
-## 9. Picture size
-- [ ] Full screen fills the TV; nothing is cut off at the edges.
+## 9. Picture and text size
+- [ ] Text and menus are easy to read from the sofa (**Large**, the default).
+- [ ] **Settings → Appearance → Size of text and menus**: Medium and Small make everything smaller; WygTV restarts
+      by itself to change it. Diagnostics shows the size and the page size (Large: 1280×720).
+- [ ] Full screen fills the TV; nothing is cut off at the edges, at every size.
+- [ ] The Live TV preview picture sits exactly in its box at every size.
 - [ ] On a 4K TV the menus are sharp, not blurry.
 
 ## Report back
