@@ -39,7 +39,7 @@
     el.setAttribute('type', 'application/avplayer');
     el.className = 'video';
     let src = '', state = 'NONE', wantPlay = false, ready = 0, paused = true, err = null, volume = 1, token = 0;
-    let lastRect = '', rectTimer = 0, lastTime = 0, durationMs = 0, buffering = false, suspended = false;
+    let lastRect = '', rectTimer = 0, lastTime = 0, durationMs = 0, buffering = false, suspended = false, textOn = false, chosen = {};
 
     const fire = (type) => el.dispatchEvent(new Event(type));
     const call = (fn) => { try { return fn(); } catch (e) { return undefined; } };
@@ -62,6 +62,7 @@
       // Stopping costs the TV time: only when a stream is open (player.js clears the old one in several ways).
       if (state !== 'NONE') { call(() => av().stop()); call(() => av().close()); }
       state = 'NONE'; ready = 0; paused = true; wantPlay = false; lastRect = ''; lastTime = 0; durationMs = 0; buffering = false;
+      textOn = false; chosen = {};
     }
 
     function failWith(message) {
@@ -94,7 +95,7 @@
           onstreamcompleted() { if (mine !== token) return; paused = true; fire('ended'); },
           onerror(type) { if (mine !== token) return; failWith(type); },
           onevent() { },
-          onsubtitlechange() { },
+          onsubtitlechange(ms, text) { if (mine === token && textOn && el.onsubtitle) el.onsubtitle(String(text || ''), Number(ms) || 0); },
           ondrmevent() { },
         });
         call(() => av().setDisplayMethod('PLAYER_DISPLAY_MODE_LETTER_BOX'));
@@ -161,6 +162,32 @@
       fire('pause');
     };
     el.load = function () { if (!src) close(); };
+
+    // ---------------------------------------------------------------- sound tracks and subtitles
+    const extra = (t) => { try { return JSON.parse(t.extra_info || '{}'); } catch (e) { return {}; } };
+    /** The stream's tracks of a type ('AUDIO' or 'TEXT'): [{ index, lang, codec }]. */
+    el.wygTracks = function (type) {
+      if (!ready) return [];
+      const all = call(() => av().getTotalTrackInfo()) || [];
+      return Array.prototype.filter.call(all, (t) => t.type === type).map((t) => {
+        const x = extra(t);
+        return { index: Number(t.index), lang: x.language || x.track_lang || '', codec: x.fourCC || '' };
+      });
+    };
+    /** The track playing now (−1: subtitles off). */
+    el.wygTrack = function (type) {
+      if (type === 'TEXT' && !textOn) return -1;
+      if (chosen[type] != null) return chosen[type];
+      const cur = call(() => av().getCurrentStreamInfo()) || [];
+      const t = Array.prototype.find.call(cur, (c) => c.type === type);
+      return t ? Number(t.index) : (type === 'TEXT' ? -1 : 0);
+    };
+    el.wygSelectTrack = function (type, index) {
+      if (type === 'TEXT' && index < 0) { textOn = false; call(() => av().setSilentSubtitle(true)); return; }
+      call(() => av().setSelectTrack(type, index));
+      chosen[type] = index;
+      if (type === 'TEXT') { textOn = true; call(() => av().setSilentSubtitle(false)); }
+    };
     el.canPlayType = () => '';
     const removeAttribute = el.removeAttribute.bind(el);
     el.removeAttribute = (name) => { if (name === 'src') { src = ''; close(); } else removeAttribute(name); };

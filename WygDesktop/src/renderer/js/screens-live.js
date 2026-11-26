@@ -144,7 +144,7 @@
       if (!menu.some((m) => m.sel === sel)) sel = (menu.find((m) => m.sel && m.count) || menu[0]).sel;
       const menuCol = h('div', { class: 'col menu-col', 'data-col': '', 'data-wrap': '' });
       const chanCol = h('div', { class: 'col chan-col', 'data-col': '', 'data-wrap': '' });
-      const previewBox = h('div', { class: 'preview-box' }, h('div', { class: 'preview-idle' }, h('img', { src: 'assets/icon.png', alt: '' }), h('div', null, 'Press Enter to watch here · Enter again for full screen')));
+      const previewBox = h('div', { class: 'preview-box' }, h('div', { class: 'preview-idle' }, h('img', { src: 'assets/icon.png', alt: '' }), h('div', null, (W.isTV ? 'Press OK to watch here · OK again for full screen' : 'Press Enter to watch here · Enter again for full screen'))));
       const info = h('div', { class: 'live-info' });
       const chanTitle = h('div', { class: 'col-title' });
       let chans = [];
@@ -224,7 +224,7 @@
           list.append(row);
           filler.watch(row);
         }
-        if (!chans.length) list.append(h('div', { class: 'empty' }, sel === 'favs' ? 'No favorites yet. Hold Enter (or right-click) on a channel to add it.' : sel === 'recent' ? 'Channels you watch show up here.' : 'No channels here.'));
+        if (!chans.length) list.append(h('div', { class: 'empty' }, sel === 'favs' ? (W.isTV ? 'No favorites yet. Hold OK on a channel to add it.' : 'No favorites yet. Hold Enter (or right-click) on a channel to add it.') : sel === 'recent' ? 'Channels you watch show up here.' : 'No channels here.'));
         chanCol.replaceChildren(chanTitle, list);
         chanCol.scrollTop = 0;
       };

@@ -19,13 +19,15 @@
   let mini = false, miniBar = null; // the mini player: the picture in a corner, still playing, while the rest of the app is used
   let offset = 0, duration = 0; // for FFmpeg-converted files (seek = restart at offset)
   let attempt = 0, lastProgress = 0, stallTimer = null, startTimer = null, saveTimer = null, hideTimer = null, audioCheck = null;
-  let probeInfo = null, audioIndex = 0, numBuf = '', numTimer = null;
+  let probeInfo = null, audioIndex = 0, numBuf = '', numTimer = null, subsEl = null, subsTimer = null;
 
   function build() {
     video = (W.api && W.api.makeVideo && W.api.makeVideo()) || h('video', { class: 'video', playsinline: true });
     spinner = h('div', { class: 'player-spinner spinner', hidden: true });
     msgEl = h('div', { class: 'player-msg', hidden: true });
     numEl = h('div', { class: 'player-num', hidden: true });
+    // Subtitles the TV's player hands over as text (Samsung TVs: AVPlay); other players draw their own.
+    subsEl = h('div', { class: 'player-subs', hidden: true });
     osdTitle = h('div', { class: 'osd-title' });
     osdSub = h('div', { class: 'osd-sub' });
     osdNow = h('div', { class: 'osd-now' });
@@ -41,7 +43,13 @@
       h('div', { class: 'osd-top' }, h('img', { class: 'osd-logo', src: 'assets/icon.png', alt: '' }), h('div', { class: 'osd-titles' }, osdTitle, osdSub), h('div', { class: 'osd-clock' })),
       h('div', { class: 'osd-bottom' }, osdNow, osdBar, osdTimes, osdButtons));
     miniBar = h('div', { class: 'mini-bar' });
-    root = h('div', { id: 'player', hidden: true }, video, spinner, msgEl, numEl, overlay, miniBar);
+    root = h('div', { id: 'player', hidden: true }, video, spinner, msgEl, numEl, overlay, subsEl, miniBar);
+    if (video.wygTracks) video.onsubtitle = (text, ms) => {
+      clearTimeout(subsTimer);
+      subsEl.textContent = text || '';
+      subsEl.hidden = !text;
+      if (text) subsTimer = setTimeout(() => { subsEl.hidden = true; }, Math.max(500, ms || 3000));
+    };
     // Picture-in-picture: the browser's own floating window. Going into it from full screen also shrinks the
     // in-app picture to the mini player, so the app can be used while it plays.
     video.addEventListener('enterpictureinpicture', () => { if (full) P.mini(); renderMiniBar(); });
@@ -399,12 +407,13 @@
     miniBar.replaceChildren();
     if (!mini || !item) return;
     const b = (label, title, fn) => W.btn({ class: 'mini-btn', title, onclick: (e) => { e.stopPropagation(); fn(); } }, label);
-    miniBar.append(
+    // append() and replaceChildren() write a null as the text "null": leave the missing buttons out.
+    miniBar.append(...[
       h('div', { class: 'mini-title' }, (item.num ? item.num + '  ' : '') + item.name),
       b('⛶', 'Full screen', () => P.enterFull()),
       b(video.paused ? '▶' : '❚❚', video.paused ? 'Play' : 'Pause', () => { togglePause(); renderMiniBar(); }),
       P.pipSupported() ? b('⧉', 'Picture-in-picture', () => P.pip()) : null,
-      b('✕', 'Close', () => P.stop()));
+      b('✕', 'Close', () => P.stop())].filter(Boolean));
   }
 
   P.pipSupported = () => !!(document.pictureInPictureEnabled && video && !video.disablePictureInPicture);
@@ -444,6 +453,8 @@
       );
     }
     if (probeInfo && probeInfo.audio.length > 1) osdButtons.append(b('🔊 Sound', pickAudio));
+    else if (video.wygTracks && video.wygTracks('AUDIO').length > 1) osdButtons.append(b('🔊 Sound', () => pickTrack('AUDIO')));
+    if (video.wygTracks && video.wygTracks('TEXT').length) osdButtons.append(b('💬 Subtitles', () => pickTrack('TEXT')));
     osdButtons.append(...[W.isTV ? null : b('🔉 Volume', pickVolume), b('▣ Mini player', () => { P.mini(); }, 'Keep watching in a corner while you browse'),
       P.pipSupported() ? b('⧉ Picture-in-picture', () => P.pip(), 'Keep watching in a floating window') : null, W.isIOS || W.isTV ? null : b('⛶ Window', () => W.api.win.fullscreen()), W.isTV ? null : b('↗ ' + W.extLabel, P.external), b('✕ Close', () => W.back())].filter(Boolean));
     updateNow();
@@ -455,10 +466,10 @@
     const g = await W.guide.get([it.ch]);
     if (it !== item) return;
     const nn = W.guide.nowNext(g[it.key] || []);
-    osdNow.replaceChildren(
+    osdNow.replaceChildren(...[
       nn.now ? h('div', { class: 'osd-prog' }, h('b', null, nn.now[2]), h('span', null, '  ' + W.fmtTime(nn.now[0]) + ' – ' + W.fmtTime(nn.now[1]))) : h('div', { class: 'osd-prog muted' }, 'No guide information'),
       nn.now && nn.now[3] ? h('div', { class: 'osd-desc' }, nn.now[3]) : null,
-      nn.next ? h('div', { class: 'osd-nextp' }, 'Next: ' + W.fmtTime(nn.next[0]) + '  ' + nn.next[2]) : null);
+      nn.next ? h('div', { class: 'osd-nextp' }, 'Next: ' + W.fmtTime(nn.next[0]) + '  ' + nn.next[2]) : null].filter(Boolean));
     if (nn.now) { osdFill.style.width = Math.min(100, (Date.now() - nn.now[0]) / (nn.now[1] - nn.now[0]) * 100) + '%'; osdTimes.textContent = ''; }
     else osdFill.style.width = '0';
   }
@@ -507,6 +518,31 @@
     convert(opts.convert || 'copy');
   }
 
+  /** Sound tracks and subtitles the TV's own player found in the stream (Samsung TVs). */
+  async function pickTrack(type) {
+    const list = video.wygTracks(type);
+    const cur = video.wygTrack(type);
+    const items = list.map((t, i) => ({ label: (type === 'AUDIO' ? 'Track ' : 'Subtitles ') + (i + 1) + (t.lang ? ' · ' + t.lang : '') + (t.codec ? ' · ' + t.codec : ''), checked: t.index === cur }));
+    if (type === 'TEXT') items.unshift({ label: 'Off', checked: cur < 0 });
+    const i = await W.menu(type === 'AUDIO' ? 'Sound track' : 'Subtitles', items);
+    if (i < 0) return;
+    const pick = type === 'TEXT' ? (i === 0 ? -1 : list[i - 1].index) : list[i].index;
+    video.wygSelectTrack(type, pick);
+    if (type === 'TEXT' && pick < 0) subsEl.hidden = true;
+    W.toast(type === 'AUDIO' ? 'Sound: ' + items[i].label : pick < 0 ? 'Subtitles off' : 'Subtitles on');
+  }
+
+  /** The CC button: subtitles on (the first track) or off. */
+  function toggleSubs() {
+    if (!video.wygTracks) return;
+    const list = video.wygTracks('TEXT');
+    if (!list.length) { W.toast('No subtitles in this stream'); return; }
+    const on = video.wygTrack('TEXT') < 0;
+    video.wygSelectTrack('TEXT', on ? list[0].index : -1);
+    if (!on) subsEl.hidden = true;
+    W.toast(on ? 'Subtitles on' : 'Subtitles off');
+  }
+
   async function pickVolume() {
     const levels = [100, 80, 60, 40, 20, 0];
     const cur = Math.round(video.volume * 100);
@@ -532,8 +568,14 @@
       if (!overlay.hidden && !isLiveItem()) { hideOsd(); return true; }
       return false;
     }
-    if (/^[0-9]$/.test(k) && isLiveItem()) { typeNumber(k); return true; }
+    if ((/^[0-9]$/.test(k) || ((k === '-' || k === '.') && numBuf)) && isLiveItem()) { typeNumber(k); return true; }
     if (k === 'MediaPlayPause' || k === 'p' || k === 'P') { togglePause(); return true; }
+    // Remotes with separate play and pause keys (Samsung TVs), and rewind / fast-forward.
+    if (k === 'MediaPlay') { if (video.paused) togglePause(); return true; }
+    if (k === 'MediaPause') { if (!video.paused) togglePause(); return true; }
+    if (k === 'MediaRewind') { seekBy(-10); return true; }
+    if (k === 'MediaFastForward') { seekBy(30); return true; }
+    if (k === 'Subtitle') { toggleSubs(); return true; }
     if (k === 'PageUp' || k === 'MediaTrackPrevious' || k === 'ChannelUp') { isLiveItem() ? P.zap(-1) : seekBy(-60); return true; }
     if (k === 'PageDown' || k === 'MediaTrackNext' || k === 'ChannelDown') { isLiveItem() ? P.zap(1) : seekBy(60); return true; }
     if (k === 'MediaStop') { W.back(); return true; }
@@ -554,14 +596,27 @@
     return false;
   }
 
+  /**
+   * The channel with this number: in the list first, then anywhere. "4-1", "4.1" and "41" all find 4.1
+   * (antenna sub-channels), when no channel is numbered 41 itself.
+   */
+  P.channelByNumber = function channelByNumber(n, list) {
+    const want = String(n).replace(/-/g, '.');
+    const all = W.data.allChannels();
+    const lists = list && list.length ? [list, all] : [all];
+    for (const l of lists) { const c = l.find((x) => x.num === want); if (c) return c; }
+    const digits = want.replace(/\D/g, '');
+    for (const l of lists) { const c = l.find((x) => x.num && x.num.replace(/\D/g, '') === digits); if (c) return c; }
+    return null;
+  };
+
   function typeNumber(d) {
-    numBuf = (numBuf + d).slice(-4);
+    numBuf = (numBuf + (d === '-' ? '.' : d)).slice(-5);
     numEl.textContent = numBuf; numEl.hidden = false;
     clearTimeout(numTimer);
     numTimer = setTimeout(() => {
       numEl.hidden = true;
-      const list = opts.list && opts.list.length ? opts.list : W.data.allChannels();
-      const ch = list.find((c) => c.num === numBuf) || W.data.allChannels().find((c) => c.num === numBuf);
+      const ch = P.channelByNumber(numBuf, opts.list);
       numBuf = '';
       if (ch) P.playChannel(ch, Object.assign({}, opts, { full: true, host }));
       else W.toast('No channel with that number');

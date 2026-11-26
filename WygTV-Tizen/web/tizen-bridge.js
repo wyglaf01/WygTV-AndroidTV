@@ -14,7 +14,9 @@
  * Video plays in Samsung's AVPlay (web/tizen-avplay.js): makeVideo() hands player.js an element that behaves
  * like <video>, and antenna channels play as they are (MPEG-2 and Dolby sound are decoded by the TV).
  *
- * Still to come (see WygTV-Tizen/README.md): media and number keys, sound tracks and subtitles (phase 4).
+ * Remote keys: the TV only sends the keys an app registers, so the ones WygTV uses are registered at start and
+ * turned into the key names the shared screens know (ChannelUp, MediaPlay, Subtitle…). Colour keys open Live TV,
+ * the TV Guide, Search and Settings, and typing a channel number anywhere tunes it.
  */
 (function () {
   const req = window.__wygRequire;
@@ -268,6 +270,79 @@
     if (asking) return;
     asking = true;
     try { if (await W.confirm('Exit ' + BRAND + '?', 'Press OK to close ' + BRAND + '.')) exitApp(); } finally { asking = false; }
+  }, true);
+
+  // ------------------------------------------------------------------ the remote's other keys
+  // Samsung key names → what the shared screens and player.js expect in KeyboardEvent.key.
+  const KEYS = {
+    0: '0', 1: '1', 2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7', 8: '8', 9: '9', Minus: '-',
+    ChannelUp: 'ChannelUp', ChannelDown: 'ChannelDown',
+    MediaPlayPause: 'MediaPlayPause', MediaPlay: 'MediaPlay', MediaPause: 'MediaPause', MediaStop: 'MediaStop',
+    MediaRewind: 'MediaRewind', MediaFastForward: 'MediaFastForward', MediaTrackPrevious: 'MediaTrackPrevious', MediaTrackNext: 'MediaTrackNext',
+    Info: 'i', Caption: 'Subtitle',
+    ColorF0Red: 'TvRed', ColorF1Green: 'TvGreen', ColorF2Yellow: 'TvYellow', ColorF3Blue: 'TvBlue', Guide: 'TvGuide', ChannelList: 'TvChannelList',
+  };
+  const byCode = {};
+  try {
+    const input = tz && tz.tvinputdevice;
+    if (input) {
+      for (const k of input.getSupportedKeys()) {
+        if (!(k.name in KEYS)) continue;
+        try { input.registerKey(k.name); byCode[k.code] = KEYS[k.name]; } catch (e) { }
+      }
+    }
+  } catch (e) { }
+
+  const typing = () => { const t = document.activeElement; return !!t && /INPUT|TEXTAREA|SELECT/.test(t.tagName); };
+  const layerOpen = () => !!document.querySelector('#layers > .layer');
+  const playerFull = () => !!(W.player && W.player.isFull && W.player.isFull());
+  function goTo(screen) {
+    if (layerOpen()) return;
+    if (playerFull()) W.player.exitFull();
+    W.go(screen);
+  }
+
+  // A channel number typed outside the full-screen player (the player has its own): tune it full screen.
+  let numBuf = '', numTimer = 0, numEl = null;
+  function typeNumber(d) {
+    if (!numEl) { numEl = document.createElement('div'); numEl.className = 'tv-num'; document.body.appendChild(numEl); }
+    if (d === '-') { if (!numBuf || /\.$/.test(numBuf)) return; d = '.'; }
+    numBuf = (numBuf + d).slice(-5);
+    numEl.textContent = numBuf;
+    numEl.hidden = false;
+    clearTimeout(numTimer);
+    numTimer = setTimeout(() => {
+      numEl.hidden = true;
+      const ch = W.player.channelByNumber(numBuf);
+      numBuf = '';
+      if (ch) W.player.playChannel(ch, { full: true, list: W.data.allChannels() });
+      else W.toast('No channel with that number');
+    }, 1500);
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.__wyg) return;
+    const name = byCode[e.keyCode] || (/^[0-9]$/.test(e.key) ? e.key : null);
+    if (!name) return;
+    // Colour keys can't type anything, so they work in Search's box too; the other keys leave text boxes alone.
+    const tv = {
+      TvRed: () => goTo('live'), TvGreen: () => goTo('guide'), TvYellow: () => goTo('search'), TvBlue: () => goTo('settings'),
+      TvGuide: () => goTo('guide'), TvChannelList: () => goTo('live'),
+    }[name];
+    if (tv) { e.preventDefault(); e.stopImmediatePropagation(); if (typing()) document.activeElement.blur(); tv(); return; }
+    if (typing()) return;
+    if (!playerFull() && !layerOpen()) {
+      if (/^[0-9-]$/.test(name)) { e.preventDefault(); e.stopImmediatePropagation(); typeNumber(name); return; }
+      // Channel up/down while the Live TV preview or the mini player plays.
+      if ((name === 'ChannelUp' || name === 'ChannelDown') && W.player.item()) { e.preventDefault(); e.stopImmediatePropagation(); W.player.zap(name === 'ChannelUp' ? -1 : 1); return; }
+    }
+    if (name === e.key) return; // already what the screens expect
+    // Hand the key on under the name the shared screens know.
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    const k = new KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true });
+    k.__wyg = true;
+    (document.activeElement || document.body).dispatchEvent(k);
   }, true);
 
   const ok = (v) => Promise.resolve(v);
