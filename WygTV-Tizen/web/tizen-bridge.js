@@ -11,8 +11,10 @@
  * Backups are kept on the TV (the newest 5), and can also be restored from a web link, e.g. a backup the
  * desktop or iOS app saved.
  *
- * Still to come (see WygTV-Tizen/README.md): Samsung's AVPlay player for MPEG-2 and Dolby antenna channels
- * (phase 3), media and number keys (phase 4).
+ * Video plays in Samsung's AVPlay (web/tizen-avplay.js): makeVideo() hands player.js an element that behaves
+ * like <video>, and antenna channels play as they are (MPEG-2 and Dolby sound are decoded by the TV).
+ *
+ * Still to come (see WygTV-Tizen/README.md): media and number keys, sound tracks and subtitles (phase 4).
  */
 (function () {
   const req = window.__wygRequire;
@@ -272,6 +274,9 @@
   const no = (why) => () => Promise.reject(new Error(why));
   const api = {
     brand: BRAND, platform: 'tizen', noFFmpeg: true,
+    // On a TV, AVPlay plays everything itself (null in a browser preview, where player.js uses <video>).
+    makeVideo: window.wygAvVideo ? () => window.wygAvVideo() : null,
+    playsAntenna: !!window.wygAvVideo,
     onUpdateProgress: () => { },
     app: { info: () => ok({ version: appVersion(), platform: 'tizen', arch: 'arm', brand: BRAND, device: tvModel() ? 'Samsung TV ' + tvModel() : 'Samsung TV' }) },
     net: { setUserAgent: (ua) => ok(window.__wygNet.setUserAgent(ua)), text: (u, t) => text(u, t), json: (u, t) => json(u, t) },

@@ -5,6 +5,9 @@
  * by FFmpeg. Live streams reconnect by themselves when they stall.
  *
  * It shows either as a small preview inside the Live TV screen or full screen with an on-screen bar.
+ *
+ * On Samsung TVs (WygTV-Tizen) the bridge's makeVideo() gives an element played by the TV's own AVPlay instead
+ * of a <video>: it plays every format itself, MPEG-2 antenna channels and Dolby sound included.
  */
 (function () {
   const { h } = W;
@@ -19,7 +22,7 @@
   let probeInfo = null, audioIndex = 0, numBuf = '', numTimer = null;
 
   function build() {
-    video = h('video', { class: 'video', playsinline: true });
+    video = (W.api && W.api.makeVideo && W.api.makeVideo()) || h('video', { class: 'video', playsinline: true });
     spinner = h('div', { class: 'player-spinner spinner', hidden: true });
     msgEl = h('div', { class: 'player-msg', hidden: true });
     numEl = h('div', { class: 'player-num', hidden: true });
@@ -98,7 +101,11 @@
     destroyEngine();
     const isHls = kindHint === 'hls' || (!kindHint && /\.m3u8(\?|$)|\/hls\//i.test(url));
     const isTs = kindHint === 'ts' || (!kindHint && (/\.ts(\?|$)/i.test(url) || (isLiveItem() && !/\.(mp4|mkv|webm|mov|m4v)(\?|$)/i.test(url))));
-    if (isHls && W.isIOS && video.canPlayType('application/vnd.apple.mpegurl')) {
+    if (video.wygAvPlay) {
+      // Samsung TVs: AVPlay plays HLS, MPEG-TS and files itself.
+      video.src = url;
+      engine = { kind: 'native', obj: null };
+    } else if (isHls && W.isIOS && video.canPlayType('application/vnd.apple.mpegurl')) {
       // iPhone/iPad: Apple's own player plays HLS best (and needs no CORS from the provider).
       video.src = url;
       engine = { kind: 'native', obj: null };
@@ -176,7 +183,8 @@
       if (W.api.noFFmpeg) {
         if (isLiveItem() && attempt < 6 && opts.wasPlaying) { reconnect(where); return; }
         destroyEngine(); spinner.hidden = true;
-        showError('This stream will not play in ' + W.brand + ' (' + String(detail || where).slice(0, 60) + '). VLC for iPhone and iPad plays more kinds of video.');
+        showError(W.isTV ? 'This stream will not play on this TV (' + String(detail || where).slice(0, 60) + ').'
+          : 'This stream will not play in ' + W.brand + ' (' + String(detail || where).slice(0, 60) + '). VLC for iPhone and iPad plays more kinds of video.');
         return;
       }
       attempt = 1;
@@ -215,7 +223,7 @@
   function showError(t) {
     msgEl.replaceChildren(h('div', null, t), h('div', { class: 'player-msg-actions' },
       W.btn({ class: 'button', onclick: () => P.retry() }, 'Try again'),
-      W.btn({ class: 'button', onclick: () => P.external() }, 'Open in ' + W.extLabel)));
+      W.isTV ? null : W.btn({ class: 'button', onclick: () => P.external() }, 'Open in ' + W.extLabel)));
     msgEl.hidden = false;
     if (full) { clearTimeout(showMsg.t); W.focusFirst(msgEl); }
   }
@@ -242,7 +250,7 @@
       if (item !== it) return;
     }
     if (it.kind === 'live') {
-      if (W.api.noFFmpeg && it.convert) { spinner.hidden = true; showError('Antenna channels need converting, which ' + W.brand + ' can’t do. Open them in VLC instead.'); }
+      if (W.api.noFFmpeg && it.convert && !W.api.playsAntenna) { spinner.hidden = true; showError('Antenna channels need converting, which ' + W.brand + ' can’t do. Open them in VLC instead.'); }
       else if (!W.api.noFFmpeg && (it.convert || W.settings.alwaysConvert)) { attempt = 1; convert(it.convert || 'copy'); }
       else startEngine(it.url);
     } else {
@@ -436,8 +444,8 @@
       );
     }
     if (probeInfo && probeInfo.audio.length > 1) osdButtons.append(b('🔊 Sound', pickAudio));
-    osdButtons.append(...[b('🔉 Volume', pickVolume), b('▣ Mini player', () => { P.mini(); }, 'Keep watching in a corner while you browse'),
-      P.pipSupported() ? b('⧉ Picture-in-picture', () => P.pip(), 'Keep watching in a floating window') : null, W.isIOS ? null : b('⛶ Window', () => W.api.win.fullscreen()), b('↗ ' + W.extLabel, P.external), b('✕ Close', () => W.back())].filter(Boolean));
+    osdButtons.append(...[W.isTV ? null : b('🔉 Volume', pickVolume), b('▣ Mini player', () => { P.mini(); }, 'Keep watching in a corner while you browse'),
+      P.pipSupported() ? b('⧉ Picture-in-picture', () => P.pip(), 'Keep watching in a floating window') : null, W.isIOS || W.isTV ? null : b('⛶ Window', () => W.api.win.fullscreen()), W.isTV ? null : b('↗ ' + W.extLabel, P.external), b('✕ Close', () => W.back())].filter(Boolean));
     updateNow();
   }
 
