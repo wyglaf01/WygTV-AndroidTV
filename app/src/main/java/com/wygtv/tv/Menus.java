@@ -603,7 +603,7 @@ final class Menus {
             row(a, list, groupIcon(GROUP_PLAYLISTS) + "  " + groupTitle(GROUP_PLAYLISTS), "playlists, HDHomeRun, AirTV, Tablo, manage categories, hide and show channels, channel groups, TV guides (EPG)", () -> settingsGroup(a, GROUP_PLAYLISTS));
             row(a, list, groupIcon(GROUP_PLAYER) + "  " + groupTitle(GROUP_PLAYER), "built-in or external player, live stream format, buffer, video decoder, subtitles, watched series, play next", () -> settingsGroup(a, GROUP_PLAYER));
             row(a, list, groupIcon(GROUP_APPEARANCE) + "  " + groupTitle(GROUP_APPEARANCE), "theme, glass effect, app mode, main screen, start-up screen, side menu order, Exit button, guide rows, channel order, live preview, movie and series info, IMDb ratings", () -> settingsGroup(a, GROUP_APPEARANCE));
-            row(a, list, groupIcon(GROUP_BACKUP) + "  " + groupTitle(GROUP_BACKUP), "back up, restore, check for updates  •  " + Brand.NAME + " " + Updater.installedName(a), () -> settingsGroup(a, GROUP_BACKUP));
+            row(a, list, groupIcon(GROUP_BACKUP) + "  " + groupTitle(GROUP_BACKUP), BuildConfig.GALAXY ? "back up, restore, about" : "back up, restore, check for updates  •  " + Brand.NAME + " " + Updater.installedName(a), () -> settingsGroup(a, GROUP_BACKUP));
         } else if (g.equals(GROUP_PLAYLISTS)) {
             if (!Brand.OTA) row(a, list, "Manage playlists", Manage.playlistSummary(a) + "  •  press OK to add, edit, refresh, delete or turn playlists on and off", () -> { playlistsFromSettings = true; playlists(a); });
             final int onOffRow = list.getChildCount();
@@ -809,13 +809,15 @@ final class Menus {
         } else {
             row(a, list, "Back up playlists", "save playlists, favorites, your categories, My List, hidden items and all settings to a dated " + Brand.NAME + " backup file", () -> Backup.backup(a));
             row(a, list, "Restore from a backup", "reload everything from a " + Brand.NAME + " backup file", () -> Backup.restore(a));
-            row(a, list, "Check for updates", Brand.NAME + " " + Updater.installedName(a) + "  •  press OK to look for a newer version and install it over this one", () -> Updater.check(a, true));
-            final int autoRow = list.getChildCount();
-            boolean auto = a.prefs.getBoolean(Updater.PREF_AUTO, true);
-            row(a, list, "Look for updates at start-up", auto ? "On  •  offers new versions when " + Brand.NAME + " opens" : "Off", () -> {
-                a.prefs.edit().putBoolean(Updater.PREF_AUTO, !a.prefs.getBoolean(Updater.PREF_AUTO, true)).apply();
-                settings(a, autoRow);
-            });
+            if (!BuildConfig.GALAXY) { // the Galaxy Store version is updated by the store
+                row(a, list, "Check for updates", Brand.NAME + " " + Updater.installedName(a) + "  •  press OK to look for a newer version and install it over this one", () -> Updater.check(a, true));
+                final int autoRow = list.getChildCount();
+                boolean auto = a.prefs.getBoolean(Updater.PREF_AUTO, true);
+                row(a, list, "Look for updates at start-up", auto ? "On  •  offers new versions when " + Brand.NAME + " opens" : "Off", () -> {
+                    a.prefs.edit().putBoolean(Updater.PREF_AUTO, !a.prefs.getBoolean(Updater.PREF_AUTO, true)).apply();
+                    settings(a, autoRow);
+                });
+            }
             String version = Updater.installedName(a);
             final String about = Brand.NAME + " " + version + (Brand.OTA ? "  •  antenna TV from HDHomeRun and Tablo" : " for Android TV");
             row(a, list, "About", about + "  •  made by Wyglaf", () -> aboutDialog(a, about));

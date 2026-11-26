@@ -160,6 +160,111 @@ jobs:
           path: app/build/reports/
           if-no-files-found: ignore
 
+  # WygTV for Samsung's Galaxy Store (WYGTV_GALAXY=1): targets API 34 and has no in-app updater (the store updates it).
+  # Uploaded to Seller Portal by hand; published here as the wygtv-galaxy pre-release.
+  galaxy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Load the signing key
+        env:
+          WYGTV_KEYSTORE_B64: ${{ secrets.WYGTV_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$WYGTV_KEYSTORE_B64" ]; then
+            echo "$WYGTV_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/wygtv-release.jks"
+            echo "WYGTV_KEYSTORE=$RUNNER_TEMP/wygtv-release.jks" >> "$GITHUB_ENV"
+          else
+            echo "::warning::WYGTV_KEYSTORE_B64 secret not set; signing with a temporary debug key."
+          fi
+
+      - name: Check and build WygTV for Galaxy Store
+        env:
+          WYGTV_KEY_PASSWORD: ${{ secrets.WYGTV_KEY_PASSWORD }}
+          WYGTV_GALAXY: '1'
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
+        run: gradle --no-daemon :app:lintDebug :app:assembleDebug
+
+      - name: Make sure the store build can't install or update apps
+        run: |
+          APK=$(ls app/build/outputs/apk/debug/*.apk | head -1)
+          AAPT=$(ls "$ANDROID_HOME"/build-tools/*/aapt | tail -1)
+          "$AAPT" dump badging "$APK" | grep -E "^(package|targetSdkVersion|uses-permission)"
+          if "$AAPT" dump badging "$APK" | grep -q REQUEST_INSTALL_PACKAGES; then echo "::error::the Galaxy Store build still asks to install packages"; exit 1; fi
+          "$AAPT" dump badging "$APK" | grep -q "targetSdkVersion:'34'" || { echo "::error::the Galaxy Store build must target API 34"; exit 1; }
+          mkdir -p dist
+          cp "$APK" "dist/wygtv-galaxy-1.0.${GITHUB_RUN_NUMBER}.apk"
+
+      - name: Upload Galaxy Store APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: wygtv-galaxy
+          path: dist/*.apk
+          if-no-files-found: error
+
+      - name: Upload check reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Galaxy-check-reports
+          path: app/build/reports/
+          if-no-files-found: ignore
+
+  publish-galaxy:
+    needs: galaxy
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/app')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Download Galaxy Store APK
+        uses: actions/download-artifact@v4
+        with:
+          name: wygtv-galaxy
+          path: dist
+
+      - name: Update the WygTV for Galaxy Store release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: wygtv-galaxy
+        run: |
+          git tag -f "$TAG"
+          git push -f origin "refs/tags/$TAG"
+          APK=$(ls dist/*.apk | head -1)
+          NOTES="WygTV 1.0.${GITHUB_RUN_NUMBER} for Samsung's Galaxy Store (targets Android 14 / API 34, no in-app updater).
+
+          Upload $(basename "$APK") in Galaxy Store Seller Portal (Binary tab). It is not meant for installing by hand: use WygTV from the latest release for that."
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "WygTV for Galaxy Store 1.0.${GITHUB_RUN_NUMBER}" --notes "$NOTES" --prerelease --latest=false
+            for old in $(gh release view "$TAG" --json assets --jq '.assets[].name' | grep '^wygtv-galaxy-.*\.apk$'); do gh release delete-asset "$TAG" "$old" --yes; done
+          else
+            gh release create "$TAG" --title "WygTV for Galaxy Store 1.0.${GITHUB_RUN_NUMBER}" --notes "$NOTES" --prerelease --latest=false
+          fi
+          gh release upload "$TAG" "$APK" --clobber
+
   # WygOTA for Ubuntu: a .deb built with jpackage (bundles its own Java; needs VLC, which apt installs with it).
   # Built on the oldest supported Ubuntu so the package installs on 22.04 and newer.
   linux:

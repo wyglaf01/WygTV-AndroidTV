@@ -285,7 +285,9 @@ final class Subtitles {
     }
 
     void pickFile() {
-        if (Build.VERSION.SDK_INT >= 23 && a.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+        // Android 13+ with a newer target (the Galaxy Store build) has no such permission to ask for: just list what can be read.
+        boolean askable = Build.VERSION.SDK_INT < 33 || a.getApplicationInfo().targetSdkVersion < 33;
+        if (Build.VERSION.SDK_INT >= 23 && askable && a.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
             toast("Allow WygTV to read files, then choose this again.");
             a.requestPermissions(new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, REQ_FILES);
             return;

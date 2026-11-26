@@ -61,11 +61,13 @@ final class Updater {
 
     /** Called once at start-up: quietly offers an update when there is one. */
     static void checkAtStartup(MainActivity a) {
+        if (BuildConfig.GALAXY) return; // the Galaxy Store version is updated by the store
         if (a.prefs.getBoolean(PREF_AUTO, true)) check(a, false);
     }
 
     /** Looks for a newer WygTV. When {@code manual}, also says so when it is already up to date or the check fails. */
     static void check(MainActivity a, boolean manual) {
+        if (BuildConfig.GALAXY) { if (manual) Toast.makeText(a, "Updates come from the Galaxy Store.", Toast.LENGTH_LONG).show(); return; }
         if (manual) Toast.makeText(a, "Checking for a " + Brand.NAME + " update…", Toast.LENGTH_SHORT).show();
         new Thread(() -> {
             JSONObject info = null;
