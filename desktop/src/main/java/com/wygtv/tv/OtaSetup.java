@@ -29,7 +29,7 @@ final class OtaSetup extends JDialog {
     private final BiConsumer<Hdhr.Device, List<OtaLineup.Channel>> done;
 
     OtaSetup(JFrame owner, String address, String problem, BiConsumer<Hdhr.Device, List<OtaLineup.Channel>> done) {
-        super(owner, "Set up your HDHomeRun tuner", true);
+        super(owner, "Set up your HDHomeRun or Tablo", true);
         this.done = done;
         JPanel p = new JPanel();
         p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
@@ -37,7 +37,9 @@ final class OtaSetup extends JDialog {
         JTextArea note = new JTextArea("Channels come from the tuner's lineup (the same list as http://hdhomerun.local/lineup.html), "
                 + "grouped by channel number. The TV guide comes from SiliconDust's free HDHomeRun guide.\n\n"
                 + "If hdhomerun.local isn't found, press Find tuners or type the tuner's IP address "
-                + "(shown in your router, or at my.hdhomerun.com)." + (problem == null ? "" : "\n\n" + problem));
+                + "(shown in your router, or at my.hdhomerun.com).\n\n"
+                + "A black Tablo (DUAL, QUAD, LITE) works too: press Find tuners or type its IP address. Its channels and TV guide come from the Tablo. "
+                + "The white 4th Gen Tablo only works in Tablo's own app." + (problem == null ? "" : "\n\n" + problem));
         note.setLineWrap(true); note.setWrapStyleWord(true); note.setEditable(false); note.setOpaque(false); note.setColumns(44);
         note.setAlignmentX(Component.LEFT_ALIGNMENT);
         p.add(note);
@@ -73,7 +75,11 @@ final class OtaSetup extends JDialog {
     private void find() {
         busy(true, "Looking for HDHomeRun tuners…");
         new SwingWorker<List<Hdhr.Device>, Void>() {
-            @Override protected List<Hdhr.Device> doInBackground() { return Hdhr.discoverAll(); }
+            @Override protected List<Hdhr.Device> doInBackground() {
+                List<Hdhr.Device> all = new java.util.ArrayList<>(Hdhr.discoverAll());
+                all.addAll(OtaTablo.discoverAll()); // black Tablos, through Tablo's cloud lookup
+                return all;
+            }
 
             @Override protected void done() {
                 List<Hdhr.Device> found;
@@ -102,6 +108,7 @@ final class OtaSetup extends JDialog {
     private void connect() {
         String base = Hdhr.baseFromInput(host.getText());
         if (base.isEmpty()) { status.setText("Enter the tuner's address, like hdhomerun.local or 192.168.1.50."); return; }
+        final String typed = host.getText();
         busy(true, "Connecting to " + Hdhr.hostOf(base) + "…");
         new SwingWorker<Object[], Void>() {
             String problem;
@@ -109,9 +116,14 @@ final class OtaSetup extends JDialog {
             @Override protected Object[] doInBackground() {
                 Hdhr.Device dev;
                 try { dev = Hdhr.describe(base); } catch (Exception e) {
-                    problem = "No HDHomeRun tuner answered at " + Hdhr.hostOf(base) + ". Check the address, or press Find tuners."
-                            + (base.contains(".local") ? " If this computer can't look up hdhomerun.local, use the tuner's IP address." : "");
-                    return null;
+                    // Not an HDHomeRun: maybe a black Tablo at that address.
+                    try { dev = OtaTablo.describe(typed); }
+                    catch (Tablo.LockedException locked) { problem = Tablo.LOCKED; return null; }
+                    catch (Exception notTablo) {
+                        problem = "No HDHomeRun or Tablo answered at " + Hdhr.hostOf(base) + ". Check the address, or press Find tuners."
+                                + (base.contains(".local") ? " If this computer can't look up hdhomerun.local, use the tuner's IP address." : "");
+                        return null;
+                    }
                 }
                 List<OtaLineup.Channel> chans;
                 try { chans = OtaLineup.load(dev.lineupUrl); } catch (Exception e) { problem = "The tuner answered but its channel list couldn't be read."; return null; }

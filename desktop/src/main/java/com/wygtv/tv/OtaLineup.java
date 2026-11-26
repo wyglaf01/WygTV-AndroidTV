@@ -55,6 +55,7 @@ final class OtaLineup {
 
     /** Blocking: call off the UI thread. */
     static List<Channel> load(String lineupUrl) throws Exception {
+        if (OtaTablo.isTablo(lineupUrl)) return OtaTablo.load(lineupUrl); // a black Tablo
         return parse(Library.download(lineupUrl, 30000));
     }
 }

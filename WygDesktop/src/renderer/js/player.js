@@ -13,6 +13,7 @@
   let engine = null; // { kind, obj }
   let item = null, opts = {};
   let full = false, host = null, hostObs = null;
+  let mini = false, miniBar = null; // the mini player: the picture in a corner, still playing, while the rest of the app is used
   let offset = 0, duration = 0; // for FFmpeg-converted files (seek = restart at offset)
   let attempt = 0, lastProgress = 0, stallTimer = null, startTimer = null, saveTimer = null, hideTimer = null, audioCheck = null;
   let probeInfo = null, audioIndex = 0, numBuf = '', numTimer = null;
@@ -36,13 +37,26 @@
     overlay = h('div', { class: 'osd', hidden: true },
       h('div', { class: 'osd-top' }, h('img', { class: 'osd-logo', src: 'assets/icon.png', alt: '' }), h('div', { class: 'osd-titles' }, osdTitle, osdSub), h('div', { class: 'osd-clock' })),
       h('div', { class: 'osd-bottom' }, osdNow, osdBar, osdTimes, osdButtons));
-    root = h('div', { id: 'player', hidden: true }, video, spinner, msgEl, numEl, overlay);
+    miniBar = h('div', { class: 'mini-bar' });
+    root = h('div', { id: 'player', hidden: true }, video, spinner, msgEl, numEl, overlay, miniBar);
+    // Picture-in-picture: the browser's own floating window. Going into it from full screen also shrinks the
+    // in-app picture to the mini player, so the app can be used while it plays.
+    video.addEventListener('enterpictureinpicture', () => { if (full) P.mini(); renderMiniBar(); });
+    video.addEventListener('leavepictureinpicture', () => renderMiniBar());
+    if (W.settings.autoPip !== false) video.setAttribute('autopictureinpicture', ''); // iOS / Safari: keep playing in a window when the app goes to the background
+    document.addEventListener('keydown', (e) => {
+      if (!mini || !item || full) return;
+      if (e.key === 'MediaPlayPause') { togglePause(); renderMiniBar(); e.preventDefault(); }
+      else if (e.key === 'MediaStop') { P.stop(); e.preventDefault(); }
+    }, true);
     W.$('#app').append(root);
 
     video.addEventListener('playing', () => { spinner.hidden = true; msgEl.hidden = true; attempt = Math.min(attempt, 1); clearTimeout(startTimer); });
     video.addEventListener('waiting', () => { spinner.hidden = false; armStall(); });
     video.addEventListener('timeupdate', () => { lastProgress = Date.now(); spinner.hidden = true; updateBar(); });
     video.addEventListener('ended', onEnded);
+    video.addEventListener('play', () => renderMiniBar());
+    video.addEventListener('pause', () => renderMiniBar());
     video.addEventListener('error', () => fail('video', video.error && video.error.message));
     video.addEventListener('dblclick', () => { if (full) W.api.win.fullscreen(); else P.enterFull(); });
     // Touch screens: a double-tap on the picture does the same (not every system turns two taps into a double-click).
@@ -52,7 +66,7 @@
       if (now - lastTap < 320) { e.preventDefault(); lastTap = 0; if (full) { if (W.api.win && W.api.win.fullscreen && !W.isIOS) W.api.win.fullscreen(); } else P.enterFull(); return; }
       lastTap = now;
     }, { passive: false });
-    video.addEventListener('click', () => { if (full) { if (overlay.hidden) showOsd(); else if (!isLiveItem()) togglePause(); } });
+    video.addEventListener('click', () => { if (mini) { P.enterFull(); return; } if (full) { if (overlay.hidden) showOsd(); else if (!isLiveItem()) togglePause(); } });
     root.addEventListener('mousemove', () => { if (full) showOsd(true); });
     setInterval(() => { const c = W.$('.osd-clock', root); if (c) c.textContent = W.fmtTime(Date.now()); }, 1000 * 15);
   }
@@ -61,6 +75,7 @@
   const totalDuration = () => duration || (isFinite(video.duration) ? video.duration : 0);
   const position = () => offset + (video.currentTime || 0);
   P.isFull = () => full;
+  P.isMini = () => mini;
   P.item = () => item;
   P.playing = () => !!item;
 
@@ -219,6 +234,13 @@
     if (o.full) P.enterFull(); else if (o.host) P.attach(o.host);
     if (it.kind === 'live') { W.addRecent(it.key); W.api.net.setUserAgent(W.settings.userAgent || ''); }
     renderOsd();
+    if (it.kind === 'live' && it.ch && it.ch.tablo && !it.url) {
+      // A Tablo channel: ask the Tablo to tune it, which gives this play's HLS link.
+      spinner.hidden = false;
+      try { it.url = await W.api.tablo.watch(it.ch.tablo.base, it.ch.tablo.id); }
+      catch (e) { if (item === it) { spinner.hidden = true; showError(e.message || String(e)); } return; }
+      if (item !== it) return;
+    }
     if (it.kind === 'live') {
       if (W.api.noFFmpeg && it.convert) { spinner.hidden = true; showError('Antenna channels need converting, which ' + W.brand + ' can’t do. Open them in VLC instead.'); }
       else if (!W.api.noFFmpeg && (it.convert || W.settings.alwaysConvert)) { attempt = 1; convert(it.convert || 'copy'); }
@@ -253,7 +275,7 @@
     return true;
   }
 
-  P.retry = () => { if (item) { const it = item, o = opts; o.triedAlt = false; delete o.convert; P.play(it, o); } };
+  P.retry = () => { if (item) { const it = item, o = opts; o.triedAlt = false; delete o.convert; if (it.ch && it.ch.tablo) it.url = ''; /* tune the Tablo again */ P.play(it, o); } };
 
   P.external = async () => {
     if (!item) return;
@@ -267,6 +289,8 @@
     destroyEngine();
     W.api && W.api.stream.stop().catch(() => { });
     item = null;
+    if (mini) leaveMini();
+    if (document.pictureInPictureElement === video) document.exitPictureInPicture().catch(() => { });
     if (root) { root.hidden = true; overlay.hidden = true; msgEl.hidden = true; }
     if (full) P.exitFull(true);
     P.detach();
@@ -289,6 +313,7 @@
 
   // ------------------------------------------------------------------ preview / full screen
   P.attach = function attach(el) {
+    if (mini) leaveMini();
     host = el;
     full = false;
     root.classList.remove('full');
@@ -317,6 +342,7 @@
 
   P.enterFull = function enterFull() {
     if (!root) build();
+    if (mini) leaveMini();
     full = true;
     root.classList.add('full');
     root.classList.remove('preview');
@@ -333,6 +359,61 @@
     if (!stopping && host && host.isConnected && item) { root.classList.add('preview'); place(); }
     else if (!stopping) { P.stop(); }
     if (P.onExitFull) P.onExitFull();
+  };
+
+  // ------------------------------------------------------------------ mini player and picture-in-picture
+  /** Full screen (or a preview) → a window in the corner that keeps playing while the rest of the app is used. */
+  P.mini = function toMini() {
+    if (!item || !root) return;
+    const wasFull = full;
+    full = false;
+    W.keyHook = null;
+    if (hostObs) hostObs.disconnect();
+    hostObs = null; host = null;
+    window.removeEventListener('resize', place);
+    root.classList.remove('full', 'preview');
+    root.classList.add('mini');
+    Object.assign(root.style, { left: '', top: '', width: '', height: '' });
+    overlay.hidden = true;
+    mini = true;
+    renderMiniBar();
+    if (wasFull && P.onExitFull) P.onExitFull();
+  };
+
+  function leaveMini() {
+    mini = false;
+    if (root) root.classList.remove('mini');
+    if (miniBar) miniBar.replaceChildren();
+  }
+
+  function renderMiniBar() {
+    if (!miniBar) return;
+    miniBar.replaceChildren();
+    if (!mini || !item) return;
+    const b = (label, title, fn) => W.btn({ class: 'mini-btn', title, onclick: (e) => { e.stopPropagation(); fn(); } }, label);
+    miniBar.append(
+      h('div', { class: 'mini-title' }, (item.num ? item.num + '  ' : '') + item.name),
+      b('⛶', 'Full screen', () => P.enterFull()),
+      b(video.paused ? '▶' : '❚❚', video.paused ? 'Play' : 'Pause', () => { togglePause(); renderMiniBar(); }),
+      P.pipSupported() ? b('⧉', 'Picture-in-picture', () => P.pip()) : null,
+      b('✕', 'Close', () => P.stop()));
+  }
+
+  P.pipSupported = () => !!(document.pictureInPictureEnabled && video && !video.disablePictureInPicture);
+
+  /** The system's floating picture-in-picture window (on or off). */
+  P.pip = async function pip() {
+    if (!item || !video) return;
+    try {
+      if (document.pictureInPictureElement === video) await document.exitPictureInPicture();
+      else await video.requestPictureInPicture();
+    } catch (e) { W.toast('Picture-in-picture isn’t available for this video'); }
+  };
+
+  /** The window was minimized while something plays (desktop): keep it playing in picture-in-picture. */
+  P.autoPip = function autoPip() {
+    if (W.settings.autoPip === false || !item || video.paused || document.pictureInPictureElement) return;
+    P.pip();
   };
 
   // ------------------------------------------------------------------ on-screen bar
@@ -355,7 +436,8 @@
       );
     }
     if (probeInfo && probeInfo.audio.length > 1) osdButtons.append(b('🔊 Sound', pickAudio));
-    osdButtons.append(...[b('🔉 Volume', pickVolume), W.isIOS ? null : b('⛶ Window', () => W.api.win.fullscreen()), b('↗ ' + W.extLabel, P.external), b('✕ Close', () => W.back())].filter(Boolean));
+    osdButtons.append(...[b('🔉 Volume', pickVolume), b('▣ Mini player', () => { P.mini(); }, 'Keep watching in a corner while you browse'),
+      P.pipSupported() ? b('⧉ Picture-in-picture', () => P.pip(), 'Keep watching in a floating window') : null, W.isIOS ? null : b('⛶ Window', () => W.api.win.fullscreen()), b('↗ ' + W.extLabel, P.external), b('✕ Close', () => W.back())].filter(Boolean));
     updateNow();
   }
 
@@ -381,6 +463,7 @@
   }
 
   function showOsd(noFocus) {
+    if (mini) return;
     if (!full) return;
     const was = overlay.hidden;
     overlay.hidden = false;

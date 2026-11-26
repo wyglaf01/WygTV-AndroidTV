@@ -65,7 +65,8 @@ public final class OtaDesktop {
     private EmbeddedMediaPlayerComponent player;
     private String base = "", lineupUrl = "";
     private List<OtaLineup.Channel> channels = Collections.emptyList();
-    private boolean fullScreen;
+    private boolean fullScreen, mini;
+    private java.awt.Rectangle beforeMini;
     private final StringBuilder typed = new StringBuilder();
     private final Timer typedTimer = new Timer(2000, e -> jumpToTyped());
 
@@ -108,6 +109,7 @@ public final class OtaDesktop {
         buttons.setOpaque(false);
         buttons.add(button("Tuner…", () -> setup(null)));
         buttons.add(button("Reload guide", this::loadGuide));
+        buttons.add(button("Mini window (W)", this::toggleMini));
         buttons.add(button("Full screen (F)", this::toggleFullScreen));
         header.add(buttons, BorderLayout.EAST);
         frame.add(header, BorderLayout.NORTH);
@@ -116,7 +118,7 @@ public final class OtaDesktop {
         if (vlc) {
             // Deinterlace: antenna TV is mostly 1080i / 480i.
             player = new EmbeddedMediaPlayerComponent("--no-video-title-show", "--deinterlace=1", "--deinterlace-mode=yadif2x") {
-                @Override public void mouseClicked(MouseEvent e) { if (e.getClickCount() == 2) toggleFullScreen(); }
+                @Override public void mouseClicked(MouseEvent e) { if (e.getClickCount() == 2) { if (mini) toggleMini(); else toggleFullScreen(); } }
             };
             player.videoSurfaceComponent().setFocusable(false);
             player.mediaPlayer().events().addMediaPlayerEventListener(new MediaPlayerEventAdapter() {
@@ -184,7 +186,7 @@ public final class OtaDesktop {
         statusBar.setBorder(BorderFactory.createEmptyBorder(4, 14, 4, 14));
         status.setForeground(OtaGuide.MUTED);
         statusBar.add(status, BorderLayout.CENTER);
-        JLabel keys = new JLabel("▲▼ pick  •  Enter play  •  PgUp/PgDn channel  •  F full screen  •  M mute");
+        JLabel keys = new JLabel("▲▼ pick  •  Enter play  •  PgUp/PgDn channel  •  F full screen  •  W mini window  •  M mute");
         keys.setForeground(OtaGuide.MUTED);
         statusBar.add(keys, BorderLayout.EAST);
         frame.add(statusBar, BorderLayout.SOUTH);
@@ -238,6 +240,10 @@ public final class OtaDesktop {
             @Override protected Object[] doInBackground() throws Exception {
                 String b = base.isEmpty() ? Hdhr.baseFromInput(Hdhr.DEFAULT_HOST) : base;
                 Hdhr.Device dev;
+                if (OtaTablo.isTablo(lineupUrl)) {
+                    dev = OtaTablo.describe(b);
+                    return new Object[]{dev, OtaLineup.load(dev.lineupUrl)};
+                }
                 try { dev = Hdhr.describe(b); } catch (Exception e) {
                     // The tuner may have a new address: look for it on the network.
                     dev = null;
@@ -284,8 +290,10 @@ public final class OtaDesktop {
     private void loadGuide() {
         if (base.isEmpty()) return;
         final String b = base;
+        final boolean tablo = OtaTablo.isTablo(lineupUrl);
         new SwingWorker<Map<String, List<Xmltv.Program>>, Void>() {
-            @Override protected Map<String, List<Xmltv.Program>> doInBackground() throws Exception { return Hdhr.loadGuide(b, OtaGuide.HOURS); }
+            // A Tablo keeps its own guide; an HDHomeRun's comes from SiliconDust.
+            @Override protected Map<String, List<Xmltv.Program>> doInBackground() throws Exception { return tablo ? Tablo.loadGuide(b, OtaGuide.HOURS) : Hdhr.loadGuide(b, OtaGuide.HOURS); }
 
             @Override protected void done() {
                 try {
@@ -308,7 +316,22 @@ public final class OtaDesktop {
         frame.setTitle(NAME + "  •  " + c.title());
         if (player == null) return;
         status.setText("Tuning " + c.title() + "…");
-        player.mediaPlayer().media().play(c.url, ":network-caching=1500", ":http-reconnect");
+        if (!Tablo.isWatchUrl(c.url)) { player.mediaPlayer().media().play(c.url, ":network-caching=1500", ":http-reconnect"); return; }
+        // A Tablo channel: ask the Tablo to tune it first (it gives this play's HLS link).
+        final String number = c.number;
+        new SwingWorker<String, Void>() {
+            @Override protected String doInBackground() throws Exception { return OtaTablo.playable(c.url); }
+
+            @Override protected void done() {
+                if (!number.equals(guide.playing)) return; // another channel was picked meanwhile
+                try { player.mediaPlayer().media().play(get(), ":network-caching=1500", ":http-reconnect"); }
+                catch (Exception e) {
+                    Throwable t = e.getCause() == null ? e : e.getCause();
+                    status.setText(t instanceof Tablo.LockedException ? Tablo.LOCKED
+                            : "The Tablo couldn't tune " + c.title() + ". All of its tuners may be in use, or it may be off.");
+                }
+            }
+        }.execute();
     }
 
     private void zap(int step) {
@@ -365,6 +388,34 @@ public final class OtaDesktop {
         frame.revalidate();
     }
 
+    /**
+     * Mini window (picture-in-picture): only the picture, in a small window that stays on top of other apps in the
+     * bottom-right corner, so TV keeps playing while the computer is used. W (or double-click) goes back.
+     */
+    private void toggleMini() {
+        if (fullScreen) toggleFullScreen();
+        mini = !mini;
+        header.setVisible(!mini);
+        info.setVisible(!mini);
+        statusBar.setVisible(!mini);
+        guideScroll.setVisible(!mini);
+        split.setDividerSize(mini ? 0 : 6);
+        frame.setAlwaysOnTop(mini);
+        if (mini) {
+            beforeMini = frame.getBounds();
+            frame.setExtendedState(JFrame.NORMAL);
+            frame.setMinimumSize(new Dimension(320, 180));
+            java.awt.Rectangle screen = GraphicsEnvironment.getLocalGraphicsEnvironment().getMaximumWindowBounds();
+            int w = 480, h = 300;
+            frame.setBounds(screen.x + screen.width - w - 24, screen.y + screen.height - h - 24, w, h);
+        } else {
+            frame.setMinimumSize(new Dimension(800, 520));
+            if (beforeMini != null) frame.setBounds(beforeMini);
+            SwingUtilities.invokeLater(() -> split.setDividerLocation(0.58));
+        }
+        frame.revalidate();
+    }
+
     private boolean key(KeyEvent e) {
         if (e.getID() != KeyEvent.KEY_PRESSED || !frame.isActive()) return false;
         if (KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner() instanceof javax.swing.text.JTextComponent
@@ -378,8 +429,9 @@ public final class OtaDesktop {
                 return true;
             case KeyEvent.VK_PAGE_UP: case KeyEvent.VK_ADD: zap(-1); return true;
             case KeyEvent.VK_PAGE_DOWN: case KeyEvent.VK_SUBTRACT: zap(1); return true;
-            case KeyEvent.VK_F11: case KeyEvent.VK_F: toggleFullScreen(); return true;
-            case KeyEvent.VK_ESCAPE: if (fullScreen) toggleFullScreen(); return true;
+            case KeyEvent.VK_F11: case KeyEvent.VK_F: if (mini) toggleMini(); toggleFullScreen(); return true;
+            case KeyEvent.VK_W: toggleMini(); return true;
+            case KeyEvent.VK_ESCAPE: if (fullScreen) toggleFullScreen(); else if (mini) toggleMini(); return true;
             case KeyEvent.VK_M: if (player != null) player.mediaPlayer().audio().mute(); return true;
             default: break;
         }

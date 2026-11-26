@@ -10,6 +10,7 @@ const crypto = require('crypto');
 const net = require('./net');
 const xmltv = require('./xmltv');
 const hdhr = require('./hdhr');
+const tablo = require('./tablo');
 
 const MAX_AGE = 12 * 3600e3;
 
@@ -52,6 +53,7 @@ class EpgStore {
           if (Date.now() - saved.loadedAt < MAX_AGE) { this.set(g, saved.data, saved.loadedAt); return; }
         }
         const data = url.startsWith('hdhr:') ? await hdhr.loadGuide(url.slice(5), 24)
+          : url.startsWith('tablo:') ? await tablo.loadGuide(url.slice(6), 24)
           : await xmltv.parseStream(await net.stream(url, { timeout: 180000 }));
         this.set(g, data, Date.now());
         g.error = '';

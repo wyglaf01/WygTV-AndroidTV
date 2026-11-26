@@ -98,6 +98,7 @@
           btn({ class: 'tile', 'data-autofocus': '', onclick: () => W.addPlaylist('xtream') }, h('div', { class: 'tile-icon' }, '🔑'), h('div', { class: 'tile-label' }, 'Xtream login')),
           btn({ class: 'tile', onclick: () => W.addPlaylist('m3u') }, h('div', { class: 'tile-icon' }, '📄'), h('div', { class: 'tile-label' }, 'M3U playlist')),
           btn({ class: 'tile', onclick: () => W.addPlaylist('hdhr') }, h('div', { class: 'tile-icon' }, '📡'), h('div', { class: 'tile-label' }, 'Antenna TV (HDHomeRun)')),
+          btn({ class: 'tile', onclick: () => W.addPlaylist('tablo') }, h('div', { class: 'tile-icon' }, '📡'), h('div', { class: 'tile-label' }, 'Antenna TV (Tablo)')),
           btn({ class: 'tile', onclick: () => W.restoreBackup() }, h('div', { class: 'tile-icon' }, '⤓'), h('div', { class: 'tile-label' }, 'Restore a backup'))));
     },
   };
@@ -258,7 +259,7 @@
         const p = W.player.item();
         if (p && chanCol.isConnected) { const r = chanCol.querySelector(`[data-k="${CSS.escape('c:' + p.key)}"]`); W.$$('.chan.playing', chanCol).forEach((x) => x.classList.remove('playing')); if (r) { r.classList.add('playing'); W.focus(r, { block: 'center' }); } }
       };
-      entry.cleanup = () => { offs.forEach((f) => f()); if (filler) filler.stop(); W.player.onExitFull = null; if (!W.player.isFull()) W.player.stop(); };
+      entry.cleanup = () => { offs.forEach((f) => f()); if (filler) filler.stop(); W.player.onExitFull = null; if (!W.player.isFull() && !W.player.isMini()) W.player.stop(); };
 
       return h('div', { class: 'screen live' },
         W.header('Live TV', [
