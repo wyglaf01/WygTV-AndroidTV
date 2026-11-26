@@ -1,0 +1,96 @@
+name: Galaxy Store APK
+
+# Builds WygTV for the Samsung Galaxy Store (GALAXY_STORE=1): a signed release APK without the
+# in-app updater. Run it by hand when the current WygTV Beta is OK: it rebuilds the beta's exact
+# commit with the beta's version number and saves wygtv-galaxy-<version>.apk as a workflow artifact
+# (not a GitHub release, so the sideloaded app's updater never sees it). Upload that APK in the
+# Galaxy Store Seller Portal. Pull requests that touch the app also build it, as a check.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [app, main]
+    paths: ["app/**", ".github/workflows/galaxy-store.yml"]
+
+jobs:
+  galaxy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Read the current beta
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download wygtv-beta --repo "$GITHUB_REPOSITORY" --pattern version.json --dir "$RUNNER_TEMP/beta"
+          echo "CODE=$(jq -r .versionCode "$RUNNER_TEMP/beta/version.json")" >> "$GITHUB_ENV"
+          echo "VERSION=$(jq -r .versionName "$RUNNER_TEMP/beta/version.json")" >> "$GITHUB_ENV"
+          echo "SHA=$(gh api "repos/$GITHUB_REPOSITORY/commits/wygtv-beta" --jq .sha)" >> "$GITHUB_ENV"
+
+      - name: Use this pull request's build number
+        if: github.event_name != 'workflow_dispatch'
+        run: |
+          echo "CODE=${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          echo "VERSION=1.0.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          echo "SHA=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_ENV"
+
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SHA }}
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Load the WygTV signing key
+        env:
+          WYGTV_KEYSTORE_B64: ${{ secrets.WYGTV_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$WYGTV_KEYSTORE_B64" ]; then
+            echo "$WYGTV_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/wygtv-release.jks"
+            echo "WYGTV_KEYSTORE=$RUNNER_TEMP/wygtv-release.jks" >> "$GITHUB_ENV"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "::error::WYGTV_KEYSTORE_B64 secret not set. The Galaxy Store APK must be signed with the permanent WygTV key."
+            exit 1
+          else
+            echo "::warning::WYGTV_KEYSTORE_B64 secret not set; the check build is unsigned."
+          fi
+
+      - name: Check and build the Galaxy Store APK
+        env:
+          GALAXY_STORE: '1'
+          WYGTV_KEY_PASSWORD: ${{ secrets.WYGTV_KEY_PASSWORD }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
+          WYGTV_VERSION_CODE: ${{ env.CODE }}
+        run: gradle --no-daemon :app:testReleaseUnitTest :app:assembleRelease
+
+      - name: Confirm the store APK has no self-updater and isn't debuggable
+        run: |
+          APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          AAPT=$(ls "$ANDROID_HOME"/build-tools/*/aapt | tail -1)
+          "$AAPT" dump badging "$APK" | grep -E "^package|application-debuggable|uses-permission" || true
+          if "$AAPT" dump permissions "$APK" | grep -q REQUEST_INSTALL_PACKAGES; then echo "::error::REQUEST_INSTALL_PACKAGES is still in the store APK"; exit 1; fi
+          if "$AAPT" dump badging "$APK" | grep -q application-debuggable; then echo "::error::The store APK is debuggable"; exit 1; fi
+          mkdir -p dist && cp "$APK" "dist/wygtv-galaxy-${VERSION}.apk"
+
+      - name: Upload the Galaxy Store APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: wygtv-galaxy-${{ env.VERSION }}
+          path: dist/*.apk
+          if-no-files-found: error

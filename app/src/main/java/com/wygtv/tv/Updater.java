@@ -50,6 +50,7 @@ final class Updater {
 
     /** Called once at start-up, before the update check: says "Updated to …" after an in-app update and tidies up. */
     static void afterUpdate(MainActivity a) {
+        if (Brand.STORE) return;
         int from = a.prefs.getInt(PREF_FROM, -1);
         if (from < 0) return;
         int now = installedCode(a);
@@ -61,11 +62,13 @@ final class Updater {
 
     /** Called once at start-up: quietly offers an update when there is one. */
     static void checkAtStartup(MainActivity a) {
+        if (Brand.STORE) return;
         if (a.prefs.getBoolean(PREF_AUTO, true)) check(a, false);
     }
 
     /** Looks for a newer WygTV. When {@code manual}, also says so when it is already up to date or the check fails. */
     static void check(MainActivity a, boolean manual) {
+        if (Brand.STORE) return;
         if (manual) Toast.makeText(a, "Checking for a " + Brand.NAME + " update…", Toast.LENGTH_SHORT).show();
         new Thread(() -> {
             JSONObject info = null;
@@ -158,6 +161,7 @@ final class Updater {
 
     /** Called from MainActivity.onStart: carries on with the install after the permission screen. */
     static void onReturn(MainActivity a) {
+        if (Brand.STORE) return;
         if (!waitingForPermission || !ApkProvider.file(a).exists()) return;
         if (canInstall(a)) { install(a); return; }
         waitingForPermission = false;
