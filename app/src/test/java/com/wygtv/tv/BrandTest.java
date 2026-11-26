@@ -19,4 +19,11 @@ public class BrandTest {
             assertTrue(Updater.APK.startsWith("wygtv"));
         }
     }
+
+    /** The Galaxy Store build is always the plain WygTV app (never WygOTA or the beta). */
+    @Test public void galaxyStoreBuildIsWygTv() {
+        if (!Brand.STORE) return;
+        assertEquals("WygTV", Brand.NAME);
+        assertEquals("com.wygtv.tv", BuildConfig.APPLICATION_ID);
+    }
 }

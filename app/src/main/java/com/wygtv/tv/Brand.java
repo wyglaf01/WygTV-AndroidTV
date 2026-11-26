@@ -8,6 +8,8 @@ package com.wygtv.tv;
 final class Brand {
     /** True in the WygOTA app. */
     static final boolean OTA = BuildConfig.OTA;
+    /** True in the Galaxy Store build (GALAXY_STORE=1): the store installs updates, so the in-app updater is off. */
+    static final boolean STORE = BuildConfig.STORE;
     /** "WygTV" or "WygOTA", for anything the person reads. */
     static final String NAME = OTA ? "WygOTA" : "WygTV";
     /** Where WygOTA updates from: every CI build on `app` publishes wygota.apk and version.json there. */
