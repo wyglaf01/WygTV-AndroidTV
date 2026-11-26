@@ -62,11 +62,12 @@
    * reconnecting isn't missed), until stop() is called. Calls onValues once with what the phone sent.
    */
   function listen(topic, key, onValues) {
+    // A plain GET (no extra headers or cache options), so the browser sends it without a CORS preflight.
     const since = Math.floor(Date.now() / 1000) - 5;
     let stopped = false, ac = null, timer = 0;
     async function once() {
       ac = typeof AbortController === 'function' ? new AbortController() : null;
-      const r = await fetch(RELAY + '/' + topic + '/json?since=' + since, { signal: ac ? ac.signal : undefined, cache: 'no-store' });
+      const r = await fetch(RELAY + '/' + topic + '/json?since=' + since, { signal: ac ? ac.signal : undefined });
       if (!r.ok || !r.body) throw new Error('relay ' + r.status);
       const rd = r.body.getReader(), td = new TextDecoder();
       let buf = '';
