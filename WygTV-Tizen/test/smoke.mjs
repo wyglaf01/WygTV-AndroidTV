@@ -464,11 +464,14 @@ try {
     const { page: tv, errors } = await open('', true);
     // A stand-in for ntfy.sh: the phone's POST is kept, and the TV's listening request gets it (or ends after a
     // moment, as a quiet relay connection would, and the TV listens again).
-    const relay = { posted: [] };
+    const relay = { posted: [], trace: [] };
+    const warns = [];
+    tv.on('console', (m) => { if (m.type() === 'warning' || m.type() === 'error') warns.push(m.text().slice(0, 120)); });
     await tv.route('https://ntfy.sh/**', async (route) => {
       const topic = new URL(route.request().url()).pathname.split('/')[1];
       let msg = relay.posted.find((p) => p.topic === topic);
       if (!msg) { await new Promise((r) => setTimeout(r, 700)); msg = relay.posted.find((p) => p.topic === topic); }
+      relay.trace.push((msg ? 'served' : 'empty') + '@' + (Date.now() % 100000));
       const line = msg ? { id: 'x', event: 'message', topic, message: msg.body } : { event: 'open', topic };
       await route.fulfill({ status: 200, headers: { 'Content-Type': 'application/x-ndjson', 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(line) + '\n' });
     });
@@ -518,8 +521,9 @@ try {
     // Back on the TV: the form fills in and the QR code closes.
     await tv.waitForFunction(() => !document.querySelector('.phone-dialog'), null, { timeout: 8000 }).catch(() => { });
     const vals = await tv.evaluate(() => [...document.querySelectorAll('.dialog.form input')].map((i) => i.value));
-    check(JSON.stringify(vals) === JSON.stringify(['Kitchen', 'http://example.com/get.php?username=alice&password=hunter2', 'hunter2']),
-      `the TV's form fills in from the phone (${JSON.stringify(vals.map((v) => v.slice(0, 24)))})`);
+    const filledOk = JSON.stringify(vals) === JSON.stringify(['Kitchen', 'http://example.com/get.php?username=alice&password=hunter2', 'hunter2']);
+    check(filledOk, `the TV's form fills in from the phone (${JSON.stringify(vals.map((v) => v.slice(0, 24)))})`
+      + (filledOk ? '' : ` [relay: ${relay.trace.slice(-8).join(' ')}; TV warnings: ${JSON.stringify(warns.slice(-4))}]`));
     check(await tv.evaluate(() => !document.querySelector('.phone-dialog')), 'the QR code closes once it has');
     await tv.screenshot({ path: path.join(shots, 'phone-filled.png') });
 
