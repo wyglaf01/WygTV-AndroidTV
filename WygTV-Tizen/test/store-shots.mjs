@@ -20,7 +20,7 @@ const SHOWS = {
   'demo.live': ['Live Test Pattern', 'Signal Check', 'Overnight Test Card', 'Morning Signal'],
   'demo.bipbop': ['Stream Lab', 'Encoding Hour', 'Bit Rate Ladder', 'Codec Corner'],
   'demo.bbb': ['Big Buck Bunny', 'Making of: Bunny', 'Open Movie Night', 'Animation Workshop'],
-  'demo.sintel': ['Sintel', 'Dragons of Blender', 'Open Movie Night', 'Scoring Sintel'],
+  'demo.apple169': ['Widescreen Test', 'Aspect Ratio Hour', 'Signal Check', 'Late Test Card'],
   'demo.tos': ['Tears of Steel', 'Visual Effects Today', 'Behind the Scenes', 'Sci-Fi Shorts'],
 };
 const xt = (t) => new Date(t).toISOString().replace(/[-:T]/g, '').slice(0, 14) + ' +0000';

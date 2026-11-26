@@ -284,7 +284,7 @@
     const lines = [
       'WygTV ' + appVersion() + ' · Samsung TV ' + get(() => pi.getRealModel()) + ' (' + get(() => pi.getModel()) + ')',
       'Firmware ' + get(() => pi.getFirmware()) + ' · Tizen ' + cap('http://tizen.org/feature/platform.version') + ' · web engine Chrome ' + chrome,
-      'Screen ' + window.innerWidth + '×' + window.innerHeight + ' at ' + (window.devicePixelRatio || 1) + '× · 4K panel: ' + get(() => pi.isUdPanelSupported()),
+      'Screen ' + window.innerWidth + '×' + window.innerHeight + ' at ' + (window.devicePixelRatio || 1) + '× (size: ' + (window.__wygTvSize || '?') + ') · 4K panel: ' + get(() => pi.isUdPanelSupported()),
       '2020-TV fallbacks: ' + ((/no-flex-gap|no-aspect-ratio/.test(cls) ? cls.split(' ').filter((c) => /^no-/.test(c)).join(', ') : 'none needed')),
       'Player: ' + (window.wygAvVideo ? 'AVPlay' : 'none (not on a TV)') + ' · remote keys registered: ' + Object.keys(byCode).length,
       'Playlists: ' + (lists.map((p) => p.type).join(', ') || 'none') + ' · guides: ' + Object.keys(guide).map((u) => (guide[u].channels || 0) + (guide[u].error ? ' (' + guide[u].error.slice(0, 40) + ')' : '')).join(', '),
@@ -417,6 +417,17 @@
     file: { save: fileSave, open: fileOpen },
     // The TV app is installed from a computer (or, later, the Samsung store), so there is nothing to check here.
     diag: { report: diagnostics },
+    // Size of text and menus (applied by tizen-legacy.js as the page loads, so changing it reloads WygTV).
+    tv: {
+      sizes: [
+        { key: 'small', label: 'Small', sub: 'As on a computer: the most on screen' },
+        { key: 'medium', label: 'Medium', sub: 'A little more on screen' },
+        { key: 'large', label: 'Large', sub: 'For watching from the sofa (recommended)' },
+        { key: 'xlarge', label: 'Extra large', sub: 'Biggest text, for far away or for tired eyes' },
+      ],
+      size: () => window.__wygTvSize || 'large',
+      setSize: (k) => { try { localStorage.setItem('wyg.tvSize', JSON.stringify(k)); } catch (e) { } location.reload(); },
+    },
     update: { check: () => ok({ current: appVersion(), latest: appVersion(), available: false, kind: 'tizen' }), install: no('Updates are installed from a computer.') },
   };
   window.wyg = api;

@@ -103,7 +103,7 @@ test('index.html loads the TV files, and every script it names exists', () => {
   assert.deepEqual([...order].sort((a, b) => a - b), order, 'scripts in the order the bridge needs');
   assert.ok(order.every((i) => i > 0));
   assert.match(html, /<link rel="stylesheet" href="tizen.css">/);
-  assert.match(html, /width=1920/);
+  assert.match(html, /name="viewport"/); // its width is set as the page loads (tizen-legacy.js, the TV's text size)
 });
 
 test('config.xml is a valid Samsung TV app manifest', () => {
