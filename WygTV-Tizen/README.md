@@ -4,9 +4,9 @@ WygTV on Samsung TVs from 2020 on (Tizen 5.5 and newer). Like WygTV-iOS, it is W
 (`../WygDesktop/src/renderer`) in another shell: here a Tizen TV web app, with `web/tizen-bridge.js` standing in
 for the desktop app's main process. Changes to the desktop screens reach the TV app too.
 
-**Status: phase 1 of 7.** It builds, opens to Home, loads playlists and channels, and the remote's arrows, OK
-and Back work. Video, gzip guides and backups are not done yet (see the phases below). It hasn't been tried on a
-real TV yet.
+**Status: phase 2 of 7.** It builds, opens to Home, loads playlists, channels and guides (gzip too, kept between
+starts), saves and restores backups, and the remote's arrows, OK and Back work. Video is not done yet (phase 3).
+It hasn't been tried on a real TV yet.
 
 ## How it is built
 
@@ -14,9 +14,11 @@ real TV yet.
 
 - the desktop screens, hls.js and mpegts.js, and the desktop's `m3u.js`, `xmltv.js`, `hdhr.js` and `tablo.js`
   (wrapped by the build so they run in the page, as for iOS)
-- `web/tizen-bridge.js`: web requests (a TV app may call any server, so there are no CORS rules), guides,
-  HDHomeRun (cloud lookup and `hdhomerun.local`: TV apps can't broadcast to find tuners), Tablo, and the Back
-  key, which goes back and on Home asks whether to exit, as Samsung requires
+- `web/tizen-bridge.js`: web requests (a TV app may call any server, so there are no CORS rules); guides, which
+  stream in and un-gzip as they download (fflate) and are kept in IndexedDB for 12 hours; backups, kept on the TV
+  (the newest 5) or restored from a web link, e.g. a desktop or iPhone backup put online; HDHomeRun (cloud lookup
+  and `hdhomerun.local`: TV apps can't broadcast to find tuners); Tablo; and the Back key, which goes back and on
+  Home asks whether to exit, as Samsung requires
 - `config.xml`: the app's Samsung manifest (`WygTVtizen.WygTV`, version `1.0.<build number>`)
 
 **2020 TVs** run Chromium 69, which is older than the desktop app's Electron. The build lowers all JavaScript to
@@ -29,8 +31,9 @@ newer TVs use the real CSS. Add `?legacy=1` to the page address to try the fallb
 - `npm test` builds `www/` and checks it: every script parses as JavaScript Chromium 69 understands, WygTV's own
   code uses no newer browser features, the CSS fallbacks are in place, and `config.xml` is a valid TV manifest.
 - `npm run smoke` opens `www/` in Chromium at 1920×1080 with a stand-in for the TV's `tizen` object, normally and
-  with the fallbacks on. It checks Home, Live TV and the Back key, compares the two layouts, and saves screenshots
-  in `smoke/`. It needs Playwright with Chromium.
+  with the fallbacks on. It checks Home, Live TV and the Back key, compares the two layouts, loads a gzip guide
+  and checks it comes from storage after a restart, saves and restores backups (from the TV and from a link), and
+  saves screenshots in `smoke/`. It needs Playwright with Chromium.
 
 GitHub Actions (`.github/workflows/tizen.yml`) runs both on every change and keeps `www/` and the screenshots.
 
@@ -47,8 +50,8 @@ GitHub Actions (`.github/workflows/tizen.yml`) runs both on every change and kee
 
 ## Phases
 
-1. **Skeleton** (this): build, Chromium 69 fallbacks, `config.xml`, bridge for playlists and tuners, Back key. ✔
-2. **Bridge**: gzip guides, guides kept between starts (IndexedDB), backups.
+1. **Skeleton**: build, Chromium 69 fallbacks, `config.xml`, bridge for playlists and tuners, Back key. ✔
+2. **Bridge**: gzip guides, guides kept between starts (IndexedDB), backups. ✔
 3. **Player**: Samsung's AVPlay for live TV, movies and antenna channels (MPEG-2 and Dolby AC-3 play in the TV's
    hardware).
 4. **Remote**: channel up/down, number keys for channels like `4.1`, play/pause and colour keys, TV wording.
