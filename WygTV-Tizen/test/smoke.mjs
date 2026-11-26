@@ -468,6 +468,9 @@ try {
     const relay = { posted: [], trace: [] };
     const warns = [];
     tv.on('console', (m) => { if (m.type() === 'warning' || m.type() === 'error') warns.push(m.text().slice(0, 120)); });
+    const reqs = [];
+    tv.on('request', (q) => { if (/ntfy/.test(q.url())) reqs.push('req ' + q.method() + ' ' + q.url().replace(/wygtv-[^/]+/, 'T')); });
+    tv.on('requestfailed', (q) => { if (/ntfy/.test(q.url())) reqs.push('failed ' + (q.failure() && q.failure().errorText)); });
     await tv.route((u) => u.hostname === 'ntfy.sh', async (route) => {
       const topic = new URL(route.request().url()).pathname.split('/')[1];
       let msg = relay.posted.find((p) => p.topic === topic);
@@ -524,7 +527,7 @@ try {
     const vals = await tv.evaluate(() => [...document.querySelectorAll('.dialog.form input')].map((i) => i.value));
     const filledOk = JSON.stringify(vals) === JSON.stringify(['Kitchen', 'http://example.com/get.php?username=alice&password=hunter2', 'hunter2']);
     check(filledOk, `the TV's form fills in from the phone (${JSON.stringify(vals.map((v) => v.slice(0, 24)))})`
-      + (filledOk ? '' : ` [relay: ${relay.trace.slice(-8).join(' ')}; TV warnings: ${JSON.stringify(warns.slice(-4))}]`));
+      + (filledOk ? '' : ` [relay: ${relay.trace.slice(-8).join(' ')}; TV requests: ${JSON.stringify(reqs.slice(-6))}; TV warnings: ${JSON.stringify(warns.slice(-4))}; fetch: ${await tv.evaluate(() => typeof fetch + ' ' + typeof ReadableStream + ' ' + navigator.userAgent.match(/Chrome\/[\d.]+/))}]`));
     check(await tv.evaluate(() => !document.querySelector('.phone-dialog')), 'the QR code closes once it has');
     await tv.screenshot({ path: path.join(shots, 'phone-filled.png') });
 
