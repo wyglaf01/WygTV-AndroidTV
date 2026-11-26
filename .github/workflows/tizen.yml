@@ -1,0 +1,57 @@
+name: Build WygTV for Samsung TVs (Tizen)
+
+# WygTV-Tizen is WygDesktop's screens in a Samsung Smart TV web app (folder WygTV-Tizen/), for Tizen 5.5
+# (2020 TVs) and newer. This builds www/, checks it parses as Chromium 69 JavaScript, and opens it in a
+# browser at 1920×1080 (normally and with the 2020-TV CSS fallbacks on). The unsigned www/ is kept as an
+# artifact for Tizen Studio; signed .wgt packages come later (they need the Samsung certificate as secrets).
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [app]
+    paths: ["WygTV-Tizen/**", "WygDesktop/src/renderer/**", "WygDesktop/src/main/m3u.js", "WygDesktop/src/main/xmltv.js", "WygDesktop/src/main/hdhr.js", "WygDesktop/src/main/tablo.js", "docs/img/icon-512.png", ".github/workflows/tizen.yml"]
+  pull_request:
+    branches: [app]
+    paths: ["WygTV-Tizen/**", "WygDesktop/src/renderer/**", "WygDesktop/src/main/m3u.js", "WygDesktop/src/main/xmltv.js", "WygDesktop/src/main/hdhr.js", "WygDesktop/src/main/tablo.js", "docs/img/icon-512.png", ".github/workflows/tizen.yml"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: WygTV-Tizen
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: WygTV-Tizen/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Build and check www/
+        run: npm test
+
+      - name: Open it in a browser at TV size
+        run: |
+          npm install --no-save playwright@1.49.1
+          npx playwright install --with-deps chromium
+          node test/smoke.mjs
+
+      - name: Keep www/ and the screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wygtv-tizen-${{ github.run_number }}
+          path: |
+            WygTV-Tizen/www/
+            WygTV-Tizen/smoke/
+          if-no-files-found: warn

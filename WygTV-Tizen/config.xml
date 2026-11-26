@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- WygTV for Samsung Smart TVs. The build copies this into www/ with the version filled in
+     (scripts/build.mjs); Tizen Studio or the `tizen` command line packages www/ into a signed .wgt. -->
+<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets"
+        id="https://github.com/wyglaf01/WygTV-AndroidTV" version="@VERSION@" viewmodes="maximized">
+  <tizen:application id="WygTVtizen.WygTV" package="WygTVtizen" required_version="5.5"/>
+  <tizen:profile name="tv-samsung"/>
+  <name>WygTV</name>
+  <description>Live TV, movies and series from your own playlists, plus antenna TV from HDHomeRun and Tablo tuners.</description>
+  <author href="https://github.com/wyglaf01/WygTV-AndroidTV">Wyglaf</author>
+  <icon src="icon.png"/>
+  <content src="index.html"/>
+  <feature name="http://tizen.org/feature/screen.size.all"/>
+  <!-- Playlists, guides and tuners can be on any server or on the home network. -->
+  <access origin="*" subdomains="true"/>
+  <tizen:allow-navigation>*</tizen:allow-navigation>
+  <tizen:privilege name="http://tizen.org/privilege/internet"/>
+  <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+  <tizen:setting screen-orientation="landscape" context-menu="disable" background-support="disable"
+                 encryption="disable" install-location="auto" hwkey-event="enable"/>
+</widget>
