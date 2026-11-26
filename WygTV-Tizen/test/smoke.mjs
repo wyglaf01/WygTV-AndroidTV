@@ -47,6 +47,31 @@ async function open(query, playlist, page) {
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
   await page.addInitScript(([pl, b]) => {
+    // ?avplay=1: a stand-in for Samsung's AVPlay that logs every call and plays pretend streams.
+    if (/avplay=1/.test(location.search)) {
+      const log = [];
+      let st = 'NONE', L = {}, t = 0, timer = 0, url = '';
+      const A = {
+        log,
+        open(u) { url = u; t = 0; st = 'IDLE'; log.push(['open', u]); },
+        close() { clearInterval(timer); st = 'NONE'; log.push(['close']); },
+        stop() { clearInterval(timer); if (st !== 'NONE') st = 'IDLE'; log.push(['stop']); },
+        setListener(l) { L = l; }, setDisplayMethod() { }, setTimeoutForBuffering() { },
+        setDisplayRect(x, y, w, h) { log.push(['rect', x, y, w, h]); },
+        prepareAsync(ok, bad) { const u = url; setTimeout(() => { if (u !== url) return; if (/fail/.test(u)) bad({ name: 'PLAYER_ERROR_CONNECTION_FAILED' }); else { st = 'READY'; ok(); } }, 50); },
+        play() {
+          st = 'PLAYING'; log.push(['play']);
+          L.onbufferingstart(); setTimeout(() => L.onbufferingcomplete(), 30);
+          clearInterval(timer); timer = setInterval(() => { t += 500; L.oncurrentplaytime(t); }, 500);
+        },
+        pause() { st = 'PAUSED'; clearInterval(timer); log.push(['pause']); },
+        getState() { return st; },
+        getDuration() { return /movie/.test(url) ? 600000 : 0; },
+        seekTo(ms, ok) { t = ms; log.push(['seek', ms]); if (ok) ok(); },
+        suspend() { log.push(['suspend']); }, restore() { log.push(['restore']); },
+      };
+      window.webapis = { avplay: A };
+    }
     window.tizen = { application: { getAppInfo: () => ({ version: '1.0.42' }), getCurrentApplication: () => ({ exit() { window.__exited = true; } }) } };
     // Only the first time: reloads keep what the app saved, as on a TV.
     if (pl && !localStorage.getItem('wyg.settings')) localStorage.setItem('wyg.settings', JSON.stringify({ playlists: [{ id: 'demo', type: 'm3u', name: 'Demo', url: b + 'demo.m3u', epgUrl: b + 'guide.xml.gz' }] }));
@@ -151,6 +176,100 @@ try {
     const count = await page.evaluate(() => new Promise((res) => { const r = indexedDB.open('wygtv'); r.onsuccess = () => { const q = r.result.transaction('backups').objectStore('backups').count(); q.onsuccess = () => res(q.result); }; }));
     check(count === 5, `only the newest 5 backups are kept (${count})`);
     check(errors.length === 0, `phase 2: no script errors ${errors.length ? JSON.stringify(errors.slice(0, 3)) : ''}`);
+    await page.close();
+  }
+
+  // ---------------------------------------------------------------- phase 3: video in AVPlay
+  {
+    const { page, errors } = await open('?avplay=1', true);
+    const log = () => page.evaluate(() => webapis.avplay.log.slice());
+    const clearLog = () => page.evaluate(() => { webapis.avplay.log.length = 0; });
+    const last = (l, what) => l.filter((e) => e[0] === what).pop();
+    const shown = (sel) => page.evaluate((s) => { const e = document.querySelector(s); return !!e && !e.hidden && e.offsetParent !== null; }, sel);
+
+    // Live TV: OK on a channel plays it in the preview box, where AVPlay is told to draw.
+    // (Wait for movies and series to finish loading first: that redraws Live TV, which stops a preview.)
+    await page.evaluate(() => new Promise((r) => { const off = W.data.on('loaded', () => { off(); r(); }); setTimeout(r, 8000); }));
+    await page.evaluate(() => W.go('live'));
+    await page.waitForSelector('.chan');
+    await page.focus('.chan');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(1500);
+    let l = await log();
+    const tag = await page.evaluate(() => { const v = document.querySelector('#player .video'); return v ? v.tagName + ' ' + v.getAttribute('type') : 'none'; });
+    check(tag === 'OBJECT application/avplayer', `the player uses an AVPlay <object> (${tag})`);
+    check(last(l, 'open') && /ch0\.m3u8$/.test(last(l, 'open')[1]) && last(l, 'play'), `OK plays the channel in AVPlay (${JSON.stringify(last(l, 'open'))})`);
+    const box = await page.evaluate(() => { const r = document.querySelector('.preview-box').getBoundingClientRect(); return [r.left, r.top, r.width, r.height].map(Math.round); });
+    const rect = last(l, 'rect') ? last(l, 'rect').slice(1) : [];
+    check(rect.length === 4 && rect.every((v, i) => Math.abs(v - box[i]) <= 3), `AVPlay draws in the preview box (${JSON.stringify(rect)} vs ${JSON.stringify(box)})`);
+    check(!(await shown('.player-spinner')), 'the spinner goes once it plays');
+    await page.screenshot({ path: path.join(shots, 'avplay-preview.png') });
+
+    // Full screen (what OK on the playing channel does): AVPlay covers the whole TV, and the page behind is hidden.
+    await page.evaluate(() => W.player.enterFull());
+    await page.waitForTimeout(800);
+    l = await log();
+    check(JSON.stringify(last(l, 'rect')) === JSON.stringify(['rect', 0, 0, 1920, 1080]), `full screen: AVPlay covers the TV (${JSON.stringify(last(l, 'rect'))})`);
+    check(await page.evaluate(() => document.documentElement.classList.contains('av-full') && getComputedStyle(document.getElementById('backdrop')).visibility === 'hidden'), 'full screen: the page behind the picture is hidden');
+    await page.screenshot({ path: path.join(shots, 'avplay-full.png') });
+
+    // Down (on-screen bar hidden) changes channel: the old stream is closed before the next opens.
+    await page.evaluate(() => { const o = document.querySelector('.osd'); if (o) o.hidden = true; });
+    await clearLog();
+    await page.keyboard.press('ArrowDown');
+    await page.waitForTimeout(1200);
+    l = await log();
+    const order = l.map((e) => e[0]).filter((k) => ['stop', 'close', 'open', 'play'].includes(k)).join(' ');
+    check(/stop close open play/.test(order) && /ch1\.m3u8$/.test(last(l, 'open')[1]), `channel down: ${order} → ${last(l, 'open') && last(l, 'open')[1].split('/').pop()}`);
+
+    // An antenna channel (needs FFmpeg on a computer) plays straight in AVPlay on the TV.
+    await page.evaluate(() => W.player.play({ kind: 'live', key: 'hdhr|4.1', name: 'WNBC', num: '4.1', url: 'http://192.168.1.60:5004/auto/v4.1', convert: 'x264' }, { full: true }));
+    await page.waitForTimeout(1000);
+    l = await log();
+    check(/auto\/v4\.1$/.test(last(l, 'open')[1]) && !(await shown('.player-msg')), 'an antenna channel plays as it is (no "needs converting" message)');
+
+    // A stream AVPlay can't open: a TV message, and no "Open in VLC".
+    await page.evaluate(() => W.player.play({ kind: 'live', key: 'x|fail', name: 'Broken', url: 'http://127.0.0.1:1/fail.ts' }, { full: true }));
+    await page.waitForTimeout(1200);
+    const msg = await page.evaluate(() => (document.querySelector('.player-msg') || {}).textContent || '');
+    check(/will not play on this TV/.test(msg) && !/VLC/.test(msg) && /Try again/.test(msg), `a broken stream says so, with Try again and no VLC ("${msg.slice(0, 80)}")`);
+
+    // A movie resumes where it was left: AVPlay seeks once it is ready.
+    await clearLog();
+    await page.evaluate(() => W.player.play({ kind: 'movie', key: 'm|1', name: 'A movie', url: 'http://127.0.0.1:1/movie.mp4' }, { full: true, resume: 120 }));
+    await page.waitForTimeout(1500);
+    l = await log();
+    check(l.some((e) => e[0] === 'seek' && e[1] === 120000), `a movie resumes at 2:00 (${JSON.stringify(l.filter((e) => e[0] === 'seek'))})`);
+    const dur = await page.evaluate(() => document.querySelector('#player .video').duration);
+    check(dur === 600, `the movie's length comes from AVPlay (${dur} s)`);
+    const osd = await page.$$eval('.osd-btn', (els) => els.map((e) => e.textContent));
+    check(!osd.some((t) => /VLC|Window|Volume/.test(t)), `no VLC, Window or Volume buttons on the TV (${JSON.stringify(osd)})`);
+
+    // The TV's Home button: AVPlay lets go of the decoder, then picks up again.
+    await page.evaluate(() => {
+      let hidden = true;
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
+      document.dispatchEvent(new Event('visibilitychange'));
+      hidden = false;
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    l = await log();
+    check(l.some((e) => e[0] === 'suspend') && l.some((e) => e[0] === 'restore'), 'leaving WygTV and coming back suspends and restores AVPlay');
+
+    // Back from full screen: the picture goes back to the Live TV preview box, and the app shows again.
+    await clearLog();
+    await page.evaluate(() => W.back());
+    await page.waitForTimeout(700);
+    l = await log();
+    const back = last(l, 'rect') ? last(l, 'rect').slice(1) : [];
+    check(back.every((v, i) => Math.abs(v - box[i]) <= 3) && !(await page.evaluate(() => document.documentElement.classList.contains('av-full'))),
+      `Back from full screen returns the picture to the preview box (${JSON.stringify(back)})`);
+    // Back again leaves Live TV, which stops AVPlay.
+    await page.evaluate(() => W.back());
+    await page.waitForTimeout(500);
+    l = await log();
+    check(!!last(l, 'close') && (await page.evaluate(() => !W.player.item())), 'leaving Live TV stops AVPlay');
+    check(errors.length === 0, `phase 3: no script errors ${errors.length ? JSON.stringify(errors.slice(0, 3)) : ''}`);
     await page.close();
   }
 

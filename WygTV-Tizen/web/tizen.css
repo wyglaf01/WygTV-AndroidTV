@@ -5,3 +5,10 @@ html.tizen .strip::-webkit-scrollbar { display: none; }
 
 /* Samsung remotes have no mouse pointer on most screens; never leave an arrow over the picture. */
 html.tizen #player.full { cursor: none; }
+
+/* Video in Samsung's AVPlay (web/tizen-avplay.js) is drawn on a plane underneath the page. The player's <object>
+   shows it; the player itself must not paint over it. */
+html.avplay #player, html.avplay #player .video { background: transparent; }
+/* Full screen: nothing behind the player, and a see-through page, so the picture always shows. */
+html.av-full, html.av-full body { background: transparent; }
+html.av-full #backdrop, html.av-full #screen { visibility: hidden; }

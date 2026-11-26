@@ -99,7 +99,7 @@ test('index.html loads the TV files, and every script it names exists', () => {
     if (src.startsWith('$WEBAPIS')) continue; // provided by the TV
     assert.ok(fs.existsSync(path.join(www, src)), 'missing ' + src);
   }
-  const order = ['js/tizen-legacy.js', 'js/desktop-modules.js', 'js/tizen-bridge.js', 'js/core.js', 'js/app.js'].map((s) => html.indexOf(s));
+  const order = ['js/tizen-legacy.js', 'js/desktop-modules.js', 'js/tizen-avplay.js', 'js/tizen-bridge.js', 'js/core.js', 'js/app.js'].map((s) => html.indexOf(s));
   assert.deepEqual([...order].sort((a, b) => a - b), order, 'scripts in the order the bridge needs');
   assert.ok(order.every((i) => i > 0));
   assert.match(html, /<link rel="stylesheet" href="tizen.css">/);
