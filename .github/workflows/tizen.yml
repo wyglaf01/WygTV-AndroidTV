@@ -68,7 +68,7 @@ jobs:
         run: node test/store-shots.mjs
 
       - name: Keep the store screenshots
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: wygtv-tizen-store-screenshots
           path: WygTV-Tizen/store/
@@ -108,7 +108,7 @@ jobs:
           rm -f "$RUNNER_TEMP/author.p12" "$RUNNER_TEMP/distributor.p12"
 
       - name: Keep WygTV.wgt
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: wygtv-tizen-wgt-${{ github.run_number }}
           path: WygTV-Tizen/dist/
@@ -116,7 +116,7 @@ jobs:
 
       - name: Keep www/ and the screenshots
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: wygtv-tizen-${{ github.run_number }}
           path: |
@@ -134,7 +134,7 @@ jobs:
       contents: write
     steps:
       - name: Get WygTV.wgt
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: wygtv-tizen-wgt-${{ github.run_number }}
           path: dist
