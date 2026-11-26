@@ -4,7 +4,7 @@ WygTV on Samsung TVs from 2020 on (Tizen 5.5 and newer). Like WygTV-iOS, it is W
 (`../WygDesktop/src/renderer`) in another shell: here a Tizen TV web app, with `web/tizen-bridge.js` standing in
 for the desktop app's main process. Changes to the desktop screens reach the TV app too.
 
-**Status: phase 5 of 7.** It builds, opens to Home, loads playlists, channels and guides (gzip too, kept between
+**Status: phase 6 of 7** (testing on a real TV: see [TESTING.md](TESTING.md)). It builds, opens to Home, loads playlists, channels and guides (gzip too, kept between
 starts), saves and restores backups, plays video in Samsung's AVPlay (antenna channels included) with its sound tracks and
 subtitles, and works with the whole remote: arrows, OK, Back, CH ▲▼, number keys (4 - 1 for 4.1), play, pause,
 rewind, fast-forward, INFO, CC, GUIDE, CH LIST and the colour keys (red Live TV, green TV Guide, yellow Search,
@@ -94,5 +94,7 @@ in Certificate Manager, make the distributor certificate again, and update the t
 4. **Remote**: channel up/down, number keys for channels like `4.1`, play/pause and colour keys, sound tracks and
    subtitles from AVPlay, TV wording. ✔
 5. **Builds**: signed `.wgt` from GitHub Actions (Samsung certificate as secrets), `wygtv-tizen-latest` release. ✔
-6. **Testing** on a real TV in Developer mode.
+6. **Testing** on a real TV in Developer mode: the checklist in [TESTING.md](TESTING.md), and **Settings → About
+   → 🛠 Diagnostics** (TV model, firmware, Tizen and web engine versions, fallbacks, recent errors with playlist
+   logins masked) to photograph when something goes wrong.
 7. **Store**: Samsung TV Seller Office application.
