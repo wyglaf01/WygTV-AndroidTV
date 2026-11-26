@@ -18,3 +18,8 @@ html.av-full #backdrop, html.av-full #screen { visibility: hidden; }
 
 /* Settings → About → Diagnostics: one fact per line, small enough to fit on one screen for a photo. */
 html.tizen .dialog.menu.wide .dialog-text { white-space: pre-line; font-size: 16px; line-height: 1.45; max-width: 1400px; }
+
+/* "📱 Type on your phone" (tizen-phone.js): the QR code, big and centred, with room around it for phone cameras. */
+html.tizen .phone-dialog { align-items: center; text-align: center; }
+html.tizen .phone-dialog .dialog-text { white-space: pre-line; }
+html.tizen .phone-qr { display: block; margin: 8px auto 14px; width: 340px; height: 340px; image-rendering: pixelated; border-radius: 8px; }

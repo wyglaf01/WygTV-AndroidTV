@@ -417,6 +417,8 @@
     file: { save: fileSave, open: fileOpen },
     // The TV app is installed from a computer (or, later, the Samsung store), so there is nothing to check here.
     diag: { report: diagnostics },
+    // "📱 Type on your phone" in forms (web/tizen-phone.js): a QR code, and the phone's typing sent back encrypted.
+    phone: window.wygPhoneFill ? { fill: window.wygPhoneFill } : null,
     // Size of text and menus (applied by tizen-legacy.js as the page loads, so changing it reloads WygTV).
     tv: {
       sizes: [

@@ -22,6 +22,9 @@ Tick each item that works as described.
 - [ ] A **Tablo**, if you have one.
 - [ ] Close WygTV and open it again: the playlists are still there and load by themselves.
 
+- [ ] In any form (e.g. adding a playlist), **📱 Type on your phone** shows a QR code. Scan it with the phone's
+      camera, type there and press **Send to TV**: the form on the TV fills in within a few seconds.
+
 ## 3. Live TV
 - [ ] **Live TV** lists categories and channels with logos and what's on now.
 - [ ] **OK** on a channel plays it **inside the preview box**, the right size, with sound.

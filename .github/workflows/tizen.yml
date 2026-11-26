@@ -51,7 +51,7 @@ jobs:
 
       - name: Open it in a browser at TV size
         run: |
-          npm install --no-save playwright@1.49.1
+          npm install --no-save playwright@1.63.0
           npx playwright install --with-deps chromium
           node test/smoke.mjs
 

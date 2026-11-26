@@ -356,6 +356,8 @@
         msg,
         h('div', { class: 'dialog-buttons' },
           (opts.extra || []).map((x) => W.btn({ class: 'button', onclick: () => x.action(inputs) }, x.label)),
+          // Samsung TVs: type the form on a phone instead (a QR code; the bridge's phone.fill).
+          W.api && W.api.phone ? W.btn({ class: 'button', onclick: () => W.api.phone.fill(title, fields, inputs) }, '📱 Type on your phone') : null,
           W.btn({ class: 'button primary', onclick: ok }, opts.okLabel || 'Save'),
           W.btn({ class: 'button', onclick: () => L._close() }, 'Cancel')));
       const L = layer(box);
