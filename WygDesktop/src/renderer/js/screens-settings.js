@@ -54,9 +54,36 @@
           if (yes) Object.assign(pl, { type: 'xtream', host: u.origin, user: u.searchParams.get('username'), pass: u.searchParams.get('password') || '' });
         }
       } catch { }
+    } else if (type === 'tablo') {
+      // A black Tablo (2013–2023). Saved as an antenna tuner (type 'hdhr', tablo: true).
+      const b = W.busy('Looking for your Tablo…');
+      let found = [];
+      try { found = await W.api.tablo.discover(); } catch { }
+      b.close();
+      const have = (W.settings.playlists || []).filter((p) => p.type === 'hdhr' && p.tablo);
+      const fresh = found.filter((d) => !have.some((p) => p.base === d.base || (p.deviceId && p.deviceId === d.id)));
+      const i = await W.menu(fresh.length ? 'Tablos found' : 'No new Tablo found', [
+        ...fresh.map((d) => ({ label: '📡 ' + (d.model || d.name) + (d.locked ? '  (won’t share its channels)' : ''), sub: d.base.replace(/^https?:\/\//, '') + (d.tuners ? ' · ' + d.tuners + ' tuners' : '') })),
+        { label: '⌨ Type the Tablo’s address', sub: 'For example 192.168.1.60 (shown in your router or the Tablo app)' },
+      ], { text: 'For the black Tablo models (DUAL, QUAD, LITE). Channels and the TV guide come from the Tablo; each channel uses one of its tuners while it plays. '
+        + 'The white 4th Gen Tablo only works in Tablo’s own app, so it can’t be added here.' });
+      if (i < 0) return;
+      let dev = fresh[i];
+      if (!dev) {
+        const r = await W.form('Tablo address', [{ key: 'base', label: 'IP address', placeholder: '192.168.1.60' }], { okLabel: 'Add' });
+        if (!r) return;
+        try { dev = await W.api.tablo.describe(r.base); } catch (e) {
+          W.alert(/refuses other apps/.test(e.message) ? 'This Tablo won’t share its channels' : 'Tablo not found',
+            /refuses other apps/.test(e.message) ? e.message : 'No black Tablo answered at ' + r.base + ' (' + e.message + '). A white 4th Gen Tablo can’t be added: it only works in the Tablo app.');
+          return;
+        }
+      }
+      if (dev.locked) { W.alert('This Tablo won’t share its channels', 'This Tablo answered but refuses other apps (its firmware locked the API this app uses). Its channels can still be watched in the Tablo app.'); return; }
+      const n = have.length;
+      Object.assign(pl, { type: 'hdhr', tablo: true, name: n ? 'Tablo ' + (n + 1) : 'Tablo', base: dev.base, deviceId: dev.id });
     } else if (type === 'hdhr') {
       if (existing) {
-        const r = await W.form('Antenna TV', [{ key: 'name', label: 'Name', value: pl.name }, { key: 'base', label: 'Tuner address', value: pl.base }]);
+        const r = await W.form(pl.tablo ? 'Tablo' : 'Antenna TV', [{ key: 'name', label: 'Name', value: pl.name }, { key: 'base', label: pl.tablo ? 'Tablo address' : 'Tuner address', value: pl.base }]);
         if (!r) return;
         Object.assign(pl, { name: r.name.trim(), base: r.base.trim() });
       } else {
@@ -114,7 +141,7 @@
           h('div', { class: 'set-text' }, 'Your IPTV services and antenna tuners. Hold Enter (or right-click) on one for more.'),
           ...list.map((pl, i) => {
             const st = D.lists.get(pl.id);
-            const sub = (pl.type === 'xtream' ? 'Xtream · ' + pl.host : pl.type === 'm3u' ? 'M3U · ' + pl.url : 'HDHomeRun · ' + pl.base) +
+            const sub = (pl.type === 'xtream' ? 'Xtream · ' + pl.host : pl.type === 'm3u' ? 'M3U · ' + pl.url : (pl.tablo ? 'Tablo · ' : 'HDHomeRun · ') + pl.base) +
               (st ? st.loading ? ' · loading…' : st.error ? ' · ⚠ ' + st.error : st.live ? ' · ' + st.live.chans.length + ' channels' : '' : '');
             const el = btn({ class: 'set-row', 'data-k': 'pl:' + pl.id, onclick: () => plMenu(pl, i) }, h('div', { class: 'set-label' }, (pl.type === 'hdhr' ? '📡 ' : '') + D.playlistName(pl)), h('div', { class: 'set-sub' }, sub));
             el._long = () => plMenu(pl, i);
@@ -124,6 +151,7 @@
             btn({ class: 'button', onclick: () => W.addPlaylist('xtream') }, '＋ Xtream login'),
             btn({ class: 'button', onclick: () => W.addPlaylist('m3u') }, '＋ M3U playlist'),
             btn({ class: 'button', onclick: () => W.addPlaylist('hdhr') }, '＋ Antenna TV'),
+            btn({ class: 'button', onclick: () => W.addPlaylist('tablo') }, '＋ Tablo'),
             btn({ class: 'button', onclick: async () => { await savePlaylists(); W.refresh(); } }, '⟳ Reload all')),
         ];
       },
@@ -179,6 +207,8 @@
       label: '▶ Player',
       render() {
         return [
+          btn({ class: 'set-row', onclick: () => { W.settings.autoPip = W.settings.autoPip === false; W.saveSettings(); W.refresh(); } },
+            h('div', { class: 'set-label' }, 'Picture-in-picture'), h('div', { class: 'set-sub' }, (W.settings.autoPip === false ? 'Off' : 'On') + ': ' + (W.isIOS ? 'leaving the app while something plays keeps it playing in a small window' : 'minimizing the window while something plays keeps it playing in a small window') + '. The player’s ▣ Mini player and ⧉ buttons work either way')),
           W.isIOS ? null : btn({ class: 'set-row', onclick: () => { W.settings.alwaysConvert = !W.settings.alwaysConvert; W.saveSettings(); W.refresh(); } },
             h('div', { class: 'set-label' }, 'Convert every live channel with FFmpeg'), h('div', { class: 'set-sub' }, W.settings.alwaysConvert ? 'On: steadier sound on some services, uses more CPU' : 'Off: only when a channel won’t play directly (recommended)')),
           btn({ class: 'set-row', onclick: async () => {

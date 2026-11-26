@@ -6,6 +6,7 @@ const { spawn } = require('child_process');
 const net = require('./net');
 const m3u = require('./m3u');
 const hdhr = require('./hdhr');
+const tablo = require('./tablo');
 const stream = require('./stream');
 const updater = require('./updater');
 const { EpgStore } = require('./epg');
@@ -54,6 +55,9 @@ function createWindow() {
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: 'deny' }; });
   win.webContents.on('will-navigate', (e, url) => { if (!url.startsWith('file:')) e.preventDefault(); });
   win.on('closed', () => { win = null; stream.stopAll(); });
+  // Minimized while something plays: keep it playing in picture-in-picture (Settings → Player). The "true" counts as
+  // a user action, which the browser requires before it opens the window.
+  win.on('minimize', () => { if (win) win.webContents.executeJavaScript('window.W && W.player && W.player.autoPip && W.player.autoPip()', true).catch(() => { }); });
 }
 
 app.whenReady().then(() => {
@@ -82,6 +86,10 @@ handle('m3u:load', async (url) => m3u.parse(/^https?:/i.test(url) ? await net.te
 handle('hdhr:discover', () => hdhr.discoverAll());
 handle('hdhr:describe', (base) => hdhr.describe(base));
 handle('hdhr:lineup', (base) => hdhr.lineup(base));
+handle('tablo:discover', () => tablo.discoverAll());
+handle('tablo:describe', (base) => tablo.describe(base));
+handle('tablo:lineup', (base) => tablo.lineup(base));
+handle('tablo:watch', (base, id) => tablo.watch(base, id));
 handle('epg:ensure', (urls, force) => epg.ensure(urls, force));
 handle('epg:status', () => epg.status());
 handle('epg:query', (items, from, to) => epg.query(items, from, to));

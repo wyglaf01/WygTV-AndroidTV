@@ -38,9 +38,26 @@ async function json(url, opts) {
   try { return JSON.parse(t); } catch { throw new Error('The server did not answer with JSON (' + t.slice(0, 80).replace(/\s+/g, ' ') + '…)'); }
 }
 
+/** POSTs JSON and reads JSON back (Tablo tuners). */
+async function postJson(url, body, { timeout = 30000 } = {}) {
+  if (!/^https?:\/\//i.test(url)) throw new Error('Only http(s) links are supported: ' + url);
+  const res = await doFetch(url, {
+    method: 'POST',
+    headers: { 'User-Agent': userAgent, Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(body == null ? {} : body),
+    signal: AbortSignal.timeout(timeout),
+  });
+  const t = await res.text();
+  if (!res.ok) {
+    try { const j = JSON.parse(t); if (j && j.error) return j; } catch { }
+    throw new Error(`HTTP ${res.status} from ${new URL(url).host}`);
+  }
+  try { return JSON.parse(t); } catch { throw new Error('The server did not answer with JSON'); }
+}
+
 async function stream(url, opts) {
   const res = await get(url, opts);
   return Readable.fromWeb(res.body);
 }
 
-module.exports = { get, text, json, stream, setUserAgent, getUserAgent };
+module.exports = { get, text, json, postJson, stream, setUserAgent, getUserAgent };

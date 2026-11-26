@@ -9,7 +9,7 @@ async function call(name, ...args) {
 
 const api = {};
 for (const name of ['app:info', 'net:setUserAgent', 'net:text', 'net:json', 'm3u:load', 'hdhr:discover', 'hdhr:describe',
-  'hdhr:lineup', 'epg:ensure', 'epg:status', 'epg:query', 'stream:probe', 'stream:start', 'stream:stop', 'stream:log',
+  'hdhr:lineup', 'tablo:discover', 'tablo:describe', 'tablo:lineup', 'tablo:watch', 'epg:ensure', 'epg:status', 'epg:query', 'stream:probe', 'stream:start', 'stream:stop', 'stream:log',
   'shell:open', 'win:fullscreen', 'win:quit', 'ext:play', 'ext:pick', 'file:save', 'file:open', 'update:check', 'update:install']) {
   const [a, b] = name.split(':');
   (api[a] ||= {})[b] = (...args) => call(name, ...args);

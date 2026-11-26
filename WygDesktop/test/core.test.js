@@ -87,3 +87,46 @@ test('FFmpeg description of a stream is read', () => {
   assert.strictEqual(p.width, 1920);
   assert.strictEqual(p.subs.length, 1);
 });
+
+// ------------------------------------------------------------------ Tablo
+const tablo = require('../src/main/tablo');
+
+test('Tablo addresses get the port', () => {
+  assert.strictEqual(tablo.baseFromInput('192.168.1.60'), 'http://192.168.1.60:8885');
+  assert.strictEqual(tablo.baseFromInput('http://192.168.1.60/'), 'http://192.168.1.60:8885');
+  assert.strictEqual(tablo.baseFromInput('192.168.1.60:9000'), 'http://192.168.1.60:9000');
+  assert.strictEqual(tablo.baseFromInput(''), '');
+});
+
+test('Tablo cloud lookup, server info and a locked Tablo', () => {
+  const d = tablo.parseCloud({ cpes: [{ serverid: 'SID_A', name: 'Den', private_ip: '192.168.1.60' }, { serverid: 'X' }] });
+  assert.deepStrictEqual(d, [{ id: 'SID_A', name: 'Den', base: 'http://192.168.1.60:8885' }]);
+  const s = tablo.parseServerInfo({ server_id: 'SID_A', name: 'Tablo', model: { name: 'Tablo QUAD', tuners: 4 } }, 'http://x:8885');
+  assert.strictEqual(s.model, 'Tablo QUAD'); assert.strictEqual(s.tuners, 4);
+  assert.throws(() => tablo.parseServerInfo({ error: { code: 'unauthorized', description: 'Authentication failure' } }, 'b'), /refuses other apps/);
+});
+
+test('Tablo channels sorted by number', () => {
+  const c = tablo.parseChannels({
+    '/guide/channels/2': { object_id: 2, channel: { call_sign: 'COZI', major: 4, minor: 2, network: null, resolution: 'sd' } },
+    '/guide/channels/1': { object_id: 1, channel: { call_sign: 'WNBC', major: 4, minor: 1, network: 'NBC', resolution: 'hd_1080' } },
+    '/guide/channels/3': { object_id: 3, channel: { call_sign: 'WCBS', major: 2, minor: 1, network: 'CBS', resolution: 'hd_1080' } },
+  });
+  assert.deepStrictEqual(c.map((x) => x.num), ['2.1', '4.1', '4.2']);
+  assert.deepStrictEqual(c[1], { id: '1', num: '4.1', name: 'WNBC', network: 'NBC', hd: true });
+});
+
+test('Tablo watch answer and guide airings', () => {
+  assert.strictEqual(tablo.parseWatch({ playlist_url: 'http://192.168.1.60/stream/pl.m3u8?a=1' }, 'http://192.168.1.60:8885'), 'http://192.168.1.60/stream/pl.m3u8?a=1');
+  assert.strictEqual(tablo.parseWatch({ playlist_url: '/stream/pl.m3u8' }, 'http://192.168.1.60:8885'), 'http://192.168.1.60/stream/pl.m3u8');
+  assert.throws(() => tablo.parseWatch({ error: { description: 'All tuners are in use' } }, 'http://x:8885'), /tuners/);
+  assert.strictEqual(tablo.parseTime('2023-01-03T01:00Z'), Date.UTC(2023, 0, 3, 1, 0, 0));
+  const g = { channels: {}, programmes: {} };
+  assert.ok(tablo.addAiring({ airing_details: { datetime: '2023-01-03T01:00Z', duration: 1800, show_title: 'Jeopardy!', channel: { channel: { major: 4, minor: 1 } } },
+    episode: { title: 'Finals', description: 'The big one.' } }, {}, g));
+  assert.ok(tablo.addAiring({ airing_details: { datetime: '2023-01-03T02:00Z', duration: 7200, show_title: 'Heat', channel_path: '/guide/channels/9' },
+    movie_airing: { description: 'Cops and robbers.' } }, { '/guide/channels/9': '7.1' }, g));
+  assert.ok(!tablo.addAiring({ airing_details: { datetime: 'x', duration: 60 } }, {}, g));
+  assert.deepStrictEqual(g.programmes['4.1'][0], [Date.UTC(2023, 0, 3, 1, 0, 0), Date.UTC(2023, 0, 3, 1, 30, 0), 'Jeopardy!', 'Finals — The big one.']);
+  assert.strictEqual(g.programmes['7.1'][0][3], 'Cops and robbers.');
+});

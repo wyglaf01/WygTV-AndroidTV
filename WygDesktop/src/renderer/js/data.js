@@ -1,6 +1,7 @@
 'use strict';
 /*
- * Playlists (Xtream Codes, M3U links/files, HDHomeRun antenna tuners), their channels, movies and
+ * Playlists (Xtream Codes, M3U links/files, antenna tuners: HDHomeRun, or a black Tablo saved as type 'hdhr'
+ * with tablo: true), their channels, movies and
  * series, and the TV guide lookups.
  */
 (function () {
@@ -17,7 +18,7 @@
 
   /** The playlist's own TV guide link. */
   D.providerGuide = (pl, st) => {
-    if (pl.type === 'hdhr') return 'hdhr:' + pl.base;
+    if (pl.type === 'hdhr') return (pl.tablo ? 'tablo:' : 'hdhr:') + pl.base; // a tuner's own guide
     if (pl.epgUrl) return pl.epgUrl.trim();
     if (pl.type === 'xtream') return `${host(pl)}/xmltv.php?username=${enc(pl.user)}&password=${enc(pl.pass)}`;
     return st && st.m3uGuide || '';
@@ -38,7 +39,7 @@
     return [...out];
   };
 
-  D.playlistName = (pl) => pl.name || (pl.type === 'hdhr' ? 'Antenna TV' : pl.type === 'xtream' ? (() => { try { return new URL(pl.host).hostname; } catch { return 'Xtream'; } })() : 'M3U playlist');
+  D.playlistName = (pl) => pl.name || (pl.type === 'hdhr' ? (pl.tablo ? 'Tablo' : 'Antenna TV') : pl.type === 'xtream' ? (() => { try { return new URL(pl.host).hostname; } catch { return 'Xtream'; } })() : 'M3U playlist');
 
   // ------------------------------------------------------------------ loading
   D.loadAll = async function loadAll() {
@@ -101,6 +102,18 @@
         const mg = [...new Set(movies.map((m) => m.cat))].map((g) => ({ id: g, name: g }));
         st.vod = { cats: mg, items: movies };
         st.series = { cats: [], items: [] };
+      } else if (pl.type === 'hdhr' && pl.tablo) {
+        // A black Tablo: channels have no fixed link; the player asks the Tablo to tune one as it plays it.
+        const r = await api().tablo.lineup(pl.base);
+        st.device = r.device;
+        st.live = {
+          cats: [{ id: 'antenna', name: 'All antenna channels' }],
+          chans: r.channels.map((c) => ({
+            key: `${pl.id}|${c.num}`, pid: pl.id, id: c.num, name: c.name + (c.hd ? ' HD' : '') + (c.network && !c.name.toUpperCase().includes(c.network.toUpperCase()) ? ' (' + c.network + ')' : ''),
+            logo: '', cat: 'antenna', epgId: c.num, num: c.num, url: '', hdhr: true, tablo: { base: pl.base, id: c.id },
+          })),
+        };
+        st.vod = { cats: [], items: [] }; st.series = { cats: [], items: [] };
       } else if (pl.type === 'hdhr') {
         const r = await api().hdhr.lineup(pl.base);
         st.device = r.device;

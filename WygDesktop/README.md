@@ -29,12 +29,12 @@ It is ad-hoc signed but not signed or notarized by Apple, so the first launch is
 
 ## Features
 
-- **Playlists**: Xtream Codes logins, M3U links or files, HDHomeRun antenna tuners ("Antenna TV", found automatically).
+- **Playlists**: Xtream Codes logins, M3U links or files, HDHomeRun antenna tuners ("Antenna TV", found automatically), and black Tablo DVRs (DUAL, QUAD, LITE: channels and guide from the Tablo; the white 4th Gen only works in Tablo's own app).
 - **Live TV**: Favorites, Recent, categories per playlist, channel list with what's on now, preview with the next shows. Enter plays in the preview, Enter again goes full screen. Hide/show categories.
 - **TV Guide**: 12-hour grid. Guides come from the playlist (XMLTV), HDHomeRun's guide, and extra XMLTV links (Settings → TV guides, including free epg.pw guides by country).
 - **Movies and Series**: categories, poster grid, My List, Continue watching, Recently added, details with IMDb / Rotten Tomatoes / Metacritic ratings (OMDb, key built in) and optional TMDb art, seasons and episodes with watch progress, next episode plays by itself.
 - **Search** across channels, movies and series.
-- **Player**: HLS and MPEG-TS play directly. Streams the built-in player can't decode (MPEG-2 antenna channels, AC-3/DTS sound, AVI…) are converted on the fly by the bundled FFmpeg. Live streams reconnect when they stall. Sound track choice, VLC/mpv hand-off.
+- **Player**: HLS and MPEG-TS play directly. Streams the built-in player can't decode (MPEG-2 antenna channels, AC-3/DTS sound, AVI…) are converted on the fly by the bundled FFmpeg. Live streams reconnect when they stall. Sound track choice, VLC/mpv hand-off. ▣ Mini player keeps the picture playing in a corner while you browse; ⧉ picture-in-picture floats it over other apps (also when the window is minimized: Settings → Player).
 - Themes (royal blue & bronze default, steampunk, blue, cyan, brown, gold, green), backup and restore, start on the last channel.
 
 ## Keys

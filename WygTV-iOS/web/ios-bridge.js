@@ -73,12 +73,25 @@
     try { return JSON.parse(t); } catch { throw new Error('The server did not answer with JSON (' + t.slice(0, 80).replace(/\s+/g, ' ') + '…)'); }
   }
 
-  // The desktop modules (m3u.js, xmltv.js, hdhr.js) are reused as they are; this is their "./net".
+  /** POSTs JSON and reads JSON back (Tablo tuners). */
+  async function postJson(url, body, timeout = 30000) {
+    let r;
+    try {
+      r = await Http.post({ url, headers: { 'User-Agent': userAgent, Accept: 'application/json', 'Content-Type': 'application/json' }, data: body == null ? {} : body, responseType: 'text', connectTimeout: Math.min(timeout, 20000), readTimeout: timeout });
+    } catch (error) { throw new Error('Could not connect to ' + new URL(url).origin + ' (' + String(error && error.message || error) + ')'); }
+    let j = r.data;
+    if (typeof j === 'string') { try { j = JSON.parse(j); } catch { j = null; } }
+    if (r.status < 200 || r.status >= 300) { if (j && j.error) return j; throw new Error(`HTTP ${r.status} from ${new URL(url).host}`); }
+    if (j == null) throw new Error('The server did not answer with JSON');
+    return j;
+  }
+
+  // The desktop modules (m3u.js, xmltv.js, hdhr.js, tablo.js) are reused as they are; this is their "./net".
   window.__wygNet = {
-    text: (url, o = {}) => text(url, o.timeout), json: (url, o = {}) => json(url, o.timeout),
+    text: (url, o = {}) => text(url, o.timeout), json: (url, o = {}) => json(url, o.timeout), postJson: (url, body, o = {}) => postJson(url, body, o.timeout),
     setUserAgent: (ua) => { if (ua && ua.trim()) userAgent = ua.trim(); }, getUserAgent: () => userAgent,
   };
-  const m3u = req('./m3u'), xmltv = req('./xmltv'), hdhr = req('./hdhr');
+  const m3u = req('./m3u'), xmltv = req('./xmltv'), hdhr = req('./hdhr'), tablo = req('./tablo');
 
   // ------------------------------------------------------------------ TV guides (same rules as src/main/epg.js)
   const MAX_AGE = 12 * 3600e3;
@@ -103,6 +116,7 @@
         }
         let data;
         if (url.startsWith('hdhr:')) data = await hdhr.loadGuide(url.slice(5), 24);
+        else if (url.startsWith('tablo:')) data = await tablo.loadGuide(url.slice(6), 24);
         else {
           const p = new xmltv.Parser();
           for await (const c of textChunks(await getBytes(url, 180000))) p.push(c);
@@ -224,6 +238,7 @@
       },
     },
     hdhr: { discover: hdhrDiscover, describe: (b) => hdhr.describe(b), lineup: (b) => hdhr.lineup(b) },
+    tablo: { discover: () => tablo.discoverAll(), describe: (b) => tablo.describe(b), lineup: (b) => tablo.lineup(b), watch: (b, id) => tablo.watch(b, id) },
     epg: {
       ensure: async (urls, force) => { await Promise.all((urls || []).filter(Boolean).map((u) => loadGuide(u, force).catch(() => { }))); return guideStatus(); },
       status: () => ok(guideStatus()),
