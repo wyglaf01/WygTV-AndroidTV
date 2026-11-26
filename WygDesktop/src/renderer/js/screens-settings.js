@@ -192,11 +192,14 @@
         return [
           // Samsung TVs: how big everything is drawn (the TV app lays the page out smaller and scales it up).
           W.isTV && W.api.tv ? h('div', { class: 'set-group' }, 'TV screen') : null,
-          W.isTV && W.api.tv ? btn({ class: 'set-row', onclick: async () => {
-            const sizes = W.api.tv.sizes, cur = W.api.tv.size();
-            const i = await W.menu('Size of text and menus', sizes.map((z) => ({ label: z.label, sub: z.sub, checked: z.key === cur })));
-            if (i >= 0 && sizes[i].key !== cur) W.api.tv.setSize(sizes[i].key);
-          } }, h('div', { class: 'set-label' }, 'Size of text and menus'), h('div', { class: 'set-sub' }, (W.api.tv.sizes.find((z) => z.key === W.api.tv.size()) || {}).label || '')) : null,
+          // A toggle: each OK goes to the next size (Small → Medium → Large → Extra large → Small) and redraws WygTV.
+          W.isTV && W.api.tv ? (() => {
+            const sizes = W.api.tv.sizes, at = Math.max(0, sizes.findIndex((z) => z.key === W.api.tv.size()));
+            const next = sizes[(at + 1) % sizes.length];
+            return btn({ class: 'set-row', onclick: () => W.api.tv.setSize(next.key) },
+              h('div', { class: 'set-label' }, 'Size of text and menus: ' + sizes[at].label),
+              h('div', { class: 'set-sub' }, sizes.map((z, i) => (i === at ? '● ' : '○ ') + z.label).join('   ') + '  •  OK: ' + next.label));
+          })() : null,
           h('div', { class: 'set-group' }, 'Theme'),
           ...Object.entries(W.THEMES).map(([k, t]) => btn({ class: 'set-row' + (W.settings.theme === k ? ' checked' : ''), onclick: () => { W.settings.theme = k; W.saveSettings(); W.applyTheme(k); W.refresh(); } },
             h('div', { class: 'set-label' }, (W.settings.theme === k ? '● ' : '○ ') + t.label), h('div', { class: 'swatches' }, [0, 1, 3, 6].map((i) => h('span', { style: { background: `#${(t.p[i] & 0xffffff).toString(16).padStart(6, '0')}` } }))))),

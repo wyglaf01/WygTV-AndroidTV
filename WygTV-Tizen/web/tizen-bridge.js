@@ -420,9 +420,10 @@
     // Size of text and menus (applied by tizen-legacy.js as the page loads, so changing it reloads WygTV).
     tv: {
       sizes: [
-        { key: 'large', label: 'Large', sub: 'For watching from the sofa (recommended)' },
-        { key: 'medium', label: 'Medium', sub: 'A little more on screen' },
         { key: 'small', label: 'Small', sub: 'As on a computer: the most on screen' },
+        { key: 'medium', label: 'Medium', sub: 'A little more on screen' },
+        { key: 'large', label: 'Large', sub: 'For watching from the sofa (recommended)' },
+        { key: 'xlarge', label: 'Extra large', sub: 'Biggest text, for far away or for tired eyes' },
       ],
       size: () => window.__wygTvSize || 'large',
       setSize: (k) => { try { localStorage.setItem('wyg.tvSize', JSON.stringify(k)); } catch (e) { } location.reload(); },

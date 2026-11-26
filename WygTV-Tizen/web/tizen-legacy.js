@@ -10,8 +10,9 @@
 (function () {
   // How big everything is drawn on the TV (Settings → Appearance → Size of text and menus). The page is laid out
   // narrower than the 1920-pixel screen and the TV scales it up, so text, buttons and spacing all grow together:
-  // large lays out 1280 wide (1.5×, the usual size for TV apps), medium 1536 (1.25×), small 1920 (as on a computer).
-  const SIZES = { large: 1280, medium: 1536, small: 1920 };
+  // xlarge lays out 1097 wide (1.75×), large 1280 (1.5×, the usual size for TV apps and the default), medium 1536
+  // (1.25×), small 1920 (as on a computer).
+  const SIZES = { xlarge: 1097, large: 1280, medium: 1536, small: 1920 };
   let tvSize = 'large';
   try { tvSize = JSON.parse(localStorage.getItem('wyg.tvSize') || '"large"'); } catch (e) { }
   if (!SIZES[tvSize]) tvSize = 'large';

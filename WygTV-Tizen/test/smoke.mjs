@@ -425,8 +425,24 @@ try {
     await page.evaluate(() => { W.player.stop(); W.go('settings', { section: 'look' }); });
     await page.waitForTimeout(300);
     const row = await page.evaluate(() => [...document.querySelectorAll('.set-row')].map((r) => r.textContent).find((t) => /Size of text/.test(t)) || '');
-    check(/Size of text and menus\s*Large/.test(row), `Settings → Appearance offers the size ("${row}")`);
+    check(/Size of text and menus: Large/.test(row) && /OK: Extra large/.test(row), `Settings → Appearance has the size toggle ("${row}")`);
     await page.screenshot({ path: path.join(shots, 'size-large-settings.png') });
+    // OK on the toggle: Extra large, 1.75× (the page about 1100 wide), and the toggle moves on to Small.
+    await Promise.all([page.waitForNavigation(), page.evaluate(() => [...document.querySelectorAll('.set-row')].find((r) => /Size of text/.test(r.textContent)).click())]);
+    await page.waitForSelector('#screen[data-screen="home"]');
+    d = await dims();
+    check(d.w === 1097 && d.size === 'xlarge', `OK on the toggle: Extra large, 1097 wide (${JSON.stringify(d)})`);
+    await page.screenshot({ path: path.join(shots, 'size-xlarge-home.png') });
+    await page.evaluate(() => W.go('live'));
+    await page.waitForTimeout(1500);
+    await page.screenshot({ path: path.join(shots, 'size-xlarge-live.png') });
+    await page.evaluate(() => W.go('settings', { section: 'look' }));
+    await page.waitForTimeout(300);
+    const row2 = await page.evaluate(() => [...document.querySelectorAll('.set-row')].map((r) => r.textContent).find((t) => /Size of text/.test(t)) || '');
+    check(/: Extra large/.test(row2) && /OK: Small/.test(row2), `the toggle then offers Small ("${row2.slice(0, 60)}…")`);
+    // Nothing wider than the screen at the biggest size.
+    const over = await page.evaluate(() => [...document.querySelectorAll('#screen *')].filter((e) => e.getBoundingClientRect().right > window.innerWidth + 2 && getComputedStyle(e).position !== 'fixed').length);
+    check(over === 0, `Extra large: nothing runs off the right edge (${over})`);
     // Small: back to a 1920-wide page, as on a computer.
     await Promise.all([page.waitForNavigation(), page.evaluate(() => W.api.tv.setSize('small'))]);
     await page.waitForSelector('#screen[data-screen="home"]');
