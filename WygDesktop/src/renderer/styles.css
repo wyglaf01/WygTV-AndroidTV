@@ -289,6 +289,10 @@ body { font-size: 16px; }
 .player-msg-actions { display: flex; gap: 10px; justify-content: center; margin-top: 12px; }
 #player.preview .player-msg-actions { display: none; }
 .player-num { position: absolute; top: 30px; right: 40px; font-size: 56px; font-weight: 700; color: var(--accent); text-shadow: 0 2px 12px #000; }
+/* Subtitles handed over as text by the TV's own player (Samsung TVs). */
+.player-subs { position: absolute; left: 50%; bottom: 9%; transform: translateX(-50%); max-width: 80%; text-align: center; font-size: 38px; line-height: 1.3; color: #fff; background: rgba(0,0,0,.62); padding: 6px 18px; border-radius: 8px; white-space: pre-line; pointer-events: none; z-index: 2; }
+#player.preview .player-subs, #player.mini .player-subs { font-size: 15px; padding: 2px 8px; }
+#player .osd:not([hidden]) ~ .player-subs { bottom: 36%; } /* above the on-screen bar while it shows */
 .osd { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; }
 .osd > * { pointer-events: auto; }
 .osd-top { display: flex; align-items: center; gap: 16px; padding: 24px 40px 60px; background: linear-gradient(rgba(0,0,0,.8), transparent); }

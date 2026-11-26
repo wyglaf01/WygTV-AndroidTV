@@ -15,7 +15,9 @@ const www = path.join(root, 'www');
 const shots = path.join(root, 'smoke');
 fs.mkdirSync(shots, { recursive: true });
 
-const M3U = ['#EXTM3U', ...Array.from({ length: 12 }, (_, i) => `#EXTINF:-1 tvg-id="ch${i}" group-title="${i < 6 ? 'News' : 'Sports'}",Channel ${i + 1}\nhttp://127.0.0.1:1/ch${i}.m3u8`)].join('\n');
+// Channel numbers 1–12, except two antenna-style sub-channels: 4.1 and 4.2.
+const NUMS = ['1', '2', '3', '4.1', '4.2', '6', '7', '8', '9', '10', '11', '12'];
+const M3U = ['#EXTM3U', ...Array.from({ length: 12 }, (_, i) => `#EXTINF:-1 tvg-id="ch${i}" tvg-chno="${NUMS[i]}" group-title="${i < 6 ? 'News' : 'Sports'}",Channel ${i + 1}\nhttp://127.0.0.1:1/ch${i}.m3u8`)].join('\n');
 // A guide for the demo channels, starting an hour ago, served gzip-compressed (as most guides are).
 const xmltvTime = (t) => new Date(t).toISOString().replace(/[-:T]/g, '').slice(0, 14) + ' +0000';
 const t0 = Math.floor(Date.now() / 3600e3) * 3600e3 - 3600e3;
@@ -56,7 +58,14 @@ async function open(query, playlist, page) {
         open(u) { url = u; t = 0; st = 'IDLE'; log.push(['open', u]); },
         close() { clearInterval(timer); st = 'NONE'; log.push(['close']); },
         stop() { clearInterval(timer); if (st !== 'NONE') st = 'IDLE'; log.push(['stop']); },
-        setListener(l) { L = l; }, setDisplayMethod() { }, setTimeoutForBuffering() { },
+        setListener(l) { L = l; A.L = l; }, setDisplayMethod() { }, setTimeoutForBuffering() { },
+        getTotalTrackInfo() {
+          return [{ index: 0, type: 'VIDEO', extra_info: '{}' }, { index: 1, type: 'AUDIO', extra_info: '{"language":"eng","fourCC":"AC3"}' },
+            { index: 2, type: 'AUDIO', extra_info: '{"language":"spa","fourCC":"AAC"}' }, { index: 3, type: 'TEXT', extra_info: '{"track_lang":"eng"}' }];
+        },
+        getCurrentStreamInfo() { return [{ index: 0, type: 'VIDEO' }, { index: 1, type: 'AUDIO' }]; },
+        setSelectTrack(type, i) { log.push(['track', type, i]); },
+        setSilentSubtitle(on) { log.push(['silent', on]); },
         setDisplayRect(x, y, w, h) { log.push(['rect', x, y, w, h]); },
         prepareAsync(ok, bad) { const u = url; setTimeout(() => { if (u !== url) return; if (/fail/.test(u)) bad({ name: 'PLAYER_ERROR_CONNECTION_FAILED' }); else { st = 'READY'; ok(); } }, 50); },
         play() {
@@ -72,7 +81,16 @@ async function open(query, playlist, page) {
       };
       window.webapis = { avplay: A };
     }
-    window.tizen = { application: { getAppInfo: () => ({ version: '1.0.42' }), getCurrentApplication: () => ({ exit() { window.__exited = true; } }) } };
+    // The TV's key service: which keys exist, and which the app registered.
+    const SUPPORTED = { 0: 48, 1: 49, 2: 50, 3: 51, 4: 52, 5: 53, 6: 54, 7: 55, 8: 56, 9: 57, Minus: 189, ChannelUp: 427, ChannelDown: 428,
+      MediaPlayPause: 10252, MediaPlay: 415, MediaPause: 19, MediaStop: 413, MediaRewind: 412, MediaFastForward: 417, Info: 457, Caption: 10221,
+      ColorF0Red: 403, ColorF1Green: 404, ColorF2Yellow: 405, ColorF3Blue: 406, Guide: 458, ChannelList: 10073, Exit: 10182, VolumeUp: 447 };
+    window.__registered = [];
+    const tvinputdevice = {
+      getSupportedKeys: () => Object.entries(SUPPORTED).map(([name, code]) => ({ name, code })),
+      registerKey: (n) => { window.__registered.push(n); },
+    };
+    window.tizen = { tvinputdevice, application: { getAppInfo: () => ({ version: '1.0.42' }), getCurrentApplication: () => ({ exit() { window.__exited = true; } }) } };
     // Only the first time: reloads keep what the app saved, as on a TV.
     if (pl && !localStorage.getItem('wyg.settings')) localStorage.setItem('wyg.settings', JSON.stringify({ playlists: [{ id: 'demo', type: 'm3u', name: 'Demo', url: b + 'demo.m3u', epgUrl: b + 'guide.xml.gz' }] }));
   }, [playlist, base]);
@@ -270,6 +288,86 @@ try {
     l = await log();
     check(!!last(l, 'close') && (await page.evaluate(() => !W.player.item())), 'leaving Live TV stops AVPlay');
     check(errors.length === 0, `phase 3: no script errors ${errors.length ? JSON.stringify(errors.slice(0, 3)) : ''}`);
+    await page.close();
+  }
+
+  // ---------------------------------------------------------------- phase 4: the remote, sound tracks and subtitles
+  {
+    const { page, errors } = await open('?avplay=1', true);
+    await page.evaluate(() => new Promise((r) => { const off = W.data.on('loaded', () => { off(); r(); }); setTimeout(r, 8000); }));
+    const CODE = { red: 403, green: 404, yellow: 405, blue: 406, chUp: 427, chDown: 428, play: 415, pause: 19, rew: 412, ff: 417, info: 457, cc: 10221, minus: 189, guide: 458 };
+    // A remote key as the TV sends it: a keyCode, and a key name the page can't read.
+    const press = async (code) => { await page.evaluate((c) => (document.activeElement || document.body).dispatchEvent(new KeyboardEvent('keydown', { keyCode: c, key: 'Unidentified', bubbles: true, cancelable: true })), code); await page.waitForTimeout(150); };
+    const digits = async (s) => { for (const c of s) await press(c === '-' ? CODE.minus : 48 + Number(c)); };
+    const screen = () => page.evaluate(() => W.current().name);
+    const log = () => page.evaluate(() => webapis.avplay.log.slice());
+    const last = (l, what) => l.filter((e) => e[0] === what).pop();
+
+    const reg = await page.evaluate(() => window.__registered.slice());
+    check(['ChannelUp', 'MediaPlay', 'ColorF0Red', 'Caption', '4', 'Minus'].every((k) => reg.includes(k)) && !reg.includes('Exit') && !reg.includes('VolumeUp'),
+      `the remote keys WygTV uses are registered (${reg.length}), and Exit and volume stay with the TV`);
+
+    await press(CODE.green); check(await screen() === 'guide', 'green key: TV Guide');
+    await press(CODE.yellow); check(await screen() === 'search', 'yellow key: Search');
+    await press(CODE.blue); check(await screen() === 'settings', 'blue key: Settings');
+    await press(CODE.red); check(await screen() === 'live', 'red key: Live TV');
+    await page.evaluate(() => W.home());
+
+    // Typing a channel number on Home tunes it full screen; 4 - 1 and 4 2 find the antenna sub-channels.
+    await digits('12');
+    check(await page.evaluate(() => (document.querySelector('.tv-num') || {}).textContent) === '12', 'typed digits show on screen');
+    await page.waitForTimeout(1900);
+    let l = await log();
+    check(/ch11\.m3u8$/.test((last(l, 'open') || [])[1] || '') && await page.evaluate(() => W.player.isFull()), `12 tunes channel 12 full screen (${(last(l, 'open') || [])[1]})`);
+    await page.evaluate(() => W.player.stop());
+    await digits('4-1');
+    await page.waitForTimeout(1900);
+    l = await log();
+    check(/ch3\.m3u8$/.test((last(l, 'open') || [])[1] || ''), `4 - 1 tunes 4.1 (${(last(l, 'open') || [])[1]})`);
+    // In the full-screen player its own number entry takes the keys: 4 2 → 4.2 (there's no 42).
+    await page.evaluate(() => { const o = document.querySelector('.osd'); if (o) o.hidden = true; });
+    await digits('42');
+    await page.waitForTimeout(1900);
+    l = await log();
+    check(/ch4\.m3u8$/.test((last(l, 'open') || [])[1] || ''), `in the player, 4 2 tunes 4.2 (${(last(l, 'open') || [])[1]})`);
+
+    // Channel up/down, pause and play keys in the player.
+    await page.evaluate(() => { const o = document.querySelector('.osd'); if (o) o.hidden = true; webapis.avplay.log.length = 0; });
+    await press(CODE.chUp);
+    await page.waitForTimeout(800);
+    l = await log();
+    check(/ch3\.m3u8$/.test((last(l, 'open') || [])[1] || ''), `CH ▲ goes to the previous channel (${(last(l, 'open') || [])[1]})`);
+    await page.evaluate(() => { webapis.avplay.log.length = 0; });
+    await press(CODE.pause); await press(CODE.pause);
+    await press(CODE.play);
+    l = await log();
+    check(l.filter((e) => e[0] === 'pause').length === 1 && last(l, 'play'), `pause pauses once, play plays (${l.map((e) => e[0]).filter((k) => /pause|play/.test(k)).join(' ')})`);
+
+    // Sound tracks and subtitles from AVPlay: buttons on the bar, the sound menu, and the CC key.
+    await page.evaluate(() => { document.querySelector('.osd').hidden = true; });
+    await press(CODE.info);
+    check(await page.evaluate(() => !document.querySelector('.osd').hidden), 'INFO shows the on-screen bar');
+    const btns = await page.$$eval('.osd-btn', (els) => els.map((e) => e.textContent));
+    check(btns.some((t) => /Sound/.test(t)) && btns.some((t) => /Subtitles/.test(t)), `the bar offers Sound and Subtitles (${JSON.stringify(btns)})`);
+    await page.evaluate(() => [...document.querySelectorAll('.osd-btn')].find((b) => /Sound/.test(b.textContent)).click());
+    await page.waitForSelector('.menu-item');
+    const tracks = await page.$$eval('.menu-item', (els) => els.map((e) => e.textContent + (e.classList.contains('checked') ? ' ✓' : '')));
+    check(tracks.length === 2 && /eng · AC3 ✓/.test(tracks[0]) && /spa · AAC/.test(tracks[1]), `Sound lists the stream's tracks, the playing one ticked (${JSON.stringify(tracks)})`);
+    await page.screenshot({ path: path.join(shots, 'sound-tracks.png') });
+    await page.click('.menu-item >> nth=1');
+    l = await log();
+    check(JSON.stringify(last(l, 'track')) === JSON.stringify(['track', 'AUDIO', 2]), 'choosing Spanish switches AVPlay to that track');
+    await press(CODE.cc);
+    l = await log();
+    check(JSON.stringify(last(l, 'track')) === JSON.stringify(['track', 'TEXT', 3]) && JSON.stringify(last(l, 'silent')) === JSON.stringify(['silent', false]), 'CC turns subtitles on');
+    await page.evaluate(() => webapis.avplay.L.onsubtitlechange(3000, 'Hello from the subtitles'));
+    check(await page.evaluate(() => { const e = document.querySelector('.player-subs'); return !e.hidden && e.textContent; }) === 'Hello from the subtitles', 'subtitle text shows over the picture');
+    await page.screenshot({ path: path.join(shots, 'subtitles.png') });
+    await press(CODE.cc);
+    l = await log();
+    check(JSON.stringify(last(l, 'silent')) === JSON.stringify(['silent', true]) && await page.evaluate(() => document.querySelector('.player-subs').hidden), 'CC again turns them off');
+
+    check(errors.length === 0, `phase 4: no script errors ${errors.length ? JSON.stringify(errors.slice(0, 3)) : ''}`);
     await page.close();
   }
 

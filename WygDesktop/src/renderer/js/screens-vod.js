@@ -73,7 +73,7 @@
         io = new IntersectionObserver((e) => { if (e.some((x) => x.isIntersecting)) more(); }, { root: gridCol, rootMargin: '800px' });
         gridCol.replaceChildren(title, grid, sentinel);
         if (shown < list.length) io.observe(sentinel);
-        if (!list.length) grid.append(h('div', { class: 'empty' }, loading ? 'Loading ' + label.toLowerCase() + '…' : sel === 'mylist' ? 'Hold Enter (or right-click) on a poster to add it to My List.' : 'Nothing here.'));
+        if (!list.length) grid.append(h('div', { class: 'empty' }, loading ? 'Loading ' + label.toLowerCase() + '…' : sel === 'mylist' ? (W.isTV ? 'Hold OK on a poster to add it to My List.' : 'Hold Enter (or right-click) on a poster to add it to My List.') : 'Nothing here.'));
         gridCol.scrollTop = 0;
       };
 

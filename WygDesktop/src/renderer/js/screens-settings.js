@@ -139,7 +139,7 @@
       render() {
         const list = W.settings.playlists || [];
         return [
-          h('div', { class: 'set-text' }, 'Your IPTV services and antenna tuners. Hold Enter (or right-click) on one for more.'),
+          h('div', { class: 'set-text' }, (W.isTV ? 'Your IPTV services and antenna tuners. Hold OK on one for more.' : 'Your IPTV services and antenna tuners. Hold Enter (or right-click) on one for more.')),
           ...list.map((pl, i) => {
             const st = D.lists.get(pl.id);
             const sub = (pl.type === 'xtream' ? 'Xtream · ' + pl.host : pl.type === 'm3u' ? 'M3U · ' + pl.url : (pl.tablo ? 'Tablo · ' : 'HDHomeRun · ') + pl.base) +
@@ -225,7 +225,9 @@
             const r = await W.form('User agent', [{ key: 'ua', label: 'Sent to your provider (leave empty for the default)', value: W.settings.userAgent, placeholder: W.brand + '/1.0' }]);
             if (r) { W.settings.userAgent = r.ua.trim(); W.saveSettings(); W.api.net.setUserAgent(W.settings.userAgent || W.brand + '/1.0'); W.refresh(); }
           } }, h('div', { class: 'set-label' }, 'User agent'), h('div', { class: 'set-sub' }, W.settings.userAgent || W.brand + '/1.0 (default)')),
-          h('div', { class: 'set-text' }, 'Player keys: Up/Down or Page Up/Down change channel, numbers jump to a channel, Left/Right skip in movies, Space or P pauses, I shows info, F toggles full screen, Esc goes back.'),
+          h('div', { class: 'set-text' }, W.isTV
+            ? 'Remote: CH ▲▼ or Up/Down change channel; number keys jump to a channel (4 - 1 for 4.1, anywhere in WygTV); ◀◀ ▶▶ skip in movies; ▶❚❚ pauses; INFO shows the bar; CC turns subtitles on or off. Colour keys: red Live TV, green TV Guide, yellow Search, blue Settings.'
+            : 'Player keys: Up/Down or Page Up/Down change channel, numbers jump to a channel, Left/Right skip in movies, Space or P pauses, I shows info, F toggles full screen, Esc goes back.'),
         ];
       },
     },
