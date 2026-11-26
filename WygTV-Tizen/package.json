@@ -11,6 +11,7 @@
     "smoke": "node scripts/build.mjs && node test/smoke.mjs"
   },
   "dependencies": {
+    "fflate": "0.8.2",
     "hls.js": "1.5.20",
     "mpegts.js": "1.8.0"
   },

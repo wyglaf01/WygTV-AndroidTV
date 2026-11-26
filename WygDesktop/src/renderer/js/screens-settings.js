@@ -42,7 +42,8 @@
         { key: 'epgUrl', label: 'TV guide link (optional)', value: pl.epgUrl, type: 'url' },
       ], {
         validate: (v) => (!v.url.trim() ? 'Enter a link or pick a file' : ''),
-        extra: [{ label: '📂 Pick a file…', action: async (inputs) => { const f = await W.api.file.open(); if (f) inputs.url.value = f.path; } }],
+        // Samsung TVs have no files to pick: playlists there come from a link.
+        extra: W.isTV ? [] : [{ label: '📂 Pick a file…', action: async (inputs) => { const f = await W.api.file.open(); if (f) inputs.url.value = f.path; } }],
       });
       if (!r) return;
       Object.assign(pl, { name: r.name.trim(), url: r.url.trim(), epgUrl: r.epgUrl.trim() });
@@ -251,7 +252,7 @@
         return [
           h('div', { class: 'set-text' }, 'Save playlists, guides, favorites, My List, watch progress and settings to a file, or bring them back.'),
           h('div', { class: 'set-buttons' },
-            btn({ class: 'button', onclick: async () => { const p = await W.api.file.save(W.isIOS ? 'wygtv-ios-backup.json' : 'wygdesktop-backup.json', W.backupText()); if (p) W.toast('Saved to ' + p); } }, '⤒ Save a backup'),
+            btn({ class: 'button', onclick: async () => { const p = await W.api.file.save(W.isIOS ? 'wygtv-ios-backup.json' : W.isTV ? 'wygtv-tv-backup.json' : 'wygdesktop-backup.json', W.backupText()); if (p) W.toast('Saved to ' + p); } }, '⤒ Save a backup'),
             btn({ class: 'button', onclick: () => W.restoreBackup() }, '⤓ Restore a backup')),
           h('div', { class: 'set-group' }, 'Hidden categories'),
           btn({ class: 'set-row', onclick: () => { W.hidden = {}; W.save('hidden', W.hidden); W.toast('All categories are showing again'); W.refresh(); } },

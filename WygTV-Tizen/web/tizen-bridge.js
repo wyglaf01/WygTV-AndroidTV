@@ -7,8 +7,12 @@
  * Web requests use the page's own fetch: config.xml's <access origin="*"> lets a TV app reach any server,
  * so there are no CORS rules to get around. The remote's Back key goes back, and on Home it offers to exit.
  *
- * Still to come (see WygTV-Tizen/README.md): gzip guides and keeping guides between starts (phase 2),
- * Samsung's AVPlay player for MPEG-2 and Dolby antenna channels (phase 3), media and number keys (phase 4).
+ * Guides stream in and un-gzip as they download (fflate), and are kept in IndexedDB between starts.
+ * Backups are kept on the TV (the newest 5), and can also be restored from a web link, e.g. a backup the
+ * desktop or iOS app saved.
+ *
+ * Still to come (see WygTV-Tizen/README.md): Samsung's AVPlay player for MPEG-2 and Dolby antenna channels
+ * (phase 3), media and number keys (phase 4).
  */
 (function () {
   const req = window.__wygRequire;
@@ -40,10 +44,43 @@
     return new Uint8Array(await r.arrayBuffer());
   }
   const isGzip = (b) => b.length > 2 && b[0] === 0x1f && b[1] === 0x8b;
-  function decode(bytes) {
-    if (isGzip(bytes)) throw new Error('This guide is gzip-compressed (.gz). Samsung TVs get gzip guides in the next WygTV update; use the plain .xml link for now.');
-    return new TextDecoder('utf-8').decode(bytes);
+  const decode = (bytes) => new TextDecoder('utf-8').decode(isGzip(bytes) ? fflate.gunzipSync(bytes) : bytes);
+
+  /**
+   * Downloads text a piece at a time, un-gzipping on the fly when it is gzip, and hands each piece to onText.
+   * Big guides (100 MB and more once un-gzipped) never sit in memory whole.
+   */
+  async function streamText(url, timeout, onText) {
+    const r = await request(url, { headers: { Accept: '*/*' } }, timeout);
+    if (!r.ok) throw new Error(`HTTP ${r.status} from ${new URL(url).host}`);
+    const td = new TextDecoder('utf-8');
+    const out = (u8) => { const t = td.decode(u8, { stream: true }); if (t) onText(t); };
+    let gun = null, head = null;
+    const feed = (u8, last) => {
+      if (head !== true) {
+        // Decide gzip or not from the first two bytes, however the download was split.
+        const b = head ? concat(head, u8) : u8;
+        if (b.length < 2 && !last) { head = b; return; }
+        head = true;
+        if (isGzip(b)) gun = new fflate.Gunzip((d) => out(d));
+        u8 = b;
+      }
+      if (gun) gun.push(u8, last); else out(u8);
+    };
+    const reader = r.body && r.body.getReader ? r.body.getReader() : null;
+    if (!reader) feed(new Uint8Array(await r.arrayBuffer()), true);
+    else {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value && value.length) feed(value, false);
+      }
+      feed(new Uint8Array(0), true);
+    }
+    const tail = td.decode();
+    if (tail) onText(tail);
   }
+  function concat(a, b) { const c = new Uint8Array(a.length + b.length); c.set(a); c.set(b, a.length); return c; }
   const text = async (url, timeout) => decode(await getBytes(url, timeout));
   async function json(url, timeout) {
     const t = await text(url, timeout);
@@ -66,9 +103,43 @@
   };
   const m3u = req('./m3u'), xmltv = req('./xmltv'), hdhr = req('./hdhr'), tablo = req('./tablo');
 
-  // ------------------------------------------------------------------ TV guides (same rules as src/main/epg.js; kept in memory for now)
+  // ------------------------------------------------------------------ IndexedDB: guides and backups kept on the TV
+  let dbOpen = null;
+  function db() {
+    if (!dbOpen) {
+      dbOpen = new Promise((resolve, reject) => {
+        const r = indexedDB.open('wygtv', 1);
+        r.onupgradeneeded = () => {
+          r.result.createObjectStore('guides', { keyPath: 'url' });
+          r.result.createObjectStore('backups', { keyPath: 'id', autoIncrement: true });
+        };
+        r.onsuccess = () => resolve(r.result);
+        r.onerror = () => reject(r.error);
+      });
+      dbOpen.catch(() => { dbOpen = null; });
+    }
+    return dbOpen;
+  }
+  /** Runs fn(store) in a transaction and resolves with the request it returns (if any) once it commits. */
+  async function store(name, mode, fn) {
+    const d = await db();
+    return new Promise((resolve, reject) => {
+      const t = d.transaction(name, mode);
+      const q = fn(t.objectStore(name));
+      t.oncomplete = () => resolve(q ? q.result : undefined);
+      t.onerror = () => reject(t.error);
+      t.onabort = () => reject(t.error || new Error('The TV\u2019s storage refused the change'));
+    });
+  }
+
+  // ------------------------------------------------------------------ TV guides (same rules as src/main/epg.js)
   const MAX_AGE = 12 * 3600e3;
   const guides = new Map();
+  // Guides nobody has asked for in 3 days (an old playlist's) are dropped at start-up.
+  store('guides', 'readwrite', (s) => {
+    const c = s.openCursor();
+    c.onsuccess = () => { const cur = c.result; if (!cur) return; if (Date.now() - cur.value.loadedAt > 3 * 24 * 3600e3) cur.delete(); cur.continue(); };
+  }).catch(() => { });
   async function loadGuide(url, force) {
     let g = guides.get(url);
     if (!g) { g = {}; guides.set(url, g); }
@@ -76,15 +147,22 @@
     if (!force && g.data && Date.now() - g.loadedAt < MAX_AGE) return;
     g.loading = (async () => {
       try {
+        if (!force && !g.data) {
+          try {
+            const saved = await store('guides', 'readonly', (s) => s.get(url));
+            if (saved && Date.now() - saved.loadedAt < MAX_AGE) { g.data = saved.data; g.loadedAt = saved.loadedAt; g.byName = null; g.error = ''; return; }
+          } catch (e) { /* storage unavailable: download it */ }
+        }
         let data;
         if (url.startsWith('hdhr:')) data = await hdhr.loadGuide(url.slice(5), 24);
         else if (url.startsWith('tablo:')) data = await tablo.loadGuide(url.slice(6), 24);
         else {
           const p = new xmltv.Parser();
-          p.push(decode(await getBytes(url, 180000)));
+          await streamText(url, 180000, (t) => p.push(t));
           data = p.finish();
         }
         g.data = data; g.loadedAt = Date.now(); g.byName = null; g.error = '';
+        store('guides', 'readwrite', (s) => s.put({ url, loadedAt: g.loadedAt, data })).catch(() => { });
       } catch (e) { g.error = String(e.message || e); throw e; } finally { g.loading = null; }
     })();
     return g.loading;
@@ -132,6 +210,35 @@
     const out = [];
     await Promise.all([...bases].map(async (b) => { try { const d = await hdhr.describe(b); if (!out.some((o) => o.id && o.id === d.id)) out.push(d); } catch (e) { } }));
     return out;
+  }
+
+  // ------------------------------------------------------------------ backups: kept on the TV, or restored from a link
+  const KEEP_BACKUPS = 5;
+  const when = (t) => new Date(t).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+  async function backupList() {
+    const all = (await store('backups', 'readonly', (s) => s.getAll())) || [];
+    return all.sort((a, b) => b.saved - a.saved);
+  }
+  async function fileSave(name, data) {
+    await store('backups', 'readwrite', (s) => s.add({ saved: Date.now(), name, text: data }));
+    const all = await backupList();
+    if (all.length > KEEP_BACKUPS) await store('backups', 'readwrite', (s) => { all.slice(KEEP_BACKUPS).forEach((b) => s.delete(b.id)); });
+    return 'this TV. Restore a backup lists the newest ' + KEEP_BACKUPS;
+  }
+  async function fileOpen() {
+    let list = [];
+    try { list = await backupList(); } catch (e) { }
+    const items = list.map((b) => ({ label: 'Saved on this TV · ' + when(b.saved) })).concat([{ label: '🔗 From a web link…' }]);
+    const i = await W.menu('Restore a backup', items, { text: 'Backups saved on this TV, or one from a link (a backup the desktop or iPhone app saved, put online).' });
+    if (i < 0) return null;
+    if (i < list.length) return { path: 'tv:' + list[i].id, text: list[i].text };
+    const r = await W.form('Restore from a link', [{ key: 'url', label: 'Backup link', placeholder: 'https://…/wygdesktop-backup.json', type: 'url' }], {
+      okLabel: 'Restore',
+      validate: (v) => (/^https?:\/\//i.test(v.url.trim()) ? '' : 'Enter a link starting with http:// or https://'),
+    });
+    if (!r) return null;
+    const url = r.url.trim();
+    return { path: url, text: await text(url, 60000) };
   }
 
   // ------------------------------------------------------------------ the app on the TV
@@ -185,7 +292,7 @@
     shell: { open: () => ok() },
     win: { fullscreen: () => ok(true), quit: () => ok(exitApp()) },
     ext: { play: no('Samsung TVs have no external players.'), pick: () => ok('') },
-    file: { save: no('Backups on Samsung TVs come in a later WygTV update.'), open: () => ok(null) },
+    file: { save: fileSave, open: fileOpen },
     // The TV app is installed from a computer (or, later, the Samsung store), so there is nothing to check here.
     update: { check: () => ok({ current: appVersion(), latest: appVersion(), available: false, kind: 'tizen' }), install: no('Updates are installed from a computer.') },
   };

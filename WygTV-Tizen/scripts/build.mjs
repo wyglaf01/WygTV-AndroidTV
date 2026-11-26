@@ -1,5 +1,5 @@
 // Builds www/ (the TV app's files) from WygDesktop's screens: node scripts/build.mjs
-// - copies WygDesktop/src/renderer, hls.js and mpegts.js
+// - copies WygDesktop/src/renderer, hls.js, mpegts.js and fflate (gzip guides)
 // - wraps the desktop's m3u.js, xmltv.js, hdhr.js and tablo.js so they run in the page (js/desktop-modules.js)
 // - adds web/tizen-bridge.js, which stands in for the desktop app's main process, and web/tizen.css
 // - makes the CSS work on Tizen 5.5 (2020 TVs, Chromium 69): flex `gap`, `aspect-ratio`, `min()` and `:has()`
@@ -25,6 +25,7 @@ fs.cpSync(path.join(desktop, 'renderer'), www, { recursive: true });
 fs.mkdirSync(path.join(www, 'vendor'), { recursive: true });
 fs.copyFileSync(nm('hls.js/dist/hls.min.js'), path.join(www, 'vendor', 'hls.min.js'));
 fs.copyFileSync(nm('mpegts.js/dist/mpegts.js'), path.join(www, 'vendor', 'mpegts.js'));
+fs.copyFileSync(nm('fflate/umd/index.js'), path.join(www, 'vendor', 'fflate.js'));
 fs.copyFileSync(path.join(root, 'web', 'tizen-bridge.js'), path.join(www, 'js', 'tizen-bridge.js'));
 fs.copyFileSync(path.join(root, 'web', 'tizen.css'), path.join(www, 'tizen.css'));
 fs.copyFileSync(path.join(repo, 'docs', 'img', 'icon-512.png'), path.join(www, 'icon.png'));
@@ -65,8 +66,8 @@ html = html
   .replace('../../node_modules/mpegts.js/dist/mpegts.js', 'vendor/mpegts.js')
   // Samsung's TV APIs (AVPlay, product info); $WEBAPIS is filled in by the TV.
   .replace('<script src="js/core.js"></script>',
-    '<script src="$WEBAPIS/webapis/webapis.js"></script>\n  <script src="js/desktop-modules.js"></script>\n  <script src="js/tizen-bridge.js"></script>\n  <script src="js/core.js"></script>');
-for (const need of ['vendor/hls.min.js', 'vendor/mpegts.js', 'js/tizen-bridge.js', 'js/tizen-legacy.js', 'tizen.css', 'name="viewport"', '$WEBAPIS']) {
+    '<script src="$WEBAPIS/webapis/webapis.js"></script>\n  <script src="vendor/fflate.js"></script>\n  <script src="js/desktop-modules.js"></script>\n  <script src="js/tizen-bridge.js"></script>\n  <script src="js/core.js"></script>');
+for (const need of ['vendor/fflate.js', 'vendor/hls.min.js', 'vendor/mpegts.js', 'js/tizen-bridge.js', 'js/tizen-legacy.js', 'tizen.css', 'name="viewport"', '$WEBAPIS']) {
   if (!html.includes(need)) throw new Error('index.html did not get ' + need);
 }
 fs.writeFileSync(path.join(www, 'index.html'), html);
