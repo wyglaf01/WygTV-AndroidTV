@@ -4,7 +4,7 @@ WygTV on Samsung TVs from 2020 on (Tizen 5.5 and newer). Like WygTV-iOS, it is W
 (`../WygDesktop/src/renderer`) in another shell: here a Tizen TV web app, with `web/tizen-bridge.js` standing in
 for the desktop app's main process. Changes to the desktop screens reach the TV app too.
 
-**Status: phase 4 of 7.** It builds, opens to Home, loads playlists, channels and guides (gzip too, kept between
+**Status: phase 5 of 7.** It builds, opens to Home, loads playlists, channels and guides (gzip too, kept between
 starts), saves and restores backups, plays video in Samsung's AVPlay (antenna channels included) with its sound tracks and
 subtitles, and works with the whole remote: arrows, OK, Back, CH ▲▼, number keys (4 - 1 for 4.1), play, pause,
 rewind, fast-forward, INFO, CC, GUIDE, CH LIST and the colour keys (red Live TV, green TV Guide, yellow Search,
@@ -46,6 +46,32 @@ newer TVs use the real CSS. Add `?legacy=1` to the page address to try the fallb
 
 GitHub Actions (`.github/workflows/tizen.yml`) runs both on every change and keeps `www/` and the screenshots.
 
+## Signed builds (WygTV.wgt)
+
+`scripts/sign.sh` signs `www/` into `dist/WygTV.wgt` with Tizen Studio's `tizen` command line. GitHub Actions
+(`.github/workflows/tizen.yml`) runs it on every build, and builds on `app` signed with your Samsung certificate are
+published at
+**https://github.com/wyglaf01/WygTV-AndroidTV/releases/download/wygtv-tizen-latest/WygTV.wgt**.
+
+To give GitHub your certificate (once, after making it in Tizen Studio's Certificate Manager):
+
+1. Find the two files Tizen Studio made: `~/SamsungCertificate/<profile name>/author.p12` and `distributor.p12`
+   (on Windows, `C:\Users\<you>\SamsungCertificate\<profile name>\`).
+2. Turn each into text: `base64 -w0 author.p12` on Linux, `base64 -i author.p12` on a Mac, or in Windows PowerShell
+   `[Convert]::ToBase64String([IO.File]::ReadAllBytes("author.p12"))`.
+3. On GitHub: the repository → **Settings → Secrets and variables → Actions → New repository secret**, four times:
+   - `TIZEN_AUTHOR_P12_B64`: the text from author.p12
+   - `TIZEN_AUTHOR_PASSWORD`: the author certificate's password
+   - `TIZEN_DISTRIBUTOR_P12_B64`: the text from distributor.p12
+   - `TIZEN_DISTRIBUTOR_PASSWORD`: the distributor certificate's password (Tizen Studio often uses the author's)
+4. Run **Actions → Build WygTV for Samsung TVs (Tizen) → Run workflow** on `app`.
+
+Until the secrets are there, the build signs with a throwaway test certificate: it checks the packaging works,
+but Samsung TVs refuse that file, so it is only kept as a workflow artifact.
+
+A Samsung certificate made for Developer mode lists the TVs it works on (their DUIDs). To add a TV later, add it
+in Certificate Manager, make the distributor certificate again, and update the two distributor secrets.
+
 ## Trying it on a TV
 
 1. Install [Tizen Studio](https://developer.samsung.com/smarttv/develop/getting-started/setting-up-sdk/installing-tv-sdk.html)
@@ -54,8 +80,10 @@ GitHub Actions (`.github/workflows/tizen.yml`) runs both on every change and kee
    computer's IP address, and restart the TV.
 3. In Tizen Studio: **Device Manager** → add the TV by its IP address. **Certificate Manager** → make a
    **Samsung** certificate for TV with your Samsung account (the TV's DUID is added from the Device Manager).
-4. Package and install: `tizen package -t wgt -s <certificate profile> -- www`, then
-   `tizen install -n WygTV.wgt -t <TV name>`.
+4. Install the signed build: download `WygTV.wgt` from the link above, then
+   `sdb connect <TV IP>` and `tizen install -n WygTV.wgt -t <TV name from sdb devices>`.
+   Or sign your own: `npm run build`, then `TIZEN_AUTHOR_P12=… TIZEN_AUTHOR_PASSWORD=… TIZEN_DISTRIBUTOR_P12=…
+   TIZEN_DISTRIBUTOR_PASSWORD=… scripts/sign.sh` and install `dist/WygTV.wgt` the same way.
 
 ## Phases
 
@@ -65,6 +93,6 @@ GitHub Actions (`.github/workflows/tizen.yml`) runs both on every change and kee
    hardware). ✔ (to check on a real TV: the picture in the Live TV preview box and the mini player)
 4. **Remote**: channel up/down, number keys for channels like `4.1`, play/pause and colour keys, sound tracks and
    subtitles from AVPlay, TV wording. ✔
-5. **Builds**: signed `.wgt` from GitHub Actions (Samsung certificate as secrets), `wygtv-tizen-latest` release.
+5. **Builds**: signed `.wgt` from GitHub Actions (Samsung certificate as secrets), `wygtv-tizen-latest` release. ✔
 6. **Testing** on a real TV in Developer mode.
 7. **Store**: Samsung TV Seller Office application.
