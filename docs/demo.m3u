@@ -1,0 +1,18 @@
+#EXTM3U
+# WygTV demo playlist: public test streams and Creative Commons films, free to play, for trying WygTV
+# (and for Samsung's app testers) without an IPTV service. Add it in WygTV as an M3U playlist:
+#   https://wyglaf01.github.io/WygTV-AndroidTV/demo.m3u
+#EXTINF:-1 tvg-id="demo.live" tvg-chno="1" group-title="Demo channels",Live test channel (Akamai)
+https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8
+#EXTINF:-1 tvg-id="demo.bipbop" tvg-chno="2" group-title="Demo channels",Apple test stream (HLS, MPEG-TS)
+https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/master.m3u8
+#EXTINF:-1 tvg-id="demo.bbb" tvg-chno="3" group-title="Demo channels",Big Buck Bunny (CC BY, Blender Foundation)
+https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8
+#EXTINF:-1 tvg-id="demo.sintel" tvg-chno="4" group-title="Demo channels",Sintel (CC BY, Blender Foundation)
+https://bitmovin-a.akamaihd.net/content/sintel/hls/playlist.m3u8
+#EXTINF:-1 tvg-id="demo.tos" tvg-chno="5" group-title="Demo channels",Tears of Steel (CC BY, Blender Foundation)
+https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8
+#EXTINF:-1 tvg-logo="https://wyglaf01.github.io/WygTV-AndroidTV/img/demo/sintel-trailer.png" group-title="Demo movies",Sintel trailer (movie file, CC BY)
+https://download.blender.org/durian/trailer/sintel_trailer-720p.mp4
+#EXTINF:-1 tvg-logo="https://wyglaf01.github.io/WygTV-AndroidTV/img/demo/big-buck-bunny.png" group-title="Demo movies",Big Buck Bunny (movie file, CC BY)
+https://download.blender.org/peach/bigbuckbunny_movies/BigBuckBunny_320x180.mp4

@@ -16,10 +16,10 @@ on:
   workflow_dispatch:
   push:
     branches: [app]
-    paths: ["WygTV-Tizen/**", "WygDesktop/src/renderer/**", "WygDesktop/src/main/m3u.js", "WygDesktop/src/main/xmltv.js", "WygDesktop/src/main/hdhr.js", "WygDesktop/src/main/tablo.js", "docs/img/icon-512.png", ".github/workflows/tizen.yml"]
+    paths: ["WygTV-Tizen/**", "docs/demo.m3u", "WygDesktop/src/renderer/**", "WygDesktop/src/main/m3u.js", "WygDesktop/src/main/xmltv.js", "WygDesktop/src/main/hdhr.js", "WygDesktop/src/main/tablo.js", "docs/img/icon-512.png", ".github/workflows/tizen.yml"]
   pull_request:
     branches: [app]
-    paths: ["WygTV-Tizen/**", "WygDesktop/src/renderer/**", "WygDesktop/src/main/m3u.js", "WygDesktop/src/main/xmltv.js", "WygDesktop/src/main/hdhr.js", "WygDesktop/src/main/tablo.js", "docs/img/icon-512.png", ".github/workflows/tizen.yml"]
+    paths: ["WygTV-Tizen/**", "docs/demo.m3u", "WygDesktop/src/renderer/**", "WygDesktop/src/main/m3u.js", "WygDesktop/src/main/xmltv.js", "WygDesktop/src/main/hdhr.js", "WygDesktop/src/main/tablo.js", "docs/img/icon-512.png", ".github/workflows/tizen.yml"]
 
 jobs:
   build:
@@ -54,6 +54,25 @@ jobs:
           npm install --no-save playwright@1.49.1
           npx playwright install --with-deps chromium
           node test/smoke.mjs
+
+      - name: Check the demo playlist's streams still answer
+        # docs/demo.m3u is what Samsung's app testers play. These are public test streams, so a broken one
+        # warns rather than failing the build.
+        run: |
+          grep -E '^https?://' ../docs/demo.m3u | while read -r u; do
+            code=$(curl -s -o /dev/null -m 20 -L -r 0-1023 -w '%{http_code}' "$u" || echo 000)
+            case "$code" in 200|206) echo "ok   $code $u" ;; *) echo "::warning::Demo stream answered $code: $u" ;; esac
+          done
+
+      - name: Screenshots for Samsung's TV store (1920×1080, demo playlist)
+        run: node test/store-shots.mjs
+
+      - name: Keep the store screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: wygtv-tizen-store-screenshots
+          path: WygTV-Tizen/store/
+          if-no-files-found: error
 
       - name: Install Tizen Studio's command line
         working-directory: ${{ runner.temp }}

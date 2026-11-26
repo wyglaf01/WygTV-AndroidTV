@@ -119,3 +119,14 @@ test('config.xml is a valid Samsung TV app manifest', () => {
   assert.match(xml, /<access origin="\*" subdomains="true"\/>/);
   assert.ok(fs.existsSync(path.join(www, 'icon.png')));
 });
+
+test("the demo playlist for Samsung's testers parses: 5 numbered channels and 2 movies, all https", async () => {
+  const { createRequire } = await import('node:module');
+  const m3u = createRequire(import.meta.url)('../../WygDesktop/src/main/m3u.js');
+  const r = m3u.parse(fs.readFileSync(path.join(root, '..', 'docs', 'demo.m3u'), 'utf8'));
+  const live = r.items.filter((i) => i.kind === 'live'), movies = r.items.filter((i) => i.kind === 'movie');
+  assert.deepEqual(live.map((i) => i.num), ['1', '2', '3', '4', '5']);
+  assert.equal(movies.length, 2);
+  assert.ok(movies.every((i) => i.logo), 'movies have posters');
+  assert.ok(r.items.every((i) => /^https:\/\//.test(i.url)), 'all https');
+});
