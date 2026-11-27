@@ -1211,7 +1211,7 @@ final class Menus {
         parent.addView(t, new LinearLayout.LayoutParams(-1, -2));
     }
 
-    /** About: the version, and Wyglaf (who makes WygTV) with his avatar. */
+    /** About: the version, and Wyglaf (who makes WygTV) with his framed portrait. */
     private static void aboutDialog(MainActivity a, String about) {
         LinearLayout box = new LinearLayout(a);
         box.setOrientation(LinearLayout.HORIZONTAL);
@@ -1220,7 +1220,7 @@ final class Menus {
         android.widget.ImageView pic = new android.widget.ImageView(a);
         pic.setImageResource(R.drawable.wyglaf_avatar);
         pic.setContentDescription("Wyglaf");
-        box.addView(pic, new LinearLayout.LayoutParams(a.dp(120), a.dp(120)));
+        box.addView(pic, new LinearLayout.LayoutParams(a.dp(128), a.dp(144)));
         LinearLayout text = new LinearLayout(a);
         text.setOrientation(LinearLayout.VERTICAL);
         text.setPadding(a.dp(18), 0, 0, 0);

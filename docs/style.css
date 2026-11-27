@@ -206,6 +206,6 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 12px 24px; justify-content: 
 
 /* Wyglaf, who makes WygTV (How WygTV started) */
 .maker { display: flex; align-items: center; gap: 16px; margin: 6px 0 14px; }
-.maker img { width: 120px; height: 120px; border-radius: 50%; }
+.maker img { width: 140px; height: 158px; flex: none; }
 .maker b { color: var(--accent, #E6B070); font-size: 20px; }
 .maker span { color: var(--muted, #C6CADD); }
