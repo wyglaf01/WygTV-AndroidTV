@@ -352,8 +352,11 @@
   function place() {
     if (!host || full || !root) return;
     if (!host.isConnected) { P.stop(); return; }
-    const r = host.getBoundingClientRect();
-    Object.assign(root.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
+    // The box is measured on screen; the player is placed inside #app. When #app is magnified (Samsung TVs' text
+    // size), screen pixels are turned back into #app's own: k is how much bigger #app is drawn than laid out.
+    const r = host.getBoundingClientRect(), app = W.$('#app'), a = app.getBoundingClientRect();
+    const k = app.offsetWidth ? a.width / app.offsetWidth : 1;
+    Object.assign(root.style, { left: (r.left - a.left) / k + 'px', top: (r.top - a.top) / k + 'px', width: r.width / k + 'px', height: r.height / k + 'px' });
   }
 
   P.enterFull = function enterFull() {

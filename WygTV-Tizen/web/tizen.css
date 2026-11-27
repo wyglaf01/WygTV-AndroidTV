@@ -23,3 +23,14 @@ html.tizen .dialog.menu.wide .dialog-text { white-space: pre-line; font-size: 16
 html.tizen .phone-dialog { align-items: center; text-align: center; }
 html.tizen .phone-dialog .dialog-text { white-space: pre-line; }
 html.tizen .phone-qr { display: block; margin: 8px auto 14px; width: 340px; height: 340px; image-rendering: pixelated; border-radius: 8px; }
+
+/* Size of text and menus (tizen-legacy.js): #app is laid out at 1/z of the screen and magnified z×, so it fills
+   the screen with everything z× bigger. Pop-ups and the player are inside #app, so they scale with it. */
+html.tv-zoom #app {
+  top: 0; left: 0; right: auto; bottom: auto;
+  width: calc(100vw / var(--tvz)); height: calc(100vh / var(--tvz));
+  transform: scale(var(--tvz)); transform-origin: 0 0;
+}
+/* Sizes given in vw/vh are screen sizes, which the magnification would make too big: divide them back. */
+html.tv-zoom .dialog { max-height: calc(86vh / var(--tvz)); }
+html.tv-zoom #player.mini { width: 420px; }

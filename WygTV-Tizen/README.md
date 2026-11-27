@@ -29,10 +29,12 @@ blue Settings). It has been tested in a browser with a stand-in AVPlay, not yet 
   sends WygTV to the background. Antenna channels, which the desktop app converts with FFmpeg, play as they are.
 - `config.xml`: the app's Samsung manifest (`WygTVtizen.WygTV`, version `1.0.<build number>`)
 
-**Text size.** On the TV everything is drawn larger for viewing from the sofa: `web/tizen-legacy.js` sets the
-page's viewport width as it loads (Extra large 1097: 1.75×; Large 1280, the default: 1.5×; Medium 1536; Small
-1920) and the TV scales the page up to the screen. AVPlay's position is scaled the same way. **Settings →
-Appearance → Size of text and menus** is a toggle: each OK goes to the next size.
+**Text size.** On the TV everything is drawn larger for viewing from the sofa: `web/tizen-legacy.js` lays the app
+(`#app`) out smaller than the screen and magnifies it to fill it (`html.tv-zoom` in `web/tizen.css`): Extra large
+1.75×, Large 1.5× (the default), Medium 1.25×, Small 1×. This works the same on every TV (some TV engines ignore a
+page's viewport width), and **Settings → Appearance → Size of text and menus** (a toggle: each OK goes to the next
+size) changes it at once, without reloading. The player turns screen positions back into the app's own units, so
+the picture still sits exactly in the preview box.
 
 **Typing on a phone.** Every form on the TV has **📱 Type on your phone** (`web/tizen-phone.js`): it shows a QR code
 for `docs/send.html` (GitHub Pages), which shows the same fields on the phone. What's typed there is encrypted on

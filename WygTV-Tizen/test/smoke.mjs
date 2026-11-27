@@ -406,14 +406,16 @@ try {
     await page.close();
   }
 
-  // ---------------------------------------------------------------- the TV's text size: the page laid out narrower and scaled up
+  // ---------------------------------------------------------------- the TV's text size: #app laid out smaller and magnified
   {
-    // isMobile makes Chromium honour the page's viewport width, as a TV's web engine does.
-    const page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, isMobile: true, deviceScaleFactor: 1 });
-    const { errors } = await open('?avplay=1', true, page);
-    const dims = () => page.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight, size: W.api.tv.size() }));
+    const { page, errors } = await open('?avplay=1', true);
+    const dims = () => page.evaluate(() => {
+      const a = document.getElementById('app'), r = a.getBoundingClientRect();
+      return { size: W.api.tv.size(), zoom: window.__wygTvZoom, layout: a.offsetWidth, screen: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)] };
+    });
     let d = await dims();
-    check(d.w === 1280 && d.size === 'large', `Large (the default) lays the page out 1280 wide, scaled 1.5× to the screen (${JSON.stringify(d)})`);
+    check(d.size === 'large' && d.zoom === 1.5 && d.layout === 1280 && JSON.stringify(d.screen) === '[0,0,1920,1080]',
+      `Large (the default): laid out 1280 wide, magnified 1.5× to fill the screen exactly (${JSON.stringify(d)})`);
     await page.screenshot({ path: path.join(shots, 'size-large-home.png') });
     await page.evaluate(() => new Promise((r) => { const off = W.data.on('loaded', () => { off(); r(); }); setTimeout(r, 8000); }));
     await page.evaluate(() => W.go('live'));
@@ -421,7 +423,7 @@ try {
     await page.focus('.chan');
     await page.keyboard.press('Enter');
     await page.waitForTimeout(1500);
-    const box = await page.evaluate(() => { const r = document.querySelector('.preview-box').getBoundingClientRect(); return [r.left, r.top, r.width, r.height].map((v) => Math.round(v * 1.5)); });
+    const box = await page.evaluate(() => { const r = document.querySelector('.preview-box').getBoundingClientRect(); return [r.left, r.top, r.width, r.height].map(Math.round); });
     let rect = await page.evaluate(() => webapis.avplay.log.filter((e) => e[0] === 'rect').pop().slice(1));
     check(rect.every((v, i) => Math.abs(v - box[i]) <= 4), `the preview plays exactly over the enlarged preview box (${JSON.stringify(rect)} vs ${JSON.stringify(box)})`);
     await page.screenshot({ path: path.join(shots, 'size-large-live.png') });
@@ -431,30 +433,42 @@ try {
     check(JSON.stringify(rect) === '[0,0,1920,1080]', `full screen still fills the TV (${JSON.stringify(rect)})`);
     await page.evaluate(() => { W.player.stop(); W.go('settings', { section: 'look' }); });
     await page.waitForTimeout(300);
-    const row = await page.evaluate(() => [...document.querySelectorAll('.set-row')].map((r) => r.textContent).find((t) => /Size of text/.test(t)) || '');
-    check(/Size of text and menus: Large/.test(row) && /OK: Extra large/.test(row), `Settings → Appearance has the size toggle ("${row}")`);
+    const rowText = () => page.evaluate(() => [...document.querySelectorAll('.set-row')].map((r) => r.textContent).find((t) => /Size of text/.test(t)) || '');
+    const row = await rowText();
+    check(/Size of text and menus: Large/.test(row) && /OK: Extra large/.test(row), `Settings → Appearance has the size toggle ("${row.slice(0, 50)}…")`);
     await page.screenshot({ path: path.join(shots, 'size-large-settings.png') });
-    // OK on the toggle: Extra large, 1.75× (the page about 1100 wide), and the toggle moves on to Small.
-    await Promise.all([page.waitForNavigation(), page.evaluate(() => [...document.querySelectorAll('.set-row')].find((r) => /Size of text/.test(r.textContent)).click())]);
-    await page.waitForSelector('#screen[data-screen="home"]');
+    // OK on the toggle: Extra large at once, without reloading WygTV.
+    await page.evaluate(() => { window.__noReload = true; });
+    await page.evaluate(() => [...document.querySelectorAll('.set-row')].find((r) => /Size of text/.test(r.textContent)).click());
+    await page.waitForTimeout(400);
     d = await dims();
-    check(d.w === 1097 && d.size === 'xlarge', `OK on the toggle: Extra large, 1097 wide (${JSON.stringify(d)})`);
+    check(d.size === 'xlarge' && d.layout === 1097 && JSON.stringify(d.screen) === '[0,0,1920,1080]' && await page.evaluate(() => window.__noReload === true),
+      `OK on the toggle: Extra large at once, laid out 1097 wide, still filling the screen, no reload (${JSON.stringify(d)})`);
+    check(/: Extra large/.test(await rowText()) && /OK: Small/.test(await rowText()), 'the toggle then offers Small');
+    await page.evaluate(() => W.home());
+    await page.waitForTimeout(500);
     await page.screenshot({ path: path.join(shots, 'size-xlarge-home.png') });
     await page.evaluate(() => W.go('live'));
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(1200);
     await page.screenshot({ path: path.join(shots, 'size-xlarge-live.png') });
-    await page.evaluate(() => W.go('settings', { section: 'look' }));
+    const over = await page.evaluate(() => [...document.querySelectorAll('#screen *')].filter((e) => { const r = e.getBoundingClientRect(); return r.width && r.right > 1922; }).length);
+    check(over === 0, `Extra large: nothing runs off the right edge of the screen (${over})`);
+    // A dialog stays on screen at the biggest size.
+    await page.evaluate(() => { W.alert('A long message', 'x '.repeat(900)); });
+    await page.waitForSelector('.dialog');
+    const dlg = await page.evaluate(() => { const r = document.querySelector('.dialog').getBoundingClientRect(); return [Math.round(r.top), Math.round(r.bottom)]; });
+    check(dlg[0] >= 0 && dlg[1] <= 1080, `Extra large: a long dialog stays on the screen (${JSON.stringify(dlg)})`);
+    await page.evaluate(() => W.back());
+    // Small: back to no magnification.
+    await page.evaluate(() => W.api.tv.setSize('small'));
     await page.waitForTimeout(300);
-    const row2 = await page.evaluate(() => [...document.querySelectorAll('.set-row')].map((r) => r.textContent).find((t) => /Size of text/.test(t)) || '');
-    check(/: Extra large/.test(row2) && /OK: Small/.test(row2), `the toggle then offers Small ("${row2.slice(0, 60)}…")`);
-    // Nothing wider than the screen at the biggest size.
-    const over = await page.evaluate(() => [...document.querySelectorAll('#screen *')].filter((e) => e.getBoundingClientRect().right > window.innerWidth + 2 && getComputedStyle(e).position !== 'fixed').length);
-    check(over === 0, `Extra large: nothing runs off the right edge (${over})`);
-    // Small: back to a 1920-wide page, as on a computer.
-    await Promise.all([page.waitForNavigation(), page.evaluate(() => W.api.tv.setSize('small'))]);
+    d = await dims();
+    check(d.size === 'small' && d.zoom === 1 && d.layout === 1920 && !(await page.evaluate(() => document.documentElement.classList.contains('tv-zoom'))), `Small: laid out 1920 wide, not magnified (${JSON.stringify(d)})`);
+    // The size is remembered when WygTV starts again.
+    await page.reload();
     await page.waitForSelector('#screen[data-screen="home"]');
     d = await dims();
-    check(d.w === 1920 && d.size === 'small', `Small lays the page out 1920 wide (${JSON.stringify(d)})`);
+    check(d.size === 'small' && d.layout === 1920, `the size is remembered next time (${d.size})`);
     check(errors.length === 0, `text size: no script errors ${errors.length ? JSON.stringify(errors.slice(0, 3)) : ''}`);
     await page.close();
   }
