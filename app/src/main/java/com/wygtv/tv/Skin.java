@@ -88,7 +88,7 @@ final class Skin {
     private static int[] sheen(int[] fill) {
         int top = fill[0], bottom = fill[fill.length - 1];
         int mid = Theme.mix(top, bottom, 0.45f);
-        return new int[]{Theme.mix(top, 0xffffffff, 0.10f), top, mid, bottom, Theme.mix(bottom, 0xff000000, 0.18f)};
+        return new int[]{Theme.mix(top, 0xffffffff, 0.16f), Theme.mix(top, 0xffffffff, 0.04f), mid, bottom, Theme.mix(bottom, 0xff000000, 0.12f)};
     }
 
     private static Bitmap grain;
@@ -96,7 +96,7 @@ final class Skin {
     /** Fine horizontal streaks of light and dark, tiled over every plate: the brushed-metal look. Made once. */
     private static synchronized Bitmap grain() {
         if (grain != null) return grain;
-        int w = 256, h = 64;
+        int w = 512, h = 64;
         Bitmap b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(b);
         Paint p = new Paint();
@@ -104,11 +104,11 @@ final class Skin {
         Random rnd = new Random(7);
         for (int y = 0; y < h; y++) {
             // A faint base tone for each line, then a few longer streaks across it.
-            int base = rnd.nextInt(18);
+            int base = rnd.nextInt(9);
             p.setColor(rnd.nextBoolean() ? (base << 24) | 0xffffff : (base << 24));
             c.drawLine(0, y + .5f, w, y + .5f, p);
             for (int k = 0; k < 3; k++) {
-                int x = rnd.nextInt(w), len = 30 + rnd.nextInt(140), alpha = 10 + rnd.nextInt(26);
+                int x = rnd.nextInt(w), len = 40 + rnd.nextInt(260), alpha = 5 + rnd.nextInt(12);
                 p.setColor(rnd.nextInt(3) == 0 ? (alpha << 24) : (alpha << 24) | 0xffffff);
                 c.drawLine(x, y + .5f, x + len, y + .5f, p);
                 if (x + len > w) c.drawLine(x - w, y + .5f, x + len - w, y + .5f, p);
