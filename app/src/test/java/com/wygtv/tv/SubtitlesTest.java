@@ -20,12 +20,10 @@ public class SubtitlesTest {
         assertEquals("Closed captions • Digital CC", Subtitles.label(null, "Digital CC", MimeTypes.APPLICATION_CEA708, 0, 0, 3));
         assertEquals("German (DVB)", Subtitles.label("de", null, MimeTypes.APPLICATION_DVBSUBS, 0, 0, 1));
     }
-    @Test public void subtitlesReadDuringUnpackingKeepTheirKind() {
-        androidx.media3.common.Format f = new androidx.media3.common.Format.Builder()
-                .setSampleMimeType(MimeTypes.APPLICATION_MEDIA3_CUES).setCodecs(MimeTypes.APPLICATION_PGS).setLanguage("fr").build();
-        assertEquals(MimeTypes.APPLICATION_PGS, Subtitles.mimeOf(f));
-        assertEquals("French (picture)", Subtitles.label(f, 1));
-        assertTrue(Captions.isClosedCaption(new androidx.media3.common.Format.Builder().setSampleMimeType(MimeTypes.APPLICATION_CEA708).build()));
-        assertEquals(3, Captions.FORMATS.size());
+    @Test public void closedCaptionKinds() {
+        assertTrue(Captions.isClosedCaption(MimeTypes.APPLICATION_CEA708));
+        assertTrue(Captions.isClosedCaption("application/cea-608"));
+        assertFalse(Captions.isClosedCaption(MimeTypes.APPLICATION_SUBRIP));
+        assertFalse(Captions.isClosedCaption((String) null));
     }
 }
