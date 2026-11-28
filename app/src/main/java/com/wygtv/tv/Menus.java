@@ -95,7 +95,7 @@ final class Menus {
             if (!on) row.setTextColor(Theme.MUTED);
             if (focus == null) focus = row;
         }
-        if (all.length() > 1) a.button("☑  Turn playlists on or off…", list, () -> Manage.playlistsOnOff(a, () -> playlists(a)));
+        if (all.length() > 1) a.button("☑  Select Active Playlists…", list, () -> Manage.playlistsOnOff(a, () -> playlists(a)));
         TextView addX = a.button("+  Add an Xtream Codes login", list, () -> xtreamForm(a, null, null));
         a.button("+  Add an M3U playlist link", list, () -> m3uForm(a, null));
         int extraCount = a.library.extras.urls().size();
@@ -619,7 +619,7 @@ final class Menus {
         } else if (g.equals(GROUP_PLAYLISTS)) {
             if (!Brand.OTA) row(a, list, "Manage playlists", Manage.playlistSummary(a) + "  •  press OK to add, edit, refresh, delete or turn playlists on and off", () -> { playlistsFromSettings = true; playlists(a); });
             final int onOffRow = list.getChildCount();
-            if (!Brand.OTA) row(a, list, "Turn playlists on or off", Manage.playlistSummary(a) + "  •  press OK to tick the playlists to use. Unticked ones are skipped in menus, guides, Search and updates",
+            if (!Brand.OTA) row(a, list, "Select Active Playlists", Manage.playlistSummary(a) + "  •  press OK to tick the playlists to use. Unticked ones are skipped in menus, guides, Search and updates",
                     () -> Manage.playlistsOnOff(a, () -> settings(a, onOffRow)));
             java.util.List<JSONObject> tuners = hdhrTuners(a);
             row(a, list, "HDHomeRun antenna TV", tuners.isEmpty()
