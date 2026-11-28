@@ -49,9 +49,9 @@
 
 <section id="story">
   <div class="wrap">
-    <h2>How WygTV started</h2>
-    <div class="maker"><img src="img/wyglaf.png" alt="Wyglaf" width="140" height="158"><div><b>Made by Wyglaf</b><br><span>The person behind WygTV</span></div></div>
-    <p class="sub">WygTV began with a simple goal: to bring free over-the-air channels from an HDHomeRun network tuner to the TV, complete with a proper channel list and TV guide. From there it grew into a full IPTV player, so your Xtream Codes and M3U playlists sit right alongside your antenna channels in one place. It was first built for Android TVs and tablets, and it has since come to Windows, Mac, Ubuntu, iPhone and iPad as well.</p>
+    <h2 id="about-title">How WygTV started</h2>
+    <div class="maker"><img src="img/wyglaf.png" alt="Wyglaf" width="140" height="158"><div><b id="about-maker">Made by Wyglaf</b><br><span id="about-tagline">The person behind WygTV</span></div></div>
+    <p class="sub" id="about-story">WygTV began with a simple goal: to bring free over-the-air channels from an HDHomeRun network tuner to the TV, complete with a proper channel list and TV guide. From there it grew into a full IPTV player, so your Xtream Codes and M3U playlists sit right alongside your antenna channels in one place. It was first built for Android TVs and tablets, and it has since come to Windows, Mac, Ubuntu, iPhone and iPad as well.</p>
   </div>
 </section>
 
@@ -303,6 +303,14 @@
   }
 </script>
 <!-- Buy Me a Coffee button (bottom right) -->
+<script>
+  // How WygTV started: docs/about.json is the one place to edit it (the apps' About reads it too).
+  fetch("about.json", { cache: "no-cache" }).then(function (r) { return r.json(); }).then(function (a) {
+    [["about-title", a.title], ["about-maker", a.maker], ["about-tagline", a.tagline], ["about-story", a.story]].forEach(function (x) {
+      var el = document.getElementById(x[0]); if (el && x[1]) el.textContent = x[1];
+    });
+  }).catch(function () {});
+</script>
 <script data-name="BMC-Widget" data-cfasync="false" src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js" data-id="wyglaf" data-description="Support me on Buy me a coffee!" data-message="" data-color="#5F7FFF" data-position="Right" data-x_margin="18" data-y_margin="18"></script>
 </body>
 </html>

@@ -1221,6 +1221,11 @@ final class Menus {
         parent.addView(t, new LinearLayout.LayoutParams(-1, -2));
     }
 
+    /** How WygTV started. The real text lives in docs/about.json on the website (one place for site and apps);
+     *  About shows the last copy it got from there, or this one until then. */
+    static final String ABOUT_URL = "https://wyglaf01.github.io/WygTV-AndroidTV/about.json";
+    static final String STORY = "WygTV began with a simple goal: to bring free over-the-air channels from an HDHomeRun network tuner to the TV, complete with a proper channel list and TV guide. From there it grew into a full IPTV player, so your Xtream Codes and M3U playlists sit right alongside your antenna channels in one place. It was first built for Android TVs and tablets, and it has since come to Windows, Mac, Ubuntu, iPhone and iPad as well.";
+
     /** About: the version, and Wyglaf (who makes WygTV) with his framed portrait. */
     private static void aboutDialog(MainActivity a, String about) {
         LinearLayout box = new LinearLayout(a);
@@ -1234,7 +1239,7 @@ final class Menus {
         LinearLayout text = new LinearLayout(a);
         text.setOrientation(LinearLayout.VERTICAL);
         text.setPadding(a.dp(18), 0, 0, 0);
-        TextView made = a.label("Made by Wyglaf", 20);
+        TextView made = a.label(a.prefs.getString("about_maker", "Made by Wyglaf"), 20);
         made.setTypeface(null, android.graphics.Typeface.BOLD);
         made.setTextColor(Theme.ACCENT);
         text.addView(made);
@@ -1242,7 +1247,26 @@ final class Menus {
         ver.setTextColor(Theme.MUTED);
         text.addView(ver);
         box.addView(text, new LinearLayout.LayoutParams(0, -2, 1));
-        new Dialogs.Builder(a).setTitle("About " + Brand.NAME).setView(box).setPositiveButton("OK", null).show();
+        LinearLayout page = new LinearLayout(a);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.addView(box);
+        TextView story = a.label(a.prefs.getString("about_story", STORY), 15);
+        story.setTextColor(Theme.TEXT);
+        story.setLineSpacing(0, 1.2f);
+        story.setPadding(a.dp(22), a.dp(6), a.dp(22), a.dp(8));
+        page.addView(story, new LinearLayout.LayoutParams(-1, -2));
+        android.widget.ScrollView scroll = new android.widget.ScrollView(a);
+        scroll.addView(page);
+        new Thread(() -> {
+            try {
+                org.json.JSONObject j = new org.json.JSONObject(new String(Updater.fetch(ABOUT_URL), "UTF-8"));
+                String m = j.optString("maker", ""), st = j.optString("story", "");
+                if (st.isEmpty()) return;
+                a.prefs.edit().putString("about_story", st).putString("about_maker", m.isEmpty() ? "Made by Wyglaf" : m).apply();
+                a.runOnUiThread(() -> { story.setText(st); if (!m.isEmpty()) made.setText(m); });
+            } catch (Exception ignored) { }
+        }).start();
+        new Dialogs.Builder(a).setTitle("About " + Brand.NAME).setView(scroll).setPositiveButton("OK", null).show();
     }
 
     private static void row(MainActivity a, LinearLayout list, String name, String value, Runnable action) {
