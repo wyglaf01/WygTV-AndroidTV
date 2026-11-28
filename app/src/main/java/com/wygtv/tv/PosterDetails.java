@@ -19,8 +19,9 @@ import java.util.Map;
 
 /**
  * The details page of a poster on the main screen (option 1), laid out like the Movies and Series details page.
- * It opens straight away with what the popular list knows (and TMDb / OMDb when a key is set), then looks for the
- * title in every switched-on playlist in the background, one playlist at a time. When it's found, ▶ Play (movies)
+ * It opens straight away with what the popular list knows (and TMDb / OMDb when a key is set). Nothing is searched
+ * until ⌕ Search Playlists is pressed; then it looks for the title in every switched-on playlist in the background,
+ * one playlist at a time. When it's found, ▶ Play (movies)
  * or ☰ Episodes (series) plays it from that playlist; with several copies (other playlists, HD / 4K) it asks which.
  */
 final class PosterDetails {
@@ -41,7 +42,10 @@ final class PosterDetails {
         return type + "|" + poster.optString("_title") + "|" + poster.optString("_year");
     }
 
-    static void open(MainActivity a, String type, JSONObject poster) {
+    static void open(MainActivity a, String type, JSONObject poster) { open(a, type, poster, false); }
+
+    /** searchNow starts the playlist search straight away (used by "Search again"). */
+    static void open(MainActivity a, String type, JSONObject poster, boolean searchNow) {
         boolean series = type.equals("series");
         String name = poster.optString("_title", poster.optString("name", "Untitled"));
         Runnable reopen = () -> open(a, type, poster);
@@ -87,10 +91,16 @@ final class PosterDetails {
         blp.setMargins(0, a.dp(10), 0, a.dp(8));
         col.addView(buttons, blp);
         Found[] found = {FOUND.get(keyOf(type, poster))};
-        TextView play = Details.action(a, buttons, "⌕  Looking in your playlists…", () -> {
+        boolean[] searching = {false};
+        Runnable[] startSearch = {null};
+        TextView play = Details.action(a, buttons, "⌕  Search Playlists", () -> {
             Found f = found[0];
-            if (f == null) { Toast.makeText(a, "Still looking for it in your playlists…", Toast.LENGTH_SHORT).show(); return; }
-            if (f.copies.isEmpty()) { notFound(a, name, f, () -> { FOUND.remove(keyOf(type, poster)); reopen.run(); }); return; }
+            if (f == null) {
+                if (searching[0]) Toast.makeText(a, "Still looking for it in your playlists…", Toast.LENGTH_SHORT).show();
+                else startSearch[0].run();
+                return;
+            }
+            if (f.copies.isEmpty()) { notFound(a, name, f, () -> { FOUND.remove(keyOf(type, poster)); open(a, type, poster, true); }); return; }
             if (f.copies.size() == 1) { start(a, type, f.copies.get(0), reopen); return; }
             List<String> labels = new ArrayList<>();
             for (JSONObject o : f.copies)
@@ -148,7 +158,12 @@ final class PosterDetails {
         };
         Runnable showFound = () -> {
             Found f = found[0];
-            if (f == null) { found1.setText("Searching your switched-on playlists one at a time…"); return; }
+            if (f == null) {
+                play.setText(searching[0] ? "⌕  Looking in your playlists…" : "⌕  Search Playlists");
+                found1.setText(searching[0] ? "Searching your switched-on playlists one at a time…"
+                        : "Press Search Playlists to look for it in your switched-on playlists.");
+                return;
+            }
             String trouble = f.problems.isEmpty() ? "" : "  (couldn't check " + TextUtils.join(", ", f.problems) + ")";
             if (f.copies.isEmpty()) {
                 play.setText("✕  Not in your playlists");
@@ -181,17 +196,23 @@ final class PosterDetails {
                 });
             }, "poster-details").start();
         }
-        if (found[0] != null) return;
-        new Thread(() -> {
-            Found f = search(a, type, poster, generation);
-            if (f == null) return; // left the page before it finished
-            a.runOnUiThread(() -> {
-                FOUND.put(keyOf(type, poster), f);
-                if (generation != a.screenGeneration || a.isFinishing() || a.isDestroyed()) return;
-                found[0] = f;
-                showFound.run();
-            });
-        }, "poster-find").start();
+        startSearch[0] = () -> {
+            if (searching[0] || found[0] != null) return;
+            searching[0] = true;
+            showFound.run();
+            new Thread(() -> {
+                Found f = search(a, type, poster, generation);
+                if (f == null) return; // left the page before it finished
+                a.runOnUiThread(() -> {
+                    FOUND.put(keyOf(type, poster), f);
+                    if (generation != a.screenGeneration || a.isFinishing() || a.isDestroyed()) return;
+                    searching[0] = false;
+                    found[0] = f;
+                    showFound.run();
+                });
+            }, "poster-find").start();
+        };
+        if (searchNow) startSearch[0].run();
     }
 
     /**
