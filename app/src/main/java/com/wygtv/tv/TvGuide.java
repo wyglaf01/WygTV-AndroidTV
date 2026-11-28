@@ -249,7 +249,7 @@ final class TvGuide {
         FrameLayout frame = new FrameLayout(a);
         GradientDrawable border = new GradientDrawable();
         border.setColor(0xff000000);
-        border.setCornerRadius(a.dp(10));
+        border.setCornerRadius(0);
         border.setStroke(a.dp(3), Theme.STROKE_FOCUS);
         frame.setBackground(border);
         frame.setPadding(a.dp(3), a.dp(3), a.dp(3), a.dp(3));
@@ -447,11 +447,11 @@ final class TvGuide {
         return v;
     }
 
-    private GradientDrawable cellBg(boolean focused, boolean airing) {
+    private android.graphics.drawable.Drawable cellBg(boolean focused, boolean airing) {
         if (focused) return a.homeTileBackground(true);
         GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
                 airing ? new int[]{Theme.pane(Theme.alpha(Theme.AIRING,0xeb)), Theme.pane(Theme.alpha(Theme.mix(Theme.AIRING,Theme.BG,0.5f),0xeb))} : Theme.surface(false));
-        g.setCornerRadius(a.dp(8));
+        g.setCornerRadius(0);
         g.setStroke(a.dp(1), airing ? Theme.mix(Theme.STROKE,Theme.ACCENT,0.4f) : Theme.edge(false));
         return g;
     }
@@ -459,7 +459,7 @@ final class TvGuide {
     private GradientDrawable rowBg(boolean focused) {
         GradientDrawable g = new GradientDrawable();
         g.setColor(Theme.pane(focused ? Theme.alpha(Theme.FOCUS,0xbf) : Theme.alpha(Theme.mix(Theme.BG,Theme.PANEL,0.4f),0xe0)));
-        g.setCornerRadius(a.dp(8));
+        g.setCornerRadius(0);
         g.setStroke(a.dp(1), focused ? Theme.STROKE_FOCUS : Theme.edge(false));
         return g;
     }

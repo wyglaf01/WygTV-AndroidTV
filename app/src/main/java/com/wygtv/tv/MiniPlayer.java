@@ -154,7 +154,7 @@ final class MiniPlayer {
     private static GradientDrawable frame(MainActivity a, boolean focused) {
         GradientDrawable g = new GradientDrawable();
         g.setColor(0xee000000);
-        g.setCornerRadius(a.dp(10));
+        g.setCornerRadius(0);
         g.setStroke(a.dp(focused ? 3 : 1), focused ? Theme.ACCENT : 0x66ffffff);
         return g;
     }

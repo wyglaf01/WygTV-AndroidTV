@@ -17,7 +17,7 @@ final class Theme {
 
     // Each theme's own colours. Order: BG, PANEL, PANEL_END, FOCUS, TEXT, MUTED, HINT, AIRING
     private static final int[][] BASES = {
-            {0xff060C24, 0xff1A3480, 0xe60A1640, 0xff2D52C4, 0xffF4EFE6, 0xffC6CADD, 0xff8C93B8, 0xff23408F}, // royal blue
+            {0xff010A62, 0xff0A2AD8, 0xe6031590, 0xff1A55F5, 0xffF6F3EC, 0xffCCD4F2, 0xff93A3E0, 0xff0E36C0}, // royal blue: bright cobalt plates on deep cobalt
             {0xff140B06, 0xff3A2414, 0xe61C100A, 0xff9C5B22, 0xffF5E8CA, 0xffD9BF94, 0xffB89F7C, 0xff6E3E1C}, // steampunk leather
             {0xff04161A, 0xff0E4A52, 0xe6062428, 0xff168A96, 0xffEEF8F6, 0xffB6D3D2, 0xff7FA6A6, 0xff13606A}, // teal
             {0xff04140C, 0xff0F4A2C, 0xe6062614, 0xff1E7A48, 0xffEEF8F0, 0xffB8D6C2, 0xff82A68E, 0xff145C36}, // emerald
