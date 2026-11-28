@@ -239,7 +239,7 @@ final class Updater {
         return c;
     }
 
-    private static byte[] fetch(String url) throws Exception {
+    static byte[] fetch(String url) throws Exception {
         HttpURLConnection c = open(url + "?t=" + System.currentTimeMillis());
         try (InputStream in = c.getInputStream()) {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
