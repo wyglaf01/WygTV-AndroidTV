@@ -37,7 +37,7 @@ public final class SteampunkBackdrop extends Drawable {
   if(!Theme.steampunk()){
    // Other themes wash the artwork in their own colour so it reads as texture.
    int top=Theme.glass?0xA0:0xC8,bottom=Theme.glass?0xC8:0xE0;
-   paint.setShader(new LinearGradient(0,b.top,0,b.bottom,new int[]{Theme.alpha(Theme.PANEL,top),Theme.alpha(Theme.BG,bottom)},null,Shader.TileMode.CLAMP));c.drawRect(b,paint);paint.setShader(null);
+   paint.setShader(new LinearGradient(0,b.top,0,b.bottom,new int[]{Theme.alpha(Theme.mix(Theme.PANEL,Theme.BG,0.5f),top),Theme.alpha(Theme.BG,bottom)},null,Shader.TileMode.CLAMP));c.drawRect(b,paint);paint.setShader(null);
   }
   if(homeScrim){
    // Soft darkening behind the centre tiles and along the bottom plate so cream text stays legible.
