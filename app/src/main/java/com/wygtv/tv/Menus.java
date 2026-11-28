@@ -568,9 +568,9 @@ final class Menus {
 
     // ------------------------------------------------------------------ settings
 
-    /** Settings is four groups; each opens its own page. "" = the top page. */
-    static final String GROUP_PLAYLISTS = "playlists", GROUP_PLAYER = "player", GROUP_APPEARANCE = "appearance", GROUP_BACKUP = "backup";
-    static final String[] GROUPS = {GROUP_PLAYLISTS, GROUP_PLAYER, GROUP_APPEARANCE, GROUP_BACKUP};
+    /** Settings is five groups; each opens its own page. "" = the top page. */
+    static final String GROUP_PLAYLISTS = "playlists", GROUP_PLAYER = "player", GROUP_SUBTITLES = "subtitles", GROUP_APPEARANCE = "appearance", GROUP_BACKUP = "backup";
+    static final String[] GROUPS = {GROUP_PLAYLISTS, GROUP_PLAYER, GROUP_SUBTITLES, GROUP_APPEARANCE, GROUP_BACKUP};
     static String settingsGroup = "";
 
     /**
@@ -583,7 +583,7 @@ final class Menus {
         TreeMenu.focusTree();
     }
 
-    /** "All settings" in the group column: the top page that lists the four groups as big rows. */
+    /** "All settings" in the group column: the top page that lists the five groups as big rows. */
     static void settingsTop(MainActivity a) { settingsGroup = ""; settings(a, 0); }
 
     /**
@@ -613,7 +613,8 @@ final class Menus {
         boolean liveOnly = a.liveOnly();
         if (g.isEmpty()) {
             row(a, list, groupIcon(GROUP_PLAYLISTS) + "  " + groupTitle(GROUP_PLAYLISTS), "playlists, HDHomeRun, AirTV, Tablo, manage categories, hide and show channels, channel groups, TV guides (EPG)", () -> settingsGroup(a, GROUP_PLAYLISTS));
-            row(a, list, groupIcon(GROUP_PLAYER) + "  " + groupTitle(GROUP_PLAYER), "built-in or external player, live stream format, buffer, video decoder, subtitles, watched series, play next", () -> settingsGroup(a, GROUP_PLAYER));
+            row(a, list, groupIcon(GROUP_PLAYER) + "  " + groupTitle(GROUP_PLAYER), "built-in or external player, live stream format, buffer, video decoder, watched series, play next", () -> settingsGroup(a, GROUP_PLAYER));
+            row(a, list, groupIcon(GROUP_SUBTITLES) + "  " + groupTitle(GROUP_SUBTITLES), "subtitles on or off for Live TV and for Movies and Series, language, text size, online subtitle sources", () -> settingsGroup(a, GROUP_SUBTITLES));
             row(a, list, groupIcon(GROUP_APPEARANCE) + "  " + groupTitle(GROUP_APPEARANCE), "theme, glass effect, app mode, main screen, start-up screen, side menu order, Exit button, guide rows, channel order, live preview, movie and series info, IMDb ratings", () -> settingsGroup(a, GROUP_APPEARANCE));
             row(a, list, groupIcon(GROUP_BACKUP) + "  " + groupTitle(GROUP_BACKUP), (Brand.STORE ? "back up, restore  •  " : "back up, restore, check for updates  •  ") + Brand.NAME + " " + Updater.installedName(a), () -> settingsGroup(a, GROUP_BACKUP));
         } else if (g.equals(GROUP_PLAYLISTS)) {
@@ -705,6 +706,19 @@ final class Menus {
                         a.prefs.edit().putString(Players.PREF_DECODER, Players.DECODER_KEYS[i]).apply();
                         settings(a, decoderRow);
                     }));
+            if (!liveOnly) {
+                final int watchedRow = list.getChildCount();
+                row(a, list, "Watched series", (Watch.hideWatched(a) ? "Hide" : "Show with ✓") + "  •  series with every episode watched. Mark episodes, seasons or a whole series in its episode list", () -> {
+                    a.prefs.edit().putBoolean(Watch.PREF_HIDE_WATCHED, !Watch.hideWatched(a)).apply();
+                    settings(a, watchedRow);
+                });
+                final int skipRow = list.getChildCount();
+                row(a, list, "Play next episode", (Watch.skipWatched(a) ? "Skip watched episodes" : "Always the very next episode") + "  •  press OK to switch", () -> {
+                    a.prefs.edit().putBoolean(Watch.PREF_SKIP_WATCHED, !Watch.skipWatched(a)).apply();
+                    settings(a, skipRow);
+                });
+            }
+        } else if (g.equals(GROUP_SUBTITLES)) {
             final int subsLiveRow = list.getChildCount();
             row(a, list, "Subtitles for Live TV", onOff(Subtitles.defaultOn(a.prefs, true)) + "  •  closed captions start on for every channel that sends them. Press OK to switch", () -> {
                 a.prefs.edit().putBoolean(Subtitles.PREF_LIVE, !Subtitles.defaultOn(a.prefs, true)).apply();
@@ -738,18 +752,6 @@ final class Menus {
                 row(a, list, "Online subtitles: SubDL", sdKey.isEmpty() ? "Off  •  press OK to add a free SubDL API key" : "On  •  key …" + sdKey.substring(Math.max(0, sdKey.length() - 4)) + "  •  press OK to change",
                         () -> subdlKey(a, subdlRow));
                 note(a, list, "Podnapisi works without a key. In the player, MENU > Subtitles searches every source that's on, or loads a subtitle file from a link, the TV or a USB drive.");
-            }
-            if (!liveOnly) {
-                final int watchedRow = list.getChildCount();
-                row(a, list, "Watched series", (Watch.hideWatched(a) ? "Hide" : "Show with ✓") + "  •  series with every episode watched. Mark episodes, seasons or a whole series in its episode list", () -> {
-                    a.prefs.edit().putBoolean(Watch.PREF_HIDE_WATCHED, !Watch.hideWatched(a)).apply();
-                    settings(a, watchedRow);
-                });
-                final int skipRow = list.getChildCount();
-                row(a, list, "Play next episode", (Watch.skipWatched(a) ? "Skip watched episodes" : "Always the very next episode") + "  •  press OK to switch", () -> {
-                    a.prefs.edit().putBoolean(Watch.PREF_SKIP_WATCHED, !Watch.skipWatched(a)).apply();
-                    settings(a, skipRow);
-                });
             }
         } else if (g.equals(GROUP_APPEARANCE)) {
             final int themeRow = list.getChildCount();
@@ -844,12 +846,13 @@ final class Menus {
         switch (group) {
             case GROUP_PLAYLISTS: return "▤";
             case GROUP_PLAYER: return "▶";
+            case GROUP_SUBTITLES: return "💬";
             case GROUP_APPEARANCE: return "◐";
             default: return "⟳";
         }
     }
 
-    /** The collapsed Settings tree on the left of a group page: All settings, then the four groups, {@code here} marked. */
+    /** The collapsed Settings tree on the left of a group page: All settings, then the five groups, {@code here} marked. */
     static void settingsTree(MainActivity a, String here) {
         TreeMenu.begin(a);
         TreeMenu.heading(a, "SETTINGS");
@@ -875,6 +878,7 @@ final class Menus {
         switch (group) {
             case GROUP_PLAYLISTS: return "Manage playlists";
             case GROUP_PLAYER: return "Manage player";
+            case GROUP_SUBTITLES: return "Subtitles";
             case GROUP_APPEARANCE: return "Appearance";
             default: return "Manage app";
         }
