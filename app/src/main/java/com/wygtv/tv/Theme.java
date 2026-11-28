@@ -1,14 +1,14 @@
 package com.wygtv.tv;
 
 /**
- * Colour themes picked in Settings (Royal blue & bronze unless changed). Every theme follows the royal blue & bronze style:
+ * Colour themes picked in Settings (Cobalt metal unless changed). Every theme is made of floating brushed-metal plates (see Skin):
  * a deep main colour for panels and focus, with bronze (or gold) trim, headings and focused tiles. Steampunk keeps the
  * original brass-on-leather artwork; the others wash the artwork in their own colour.
  * Settings > Appearance > Glass effect turns panels and buttons into frosted see-through glass (see {@link #glass}).
  */
 final class Theme {
     static final String[] KEYS = {"royal", "steampunk", "cyan", "green", "brown", "gold"};
-    static final String[] LABELS = {"Royal blue & bronze (default)", "Steampunk (brass & leather)", "Teal & bronze", "Emerald & bronze", "Mahogany & bronze", "Black & gold"};
+    static final String[] LABELS = {"Cobalt metal (default)", "Steampunk (copper & brass)", "Teal metal", "Emerald metal", "Mahogany metal", "Gunmetal & gold"};
 
     // The shared trim: Order STROKE, STROKE_FOCUS, ACCENT, HEADER, INK, TILE_A, TILE_B, TILE_STROKE, COPPER
     private static final int[] BRONZE = {0xffA8743A, 0xffF0C080, 0xffE6B070, 0xffD9A060, 0xff1A0F04, 0xffF0C88A, 0xffB0743A, 0xffFFE6BC, 0xffCD7F32};
@@ -18,11 +18,11 @@ final class Theme {
     // Each theme's own colours. Order: BG, PANEL, PANEL_END, FOCUS, TEXT, MUTED, HINT, AIRING
     private static final int[][] BASES = {
             {0xff010A62, 0xff0A2AD8, 0xe6031590, 0xff1A55F5, 0xffF6F3EC, 0xffCCD4F2, 0xff93A3E0, 0xff0E36C0}, // royal blue: bright cobalt plates on deep cobalt
-            {0xff140B06, 0xff3A2414, 0xe61C100A, 0xff9C5B22, 0xffF5E8CA, 0xffD9BF94, 0xffB89F7C, 0xff6E3E1C}, // steampunk leather
-            {0xff04161A, 0xff0E4A52, 0xe6062428, 0xff168A96, 0xffEEF8F6, 0xffB6D3D2, 0xff7FA6A6, 0xff13606A}, // teal
-            {0xff04140C, 0xff0F4A2C, 0xe6062614, 0xff1E7A48, 0xffEEF8F0, 0xffB8D6C2, 0xff82A68E, 0xff145C36}, // emerald
-            {0xff160A08, 0xff5A2418, 0xe62A100A, 0xff8E3A26, 0xffF6ECE2, 0xffD9C2B2, 0xffA88E7E, 0xff6E2E1E}, // mahogany
-            {0xff0A0A0C, 0xff2A2A31, 0xe6141418, 0xff4C4C58, 0xffF5F1E8, 0xffCFCAC0, 0xff9A968E, 0xff3A3A44}, // black
+            {0xff1E1006, 0xff8E5424, 0xe6442A10, 0xffBA7A34, 0xffFFF4DE, 0xffE6CDA4, 0xffC2A47C, 0xff6E4418}, // steampunk: copper plates, brass trim
+            {0xff02303A, 0xff0A8C9C, 0xe6044A55, 0xff16B4C6, 0xffF2FBFA, 0xffBFE0DE, 0xff86B4B4, 0xff0A7480}, // teal
+            {0xff02301A, 0xff0E9A50, 0xe6064A28, 0xff20C46C, 0xffF2FBF4, 0xffC0E2CC, 0xff8AB89A, 0xff0C7A40}, // emerald
+            {0xff360C06, 0xffA8361E, 0xe6561A0E, 0xffD04E2E, 0xffFBF0E8, 0xffE6CABA, 0xffB89484, 0xff842A18}, // mahogany
+            {0xff0E0F12, 0xff4E5560, 0xe62A2E34, 0xff6E7684, 0xffF5F1E8, 0xffD4D0C8, 0xff9E9A94, 0xff3C424C}, // black: gunmetal steel plates, gold trim
     };
     private static final int[][] TRIMS = {BRONZE, BRASS, BRONZE, BRONZE, BRONZE, GOLD};
 
