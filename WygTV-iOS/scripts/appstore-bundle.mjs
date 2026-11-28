@@ -25,7 +25,13 @@ export function prepareAppStore(www, { smoke = false } = {}) {
       check: async () => ({ available: false, current: (await api.app.info()).version, kind: 'appstore' }),
       install: async () => { throw new Error('App updates are managed by the App Store.'); },
     },` + source.slice(apiEnd);
-    if (smoke) source = source.replace("name: 'Smoke test'", "name: 'Demo playlist'");
+    if (smoke) {
+      source = source.replace("name: 'Smoke test'", "name: 'Demo playlist'");
+      source = replaceRequired(source,
+        "const step = async (name, ms = 2500) => { await sleep(ms); console.log('WYG-STEP ' + name); await sleep(1500); };",
+        "const step = async (name, ms = 1200) => { await sleep(ms); console.log('WYG-STEP ' + name); await Http.get({ url: base + '/__capture?name=' + encodeURIComponent(name), responseType: 'text', connectTimeout: 5000, readTimeout: 90000 }); };",
+        'screenshot handshake');
+    }
     if (!smoke) {
       const test = source.indexOf('  // ------------------------------------------------------------------ self-test used by CI');
       if (test < 0) throw new Error('Missing simulator test boundary');
