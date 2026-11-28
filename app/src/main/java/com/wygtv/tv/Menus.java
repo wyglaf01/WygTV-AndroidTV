@@ -1223,6 +1223,9 @@ final class Menus {
         parent.addView(t, new LinearLayout.LayoutParams(-1, -2));
     }
 
+    /** How WygTV started (same words as the website's story section). */
+    static final String STORY = "WygTV began with a simple goal: to bring free over-the-air channels from an HDHomeRun network tuner to the TV, complete with a proper channel list and TV guide. From there it grew into a full IPTV player, so your Xtream Codes and M3U playlists sit right alongside your antenna channels in one place. It was first built for Android TVs and tablets, and it has since come to Windows, Mac, Ubuntu, iPhone and iPad as well.";
+
     /** About: the version, and Wyglaf (who makes WygTV) with his framed portrait. */
     private static void aboutDialog(MainActivity a, String about) {
         LinearLayout box = new LinearLayout(a);
@@ -1244,7 +1247,17 @@ final class Menus {
         ver.setTextColor(Theme.MUTED);
         text.addView(ver);
         box.addView(text, new LinearLayout.LayoutParams(0, -2, 1));
-        new Dialogs.Builder(a).setTitle("About " + Brand.NAME).setView(box).setPositiveButton("OK", null).show();
+        LinearLayout page = new LinearLayout(a);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.addView(box);
+        TextView story = a.label(STORY, 15);
+        story.setTextColor(Theme.TEXT);
+        story.setLineSpacing(0, 1.2f);
+        story.setPadding(a.dp(22), a.dp(6), a.dp(22), a.dp(8));
+        page.addView(story, new LinearLayout.LayoutParams(-1, -2));
+        android.widget.ScrollView scroll = new android.widget.ScrollView(a);
+        scroll.addView(page);
+        new Dialogs.Builder(a).setTitle("About " + Brand.NAME).setView(scroll).setPositiveButton("OK", null).show();
     }
 
     private static void row(MainActivity a, LinearLayout list, String name, String value, Runnable action) {

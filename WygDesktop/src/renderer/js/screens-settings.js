@@ -282,6 +282,7 @@
         return [
           h('div', { class: 'about' }, h('img', { src: 'assets/icon.png', alt: '' }), h('div', null, h('div', { class: 'brand' }, W.brand), ver, h('div', { class: 'set-sub' }, W.isIOS ? 'WygTV for iPhone and iPad.' : W.isTV ? 'WygTV for Samsung Smart TVs.' : 'The desktop copy of WygTV.'))),
           h('div', { class: 'about maker' }, h('img', { src: 'assets/wyglaf.png', alt: 'Wyglaf' }), h('div', null, h('div', { class: 'brand' }, 'Made by Wyglaf'), h('div', { class: 'set-sub' }, 'The person behind WygTV.'))),
+          h('p', { class: 'about-story' }, 'WygTV began with a simple goal: to bring free over-the-air channels from an HDHomeRun network tuner to the TV, complete with a proper channel list and TV guide. From there it grew into a full IPTV player, so your Xtream Codes and M3U playlists sit right alongside your antenna channels in one place. It was first built for Android TVs and tablets, and it has since come to Windows, Mac, Ubuntu, iPhone and iPad as well.'),
           h('div', { class: 'set-buttons' },
             W.isTV ? null : btn({ class: 'button primary', onclick: () => W.checkUpdates(true) }, '⟳ Check for updates'),
             W.isIOS ? null : btn({ class: 'button', onclick: () => W.api.win.quit() }, '⏻ Quit'),
