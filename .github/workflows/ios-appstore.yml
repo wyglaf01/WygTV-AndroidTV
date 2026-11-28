@@ -1,0 +1,156 @@
+name: Prepare WygTV App Store release
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/ios-app-store-release]
+    paths: ['WygTV-iOS/**', 'WygDesktop/src/renderer/**', '.github/workflows/ios-appstore.yml']
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: WygTV-iOS
+    env:
+      VERSION: 1.2.0
+      WYG_DISTRIBUTION: appstore
+      WYG_ENABLE_SMOKE: '1'
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: WygTV-iOS/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Test iOS bridge and transport settings
+        run: |
+          npm test
+          python3 scripts/verify-transport.py ios/App/App/Info.plist
+
+      - name: Build the app's pages and copy them into the Xcode project
+        run: |
+          npm run build:web
+          npx cap sync ios
+          node scripts/prepare-store.mjs
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+
+      # ---------------------------------------------------------------- try it in an iPad Simulator
+      - name: Build for the Simulator
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/sim" \
+            CODE_SIGNING_ALLOWED=NO MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION=${{ github.run_number }} build -quiet
+
+      # Plays an HLS channel from a pretend IPTV service at this Mac's network address (plain http, like real
+      # providers), checks the MPEG-2 channel offers VLC, loads the guide and movies, and screenshots each screen.
+      - name: Try WygTV-iOS in an iPad Simulator
+        timeout-minutes: 20
+        run: |
+          brew list ffmpeg >/dev/null 2>&1 || brew install ffmpeg >/dev/null
+          M="$RUNNER_TEMP/media"; mkdir -p "$M/hls" "$RUNNER_TEMP/shots/ipad"
+          ffmpeg -loglevel error -y -f lavfi -i testsrc2=size=1280x720:rate=25 -f lavfi -i sine=frequency=440 -t 40 -c:v libx264 -preset ultrafast -g 50 -c:a aac -f mpegts "$M/h264.ts"
+          ffmpeg -loglevel error -y -f lavfi -i smptebars=size=720x480:rate=30 -f lavfi -i sine=frequency=300 -t 40 -c:v mpeg2video -b:v 4M -c:a ac3 -f mpegts "$M/mpeg2.ts"
+          ffmpeg -loglevel error -y -i "$M/h264.ts" -c copy -f hls -hls_time 4 -hls_list_size 0 "$M/hls/index.m3u8"
+          IP="$(ipconfig getifaddr en0 || ipconfig getifaddr en1 || echo 127.0.0.1)"
+          echo "Pretend provider at http://$IP:8765"
+          node scripts/make-store-fixture.mjs "$RUNNER_TEMP/store-provider.cjs"
+          MOCK_HOST=0.0.0.0 MOCK_BASE="http://$IP:8765" nohup node "$RUNNER_TEMP/store-provider.cjs" 8765 "$M" > "$RUNNER_TEMP/mock.log" 2>&1 &
+          sleep 2
+          curl -sf "http://$IP:8765/player_api.php?username=demo&password=demo" >/dev/null
+          DEV="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; l=[x for k,v in d.items() if "iOS" in k for x in v if x["name"].startswith("iPad")]; l.sort(key=lambda x: ("13-inch" not in x["name"], "Pro" not in x["name"], x["name"])); print(l[0]["udid"])')"
+          xcrun simctl list devices available | grep "$DEV"
+          xcrun simctl boot "$DEV"
+          xcrun simctl bootstatus "$DEV" -b
+          xcrun simctl install "$DEV" "$RUNNER_TEMP/sim/Build/Products/Debug-iphonesimulator/App.app"
+          # -CapacitorStorage.smoke sets the "smoke" preference the app's self-test looks for (see web/ios-bridge.js).
+          ( xcrun simctl launch --console-pty --terminate-running-process "$DEV" com.wygtv.ios -CapacitorStorage.smoke "http://$IP:8765" > "$RUNNER_TEMP/app.log" 2>&1 & )
+          RESULT=""; seen=""
+          for i in $(seq 1 300); do
+            sleep 1
+            for s in $(curl -sf "http://$IP:8765/__capture/pending"); do
+              case " $seen " in *" $s "*) ;; *) seen="$seen $s"; xcrun simctl io "$DEV" screenshot "$RUNNER_TEMP/shots/ipad/$s.png" >/dev/null 2>&1; curl -sf "http://$IP:8765/__capture/ack?name=$s" >/dev/null; echo "screenshot $s";; esac
+            done
+            RESULT="$(curl -sf "http://$IP:8765/__capture/result")"
+            [ -n "$RESULT" ] && break
+          done
+          xcrun simctl terminate "$DEV" com.wygtv.ios || true
+          echo "$RESULT"
+          echo "$RESULT" | grep -q '"ok":true'
+
+      - name: Capture and test iPhone screens
+        timeout-minutes: 12
+        run: |
+          mkdir -p "$RUNNER_TEMP/shots/iphone"
+          curl -sf -X POST -H "Content-Type: application/json" -d null "http://$(ipconfig getifaddr en0 || ipconfig getifaddr en1 || echo 127.0.0.1):8765/__capture/result" >/dev/null
+          IP="$(ipconfig getifaddr en0 || ipconfig getifaddr en1 || echo 127.0.0.1)"
+          DEV="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; l=[x for k,v in d.items() if "iOS" in k for x in v if x["name"].startswith("iPhone")]; l.sort(key=lambda x: ("Pro Max" not in x["name"], x["name"])); print(l[0]["udid"])')"
+          xcrun simctl list devices available | grep "$DEV"
+          xcrun simctl boot "$DEV"
+          xcrun simctl bootstatus "$DEV" -b
+          xcrun simctl install "$DEV" "$RUNNER_TEMP/sim/Build/Products/Debug-iphonesimulator/App.app"
+          # -CapacitorStorage.smoke sets the "smoke" preference the app's self-test looks for (see web/ios-bridge.js).
+          ( xcrun simctl launch --console-pty --terminate-running-process "$DEV" com.wygtv.ios -CapacitorStorage.smoke "http://$IP:8765" > "$RUNNER_TEMP/iphone-app.log" 2>&1 & )
+          RESULT=""; seen=""
+          for i in $(seq 1 300); do
+            sleep 1
+            for s in $(curl -sf "http://$IP:8765/__capture/pending"); do
+              case " $seen " in *" $s "*) ;; *) seen="$seen $s"; xcrun simctl io "$DEV" screenshot "$RUNNER_TEMP/shots/iphone/$s.png" >/dev/null 2>&1; curl -sf "http://$IP:8765/__capture/ack?name=$s" >/dev/null; echo "screenshot $s";; esac
+            done
+            RESULT="$(curl -sf "http://$IP:8765/__capture/result")"
+            [ -n "$RESULT" ] && break
+          done
+          xcrun simctl terminate "$DEV" com.wygtv.ios || true
+          echo "$RESULT"
+          echo "$RESULT" | grep -q '"ok":true'
+
+      - name: Simulator logs
+        if: always()
+        run: |
+          grep -v '^\s*$' "$RUNNER_TEMP/app.log" | grep -iE 'WYG-|error|warn|⚡️' | tail -n 120 || true
+          tail -n 30 "$RUNNER_TEMP/mock.log" || true
+
+      - name: Upload Simulator screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wygtv-ios-screenshots
+          path: ${{ runner.temp }}/shots
+          if-no-files-found: ignore
+
+      - name: Build unsigned App Store archive
+        run: |
+          WYG_ENABLE_SMOKE=0 npm run build:web
+          npx cap sync ios
+          node scripts/prepare-store.mjs
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release -sdk iphoneos \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/WygTV-AppStore.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION=${{ github.run_number }} SKIP_INSTALL=NO archive -quiet
+          APP="$RUNNER_TEMP/WygTV-AppStore.xcarchive/Products/Applications/App.app"
+          python3 scripts/verify-transport.py "$APP/Info.plist"
+          python3 scripts/verify-appstore.py "$APP"
+          cd "$RUNNER_TEMP"
+          zip -qry WygTV-AppStore-unsigned.xcarchive.zip WygTV-AppStore.xcarchive
+
+      - name: Upload App Store preparation pack
+        uses: actions/upload-artifact@v4
+        with:
+          name: WygTV-AppStore-preparation
+          path: |
+            ${{ runner.temp }}/WygTV-AppStore-unsigned.xcarchive.zip
+            ${{ runner.temp }}/shots
+            WygTV-iOS/app-store
+          if-no-files-found: error
+

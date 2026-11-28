@@ -1,0 +1,23 @@
+{
+  "status": "Draft for owner review; not submitted",
+  "locale": "en-US",
+  "name": "WygTV",
+  "subtitle": "Your playlists. Your screen.",
+  "version": "1.2.0",
+  "bundleIdentifier": "com.wygtv.ios",
+  "primaryCategory": "Entertainment",
+  "secondaryCategory": "Utilities",
+  "keywords": "iptv,m3u,xtream,player,live,tv,guide,video,movies,series,favorites,playlist",
+  "promotionalText": "Bring your own playlists together with a TV guide, favorites, movies and series in a clean player for iPhone and iPad.",
+  "description": "Your playlists, together in WygTV.\n\nConnect your own Xtream-compatible service, add an M3U playlist, or connect a supported home-network tuner. Browse Live TV, explore movies and series, and keep your favorites close.\n\nFeatures\n• Xtream login and M3U playlist support\n• Live TV and program guides from your provider or XMLTV links\n• Movie and series browsing\n• Favorites, My List and watch progress\n• HLS playback using iOS video support\n• Playlist backup and restore\n• A landscape interface for iPhone and iPad\n\nWygTV is a media player. No TV subscription, paid channels, movies or series are supplied. Add only playlists and services you are authorized to access. Availability, guide information and playback compatibility depend on your provider and stream format. Some formats require a compatible external player.\n\nNo WygTV account is required. Optional movie-information lookups use API keys you choose to enter. Your playlist settings and watch progress are stored on your device.",
+  "marketingURL": "https://wyglaf01.github.io/WygTV-AndroidTV/",
+  "supportURL": "https://github.com/wyglaf01/WygTV-AndroidTV/issues",
+  "privacyPolicyURL": "https://wyglaf01.github.io/WygTV-AndroidTV/privacy.html",
+  "sellerName": null,
+  "supportEmail": null,
+  "copyright": null,
+  "price": null,
+  "territories": null,
+  "ageRating": null,
+  "releaseMethod": "Manual release after owner approval"
+}

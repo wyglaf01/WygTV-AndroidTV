@@ -4,6 +4,7 @@
 // - wraps the desktop's m3u.js, xmltv.js and hdhr.js so they run in the page (js/desktop-modules.js)
 // - adds web/ios-bridge.js, which stands in for the desktop app's main process
 import fs from 'node:fs';
+import { prepareAppStore } from './appstore-bundle.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -51,4 +52,8 @@ for (const need of ['vendor/hls.min.js', 'vendor/mpegts.js', 'js/ios-bridge.js',
 }
 fs.writeFileSync(path.join(www, 'index.html'), html);
 fs.copyFileSync(path.join(root, 'web', 'ios.css'), path.join(www, 'ios.css'));
-console.log('www/ is ready');
+if (process.env.WYG_DISTRIBUTION === 'appstore') {
+  prepareAppStore(www, { smoke: process.env.WYG_ENABLE_SMOKE === '1' });
+}
+console.log('www/ is ready (' + (process.env.WYG_DISTRIBUTION || 'sideload') + ')');
+
