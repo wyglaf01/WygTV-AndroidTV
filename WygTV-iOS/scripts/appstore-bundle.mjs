@@ -29,7 +29,7 @@ export function prepareAppStore(www, { smoke = false } = {}) {
       source = source.replace("name: 'Smoke test'", "name: 'Demo playlist'");
       source = replaceRequired(source,
         "const step = async (name, ms = 2500) => { await sleep(ms); console.log('WYG-STEP ' + name); await sleep(1500); };",
-        "const step = async (name, ms = 1200) => { await sleep(ms); console.log('WYG-STEP ' + name); await Http.get({ url: base + '/__capture?name=' + encodeURIComponent(name), responseType: 'text', connectTimeout: 5000, readTimeout: 90000 }); };",
+        "const step = async (name, ms = 1200) => { await sleep(ms); console.log('WYG-STEP ' + name); await Http.get({ url: base + '/__capture?name=' + encodeURIComponent(name), responseType: 'text', connectTimeout: 90000, readTimeout: 90000 }); };",
         'screenshot handshake');
       source = replaceRequired(source,
         "console.log('WYG-SMOKE ' + JSON.stringify(out));",
