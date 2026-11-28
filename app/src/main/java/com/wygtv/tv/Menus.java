@@ -600,7 +600,7 @@ final class Menus {
         JSONObject active = a.library.find(a.library.activeId());
         boolean liveOnly = a.liveOnly();
         if (g.isEmpty()) {
-            row(a, list, groupIcon(GROUP_PLAYLISTS) + "  " + groupTitle(GROUP_PLAYLISTS), "playlists, HDHomeRun, AirTV, Tablo, manage categories, hide and show channels, channel groups, TV guides (EPG)", () -> settingsGroup(a, GROUP_PLAYLISTS));
+            row(a, list, groupIcon(GROUP_PLAYLISTS) + "  " + groupTitle(GROUP_PLAYLISTS), "playlists, HDHomeRun, Tablo, manage categories, hide and show channels, channel groups, TV guides (EPG)", () -> settingsGroup(a, GROUP_PLAYLISTS));
             row(a, list, groupIcon(GROUP_PLAYER) + "  " + groupTitle(GROUP_PLAYER), "built-in or external player, live stream format, buffer, video decoder, subtitles, watched series, play next", () -> settingsGroup(a, GROUP_PLAYER));
             row(a, list, groupIcon(GROUP_APPEARANCE) + "  " + groupTitle(GROUP_APPEARANCE), "theme, glass effect, app mode, main screen, start-up screen, side menu order, Exit button, guide rows, channel order, live preview, movie and series info, IMDb ratings", () -> settingsGroup(a, GROUP_APPEARANCE));
             row(a, list, groupIcon(GROUP_BACKUP) + "  " + groupTitle(GROUP_BACKUP), (Brand.STORE ? "back up, restore  •  " : "back up, restore, check for updates  •  ") + Brand.NAME + " " + Updater.installedName(a), () -> settingsGroup(a, GROUP_BACKUP));
@@ -614,8 +614,6 @@ final class Menus {
                     ? "not added  •  press OK to add your tuner. Its channels show in Live TV as " + Antenna.DEFAULT_NAME
                     : (tuners.size() == 1 ? describe(tuners.get(0)) : tuners.size() + " tuners") + "  •  press OK to add, edit, refresh or remove",
                     () -> { if (tuners.isEmpty()) hdhrForm(a, null); else tunerList(a); });
-            final int airRow = list.getChildCount();
-            row(a, list, "AirTV antenna TV", AirTv.summary(a), () -> AirTv.settings(a, () -> settings(a, airRow)));
             final int tabloRow = list.getChildCount();
             row(a, list, "Tablo antenna TV", tabloSummary(a), () -> tabloMenu(a, () -> settings(a, tabloRow)));
             final int catsRow = list.getChildCount();
