@@ -194,7 +194,7 @@ final class Showcase {
 
     /**
      * The classic Home's items, small, in one row: Live TV, TV Guide, Movies, Series, Search, a 📡 tile for each
-     * antenna tuner (and AirTV), Playlists, Settings and Exit. Live TV is highlighted when the screen opens.
+     * antenna tuner, Playlists, Settings and Exit. Live TV is highlighted when the screen opens.
      */
     private static LinearLayout shortcuts(MainActivity a) {
         LinearLayout row = new LinearLayout(a);
@@ -210,7 +210,6 @@ final class Showcase {
             String aid = Antenna.PREFIX + t.optString("id");
             shortcut(a, row, "📡  " + Antenna.nameOf(t), () -> a.showGuide(aid, null, true));
         }
-        if (AirTv.isOn(a.prefs)) shortcut(a, row, "📡  " + AirTv.nameOf(a.prefs), () -> AirTv.open(a));
         if (TabloApp.isOn(a.prefs)) shortcut(a, row, "📡  " + TabloApp.nameOf(a.prefs), () -> TabloApp.open(a));
         shortcut(a, row, "☰  Playlists", () -> { Menus.playlistsFromSettings = false; a.playlists(); });
         shortcut(a, row, "⚙  Settings", a::settings);

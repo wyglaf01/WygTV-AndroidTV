@@ -37,7 +37,6 @@
     <a class="l2" href="#setup-xtream">Xtream Codes</a>
     <a class="l2" href="#setup-m3u">M3U link</a>
     <a class="l2" href="#setup-hdhr">HDHomeRun antenna</a>
-    <a class="l2" href="#setup-airtv">AirTV antenna</a>
     <a class="l2" href="#setup-restore">Restore a backup</a>
     <a href="#remote">3. Remote basics</a>
     <a href="#home">4. Home &amp; side menu</a>
@@ -123,14 +122,6 @@
     </ol>
     <p>If the tuner has no channels yet, run a channel scan in the HDHomeRun app first, then come back and choose <b>Refresh channels</b> (see <a href="#set-playlists">Manage playlists</a>).</p>
 
-    <h3 id="setup-airtv">📡 AirTV (antenna TV box)</h3>
-    <p>AirTV boxes (AirTV 2, AirTV Anywhere) don't share their channels with other apps the way HDHomeRun does: their channels only play in the free Sling TV app (no subscription needed for antenna channels). WygTV gives your AirTV a button that opens Sling.</p>
-    <ol class="steps">
-      <li>Set up your AirTV in the Sling TV app first.</li>
-      <li>In WygTV, go to Settings → Manage playlists → <b>AirTV antenna TV</b> and choose <b>Turn on</b>.</li>
-      <li><b>📡 AirTV</b> now shows in the side menu, on Home and in Live TV. Press it to open Sling's local channels; Back returns to WygTV. You can rename it there too.</li>
-    </ol>
-
     <h3 id="setup-restore">↺ Restore from a backup</h3>
     <p>Moving to a new TV or reinstalling? Pick a <code>WygTV-backup-….json</code> file and everything comes back: playlists, favorites, channel groups, My List, hidden items and settings. See <a href="#set-backup">Manage app</a> for how to make one.</p>
 
@@ -166,7 +157,6 @@
       <tr><td>← Menu</td><td>Opens the main menu on the left (or "← TV Guide" in Live TV only mode). Pick ⌂ Home there to go to Home.</td></tr>
       <tr><td>★ Favorites</td><td>Your favorite channels. Highlighted when you open Live TV.</td></tr>
       <tr><td>⌕ Search</td><td>Type the channel name, then press <b>⌕ Search</b> (or the search key on the keyboard). Nothing is searched while you type. Every saved playlist is searched, one at a time, and results appear as each one finishes. The first search downloads each playlist's channel list and saves it, so later searches are quicker; the lists are downloaded again after 6 hours or when playlists update.</td></tr>
-      <tr><td>📡 AirTV</td><td>Opens Sling, when AirTV is turned on. The full <a href="#guide">TV Guide</a> (▦) and your HDHomeRun tuners (📡) are on the slim side menu at the left edge.</td></tr>
       <tr><td>◆ Your groups</td><td>Channel groups you made (e.g. "◆ Sports"). Hold OK to rename or delete.</td></tr>
       <tr><td>▤ / ▢ Playlists ›</td><td>Each saved playlist (▤ is the one you're watching). OK opens its categories right under it; OK again closes them.</td></tr>
     </table>

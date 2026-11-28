@@ -13,7 +13,7 @@ import java.util.Locale;
  * The white 4th Gen Tablo (2023 and later), and any Tablo whose firmware refuses other apps.
  *
  * A 4th Gen Tablo only talks to Tablo's own apps (it checks every request against your Tablo account), so neither
- * WygTV nor WygOTA can list or play its channels. Like AirTV, once switched on in Settings, "📡 Tablo" sits in the
+ * WygTV nor WygOTA can list or play its channels. Once switched on in Settings, "📡 Tablo" sits in the
  * side menu, on Home and in the Live TV menu, and pressing it opens the Tablo app. Back returns here.
  * Older black Tablos play inside the app instead: see {@link Tablo}.
  */
@@ -27,7 +27,14 @@ final class TabloApp {
 
     static String nameOf(SharedPreferences p) {
         String raw = p.getString(PREF_NAME, "").trim();
-        return raw.isEmpty() ? DEFAULT_NAME : AirTv.cleanName(raw);
+        return raw.isEmpty() ? DEFAULT_NAME : cleanName(raw);
+    }
+
+    /** First letter capitalized; DEFAULT_NAME when left empty. */
+    static String cleanName(String raw) {
+        String t = raw == null ? "" : raw.trim();
+        if (t.isEmpty()) return DEFAULT_NAME;
+        return t.substring(0, 1).toUpperCase(Locale.getDefault()) + t.substring(1);
     }
 
     /**
@@ -127,7 +134,7 @@ final class TabloApp {
         new Dialogs.Builder(a).setTitle("Name for your Tablo button").setView(field)
                 .setPositiveButton("Save", (d, w) -> {
                     String n = field.getText().toString().trim();
-                    a.prefs.edit().putString(PREF_NAME, n.isEmpty() ? DEFAULT_NAME : AirTv.cleanName(n)).apply();
+                    a.prefs.edit().putString(PREF_NAME, n.isEmpty() ? DEFAULT_NAME : cleanName(n)).apply();
                     redraw.run();
                 })
                 .setNegativeButton("Cancel", null).show();
