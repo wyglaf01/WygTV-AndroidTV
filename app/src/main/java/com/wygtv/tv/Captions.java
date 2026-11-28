@@ -1,7 +1,6 @@
 package com.wygtv.tv;
 
 import android.net.Uri;
-import androidx.annotation.Nullable;
 import androidx.annotation.OptIn;
 import androidx.media3.common.C;
 import androidx.media3.common.Format;
@@ -50,7 +49,7 @@ final class Captions {
             new Format.Builder().setSampleMimeType(MimeTypes.APPLICATION_CEA708).setAccessibilityChannel(1).setLabel("Digital CC").setId("wygtv-708").build()));
 
     /** True for the closed-caption kinds that come inside the video. */
-    static boolean isClosedCaption(@Nullable String mime) {
+    static boolean isClosedCaption(String mime) {
         if (mime == null) return false;
         return MimeTypes.APPLICATION_CEA608.equals(mime) || MimeTypes.APPLICATION_CEA708.equals(mime) || MimeTypes.APPLICATION_MP4CEA608.equals(mime)
                 || mime.contains("cea-608") || mime.contains("cea-708");
@@ -70,7 +69,7 @@ final class Captions {
         private final DefaultHlsExtractorFactory inner = new DefaultHlsExtractorFactory(0, true);
 
         @Override
-        public HlsMediaChunkExtractor createExtractor(Uri uri, Format format, @Nullable List<Format> muxedCaptionFormats,
+        public HlsMediaChunkExtractor createExtractor(Uri uri, Format format, List<Format> muxedCaptionFormats,
                 TimestampAdjuster timestampAdjuster, Map<String, List<String>> responseHeaders,
                 ExtractorInput sniffingExtractorInput, PlayerId playerId) throws IOException {
             return inner.createExtractor(uri, format, muxedCaptionFormats == null ? FORMATS : muxedCaptionFormats,
