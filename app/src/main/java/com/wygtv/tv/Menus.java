@@ -666,13 +666,6 @@ final class Menus {
         } else if (g.equals(GROUP_PLAYER)) {
             final int playerRow = list.getChildCount();
             row(a, list, "Player", ExternalPlayer.label(a) + "  •  press OK to keep WygTV's own player or use another video app such as VLC or MX Player", () -> choosePlayer(a, playerRow));
-            if (Pip.supported(a)) {
-                final int pipRow = list.getChildCount();
-                row(a, list, "Picture-in-picture", (Pip.onHome(a.prefs) ? "On" : "Off") + "  •  pressing Home while something plays keeps it playing in a small window. Press OK to switch", () -> {
-                    a.prefs.edit().putBoolean(Pip.PREF_ON_HOME, !Pip.onHome(a.prefs)).apply();
-                    settings(a, pipRow);
-                });
-            }
             if (!ExternalPlayer.choice(a.prefs).isEmpty()) {
                 final int forRow = list.getChildCount();
                 row(a, list, "Use the external player for", ExternalPlayer.FOR_LABELS[ExternalPlayer.forIndex(ExternalPlayer.forKey(a.prefs))] + "  •  everything else plays in WygTV's own player", () ->
