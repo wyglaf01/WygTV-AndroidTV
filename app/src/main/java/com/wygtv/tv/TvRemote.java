@@ -48,6 +48,7 @@ final class TvRemote {
 
     // Overlays.
     private LinearLayout banner;
+    private PlayerBar bar;
     private TextView bannerLogo, bannerTitle, bannerSource, bannerNow, bannerNext, numberBox;
     private String typed = "";
     private final Runnable hideBanner = () -> { if (banner != null) banner.setVisibility(View.GONE); };
@@ -77,28 +78,9 @@ final class TvRemote {
     JSONArray currentList() { return zapList; }
     PlayerView currentView() { return view; }
 
-    /** Picture-in-picture: no banner, number box, Up next or playback controls in the small window. */
-    void pictureInPicture(boolean in) {
-        if (view == null) return;
-        if (in) {
-            ui.removeCallbacksAndMessages(null);
-            view.hideController();
-            view.setUseController(false);
-            if (banner != null) banner.setVisibility(View.GONE);
-            if (numberBox != null) numberBox.setVisibility(View.GONE);
-            if (upNext != null) upNext.setVisibility(View.GONE);
-            typed = "";
-        } else {
-            view.setUseController(true);
-            if (isLive()) view.setControllerAutoShow(false);
-            view.requestFocus();
-        }
-    }
-
-    /** The player menu's window choices: the in-app mini player, and picture-in-picture where the device has it. */
+    /** The player menu's window choice: the in-app mini player. */
     private String[] windowItems() {
-        return Pip.supported(a) ? new String[]{"▣  Mini player (keep watching while you browse)", "⧉  Picture-in-picture (keep watching outside " + Brand.NAME + ")"}
-                : new String[]{"▣  Mini player (keep watching while you browse)"};
+        return new String[]{"▣  Mini player (keep watching while you browse)"};
     }
 
     private static String[] join(String[] first, String[] then) {
@@ -111,7 +93,6 @@ final class TvRemote {
     /** True (and done) when a player-menu pick was a window choice. */
     private boolean windowPick(String pick) {
         if (pick.startsWith("▣")) { MiniPlayer.shrink(a); return true; }
-        if (pick.startsWith("⧉")) { if (!Pip.enter(a)) toast("Picture-in-picture isn't available on this device."); return true; }
         return false;
     }
 
@@ -152,6 +133,7 @@ final class TvRemote {
         nlp.setMargins(0, a.dp(28), a.dp(36), 0);
         frame.addView(numberBox, nlp);
         buildUpNext(frame);
+        bar = new PlayerBar(a, frame, isLive(), this::barOptions);
 
         if (isLive()) {
             playerView.setControllerAutoShow(false);
@@ -188,9 +170,9 @@ final class TvRemote {
         bannerNext.setSingleLine(true);
         banner.addView(bannerNext);
         TextView hints = text(isLive()
-                ? "▲ / CH± change channel    ▼ controls    0-9 channel number    OK resume / favorites / groups    INFO channel info    GUIDE TV guide    MENU options / subtitles    BACK exit"
-                : "series".equals(type) && Episodes.next(a) != null ? "◀▶ seek    ▶❚❚ play / pause    MENU next episode / options / subtitles    BACK exit"
-                : "◀▶ seek    ▶❚❚ play / pause    MENU options / subtitles    BACK exit", 14, Theme.MUTED, false);
+                ? "▲ / CH± change channel    ▼ options    0-9 channel number    OK resume / favorites / groups    INFO channel info    GUIDE TV guide    MENU options / subtitles    BACK exit"
+                : "series".equals(type) && Episodes.next(a) != null ? "◀▶ seek    ▼ options    ▶❚❚ play / pause    MENU next episode / options / subtitles    BACK exit"
+                : "◀▶ seek    ▼ options    ▶❚❚ play / pause    MENU options / subtitles    BACK exit", 14, Theme.MUTED, false);
         hints.setPadding(0, a.dp(8), 0, 0);
         banner.addView(hints);
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM);
@@ -261,6 +243,7 @@ final class TvRemote {
             if (ticket != epgTicket || !forId.equals(id)) return;
             JSONArray list = o == null ? null : o.optJSONArray("epg_listings");
             bannerNow.setText(list == null || list.length() == 0 ? "No guide information" : "Now  " + epgLine(list.optJSONObject(0)));
+            if (bar != null) bar.setNow(list == null || list.length() == 0 ? "" : epgLine(list.optJSONObject(0)));
             bannerNext.setText(list != null && list.length() > 1 ? "Next  " + epgLine(list.optJSONObject(1)) : "");
         });
     }
@@ -295,6 +278,7 @@ final class TvRemote {
         boolean controls = view.isControllerFullyVisible();
         int digit = RemoteKeys.digit(key);
         if (isLive() && digit >= 0) { if (down) typeDigit(digit); return true; }
+        if (bar != null && bar.showing() && bar.key(e)) return true;
         switch (key) {
             case KeyEvent.KEYCODE_CHANNEL_UP:
                 if (down && isLive()) zap(1);
@@ -307,9 +291,9 @@ final class TvRemote {
                 if (down) zap(1);
                 return true;
             case KeyEvent.KEYCODE_DPAD_DOWN:
-                // Down shows the playback controls (live too) instead of changing channel; CH- still goes down a channel.
+                // Down opens the options bar along the bottom (live too) instead of changing channel; CH- still goes down a channel.
                 if (controls) return false;
-                if (down && e.getRepeatCount() == 0) { hideBanner.run(); view.showController(); }
+                if (down && e.getRepeatCount() == 0) openBar();
                 return true;
             case KeyEvent.KEYCODE_DPAD_CENTER:
             case KeyEvent.KEYCODE_ENTER:
@@ -332,7 +316,7 @@ final class TvRemote {
             case KeyEvent.KEYCODE_MENU:
                 if (down) playerMenu();
                 return true;
-            case KeyEvent.KEYCODE_WINDOW: // the Window / PiP key some remotes have: shrink to the mini player
+            case KeyEvent.KEYCODE_WINDOW: // the Window key some remotes have: shrink to the mini player
                 if (down && e.getRepeatCount() == 0) MiniPlayer.shrink(a);
                 return true;
             case KeyEvent.KEYCODE_CAPTIONS:
@@ -382,6 +366,7 @@ final class TvRemote {
         if (!a.mode.equals("player") || view == null) return false;
         if (!typed.isEmpty()) { ui.removeCallbacks(commitNumber); typed = ""; numberBox.setVisibility(View.GONE); return true; }
         if (view.isControllerFullyVisible()) { view.hideController(); return true; }
+        if (bar != null && bar.showing()) { bar.hide(); return true; }
         if (upNextShowing()) { upNextDismissed = true; endedSeconds = -1; upNext.setVisibility(View.GONE); return true; }
         return false;
     }
@@ -394,6 +379,7 @@ final class TvRemote {
         view = null;
         banner = null;
         upNext = null;
+        bar = null;
     }
 
     private void flashControls() { if (!isLive()) view.showController(); }
@@ -606,6 +592,60 @@ final class TvRemote {
                 }).show();
     }
 
+    /** D-pad Down: the options bar along the bottom of the picture (in place of the playback controls). */
+    private void openBar() {
+        hideBanner.run();
+        view.hideController();
+        bar.show(title);
+        if (isLive()) { bar.setNow(""); loadNowNext(); }
+    }
+
+    /** The options bar's buttons for what is playing now. Order: watching, then the stream, then the window. */
+    private java.util.List<PlayerBar.Option> barOptions() {
+        java.util.List<PlayerBar.Option> o = new java.util.ArrayList<>();
+        boolean playing = a.player != null && a.player.isPlaying();
+        o.add(new PlayerBar.Option(playing ? R.drawable.pb_pause : R.drawable.pb_play, playing ? "Pause" : "Play", null, () -> {
+            if (a.player == null) return;
+            if (a.player.isPlaying()) a.player.pause(); else a.player.play();
+        }));
+        String subs = a.subs != null && a.subs.on() ? "On" : "Off";
+        int audio = PlayerBar.audioCount(a);
+        if (isLive()) {
+            boolean fav = a.isFavorite("live", id);
+            o.add(new PlayerBar.Option(R.drawable.pb_channels, "Channels", null, bar.closing(this::channelList)));
+            o.add(new PlayerBar.Option(R.drawable.pb_guide, "TV guide", null, bar.closing(this::openGuideFromPlayer)));
+            o.add(new PlayerBar.Option(fav ? R.drawable.pb_star : R.drawable.pb_star_border, "Favorite", fav ? "★ On" : "Off",
+                    () -> toast(a.toggleFavorite("live", id, title, ext) ? "Added to Favorites" : "Removed from Favorites")));
+            o.add(new PlayerBar.Option(R.drawable.pb_restart, "Resume", null, bar.closing(this::restart)));
+        } else {
+            o.add(new PlayerBar.Option(R.drawable.pb_rewind, "Back 10 s", null, () -> seek(-SEEK_SHORT_MS)));
+            o.add(new PlayerBar.Option(R.drawable.pb_forward, "Ahead 10 s", null, () -> seek(SEEK_SHORT_MS)));
+            o.add(new PlayerBar.Option(R.drawable.pb_replay, "Start over", null, () -> { if (a.player != null) a.player.seekTo(0); }));
+            String next = "series".equals(type) ? Episodes.nextLabel(a) : null;
+            if (next != null) o.add(new PlayerBar.Option(R.drawable.pb_next, "Next episode", next, bar.closing(() -> Episodes.playNext(a))));
+            final boolean series = "series".equals(type);
+            final String listType = series ? "series" : "vod", listId = series ? (a.watching != null ? a.watching[0] : "") : id;
+            if (!listId.isEmpty()) {
+                boolean mine = a.inMyList(listType, listId);
+                o.add(new PlayerBar.Option(mine ? R.drawable.pb_mylist_done : R.drawable.pb_mylist, mine ? "In My List" : "My List", null, () -> {
+                    JSONObject item = new JSONObject();
+                    try {
+                        item.put(series ? "series_id" : "stream_id", listId).put("name", series && a.seriesTitle != null ? a.seriesTitle : title);
+                        if (!series) item.put("container_extension", ext);
+                    } catch (Exception ignored) { }
+                    toast(a.toggleMyList(listType, item) ? "Added to My List" : "Removed from My List");
+                }));
+            }
+        }
+        o.add(new PlayerBar.Option(R.drawable.pb_subtitles, "Subtitles", subs, bar.closing(() -> { if (a.subs != null) a.subs.choose(); })));
+        if (audio > 1) o.add(new PlayerBar.Option(R.drawable.pb_audio, "Audio", audio + " tracks", bar.closing(() -> PlayerBar.chooseAudio(a))));
+        o.add(new PlayerBar.Option(R.drawable.pb_picture, "Picture", PlayerBar.fitLabel(a), () -> PlayerBar.applyFit(a, 1)));
+        if (isLive()) o.add(new PlayerBar.Option(R.drawable.pb_more, "More", "groups…", bar.closing(this::channelOptions)));
+        o.add(new PlayerBar.Option(R.drawable.pb_mini, "Mini player", null, bar.closing(() -> MiniPlayer.shrink(a))));
+        o.add(new PlayerBar.Option(R.drawable.pb_exit, "Exit", null, bar.closing(a::onBackPressed)));
+        return o;
+    }
+
     private String subtitlesItem() { return "Subtitles / CC: " + (a.subs != null && a.subs.on() ? "on" : "off"); }
 
     /** A quick channel picker over the video, so you can jump without leaving the player. */
@@ -714,11 +754,8 @@ final class TvRemote {
         return t;
     }
 
-    private GradientDrawable panel() {
-        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{Theme.pane(Theme.alpha(Theme.PANEL,0xe6)), Theme.alpha(Theme.BG, Theme.glass ? 0xb0 : 0xf0)});
-        g.setCornerRadius(a.dp(14));
-        g.setStroke(a.dp(Theme.glass ? 1 : 2), Theme.glass ? Theme.edge(false) : Theme.STROKE_FOCUS);
-        return g;
+    private android.graphics.drawable.Drawable panel() {
+        return Skin.plate(a.getResources(), a.dp(1), new int[]{Theme.alpha(Theme.PANEL, 0xf0), Theme.alpha(Theme.BG, 0xf0)}, 2, Theme.STROKE_FOCUS, true);
     }
 
 }

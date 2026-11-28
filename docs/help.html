@@ -37,7 +37,6 @@
     <a class="l2" href="#setup-xtream">Xtream Codes</a>
     <a class="l2" href="#setup-m3u">M3U link</a>
     <a class="l2" href="#setup-hdhr">HDHomeRun antenna</a>
-    <a class="l2" href="#setup-airtv">AirTV antenna</a>
     <a class="l2" href="#setup-restore">Restore a backup</a>
     <a href="#remote">3. Remote basics</a>
     <a href="#home">4. Home &amp; side menu</a>
@@ -124,14 +123,6 @@
     </ol>
     <p>If the tuner has no channels yet, run a channel scan in the HDHomeRun app first, then come back and choose <b>Refresh channels</b> (see <a href="#set-playlists">Manage playlists</a>).</p>
 
-    <h3 id="setup-airtv">📡 AirTV (antenna TV box)</h3>
-    <p>AirTV boxes (AirTV 2, AirTV Anywhere) don't share their channels with other apps the way HDHomeRun does: their channels only play in the free Sling TV app (no subscription needed for antenna channels). WygTV gives your AirTV a button that opens Sling.</p>
-    <ol class="steps">
-      <li>Set up your AirTV in the Sling TV app first.</li>
-      <li>In WygTV, go to Settings → Manage playlists → <b>AirTV antenna TV</b> and choose <b>Turn on</b>.</li>
-      <li><b>📡 AirTV</b> now shows in the side menu, on Home and in Live TV. Press it to open Sling's local channels; Back returns to WygTV. You can rename it there too.</li>
-    </ol>
-
     <h3 id="setup-restore">↺ Restore from a backup</h3>
     <p>Moving to a new TV or reinstalling? Pick a <code>WygTV-backup-….json</code> file and everything comes back: playlists, favorites, channel groups, My List, hidden items and settings. See <a href="#set-backup">Manage app</a> for how to make one.</p>
 
@@ -167,7 +158,6 @@
       <tr><td>← Menu</td><td>Opens the main menu on the left (or "← TV Guide" in Live TV only mode). Pick ⌂ Home there to go to Home.</td></tr>
       <tr><td>★ Favorites</td><td>Your favorite channels. Highlighted when you open Live TV.</td></tr>
       <tr><td>⌕ Search</td><td>Type the channel name, then press <b>⌕ Search</b> (or the search key on the keyboard). Nothing is searched while you type. Every saved playlist is searched, one at a time, and results appear as each one finishes. The first search downloads each playlist's channel list and saves it, so later searches are quicker; the lists are downloaded again after 6 hours or when playlists update.</td></tr>
-      <tr><td>📡 AirTV</td><td>Opens Sling, when AirTV is turned on. The full <a href="#guide">TV Guide</a> (▦) and your HDHomeRun tuners (📡) are on the slim side menu at the left edge.</td></tr>
       <tr><td>◆ Your groups</td><td>Channel groups you made (e.g. "◆ Sports"). Hold OK to rename or delete.</td></tr>
       <tr><td>▤ / ▢ Playlists ›</td><td>Each saved playlist (▤ is the one you're watching). OK opens its categories right under it; OK again closes them.</td></tr>
     </table>
@@ -201,7 +191,7 @@
     <table>
       <tr><th>Button</th><th>What it does</th></tr>
       <tr><td><kbd>CH+</kbd> <kbd>CH−</kbd> or <kbd>▲</kbd></td><td>Next / previous channel in the list you started from (Favorites, a category, a group…). ▲ goes to the next channel.</td></tr>
-      <tr><td><kbd>▼</kbd></td><td>Shows the playback controls. They include a <b>CC</b> button: OK on it turns subtitles on or off, picks a subtitle track, and for movies and episodes searches online for subtitles (or loads a file or link). ▼ no longer changes channel; use CH− for that.</td></tr>
+      <tr><td><kbd>▼</kbd></td><td>Opens the <b>options bar</b> along the bottom of the picture: Pause, Channels, TV guide, ★ Favorite, Resume, <b>Subtitles</b>, Audio (when the channel has more than one track), Picture (Fit / Zoom / Stretch), More (channel groups), Mini player and Exit. Above the buttons you see the channel, LIVE, what's on now and the clock. ◀ ▶ move along the buttons, OK presses one, ▲ or Back closes the bar, and it hides by itself after 8 seconds. ▼ no longer changes channel; use CH− for that.</td></tr>
       <tr><td>Number keys</td><td>Type a channel number; it switches after a short pause, or press OK to go now.</td></tr>
       <tr><td><kbd>OK</kbd></td><td>Channel options: <b>Resume</b> (reconnects the channel, handy if it froze), Add to / Remove from Favorites, Add to channel group, New channel group. The channel banner (logo, source, what's on) shows underneath.</td></tr>
       <tr><td><kbd>Info</kbd></td><td>Channel banner with the channel's logo and what's on now and next.</td></tr>
@@ -218,6 +208,7 @@
       <tr><td><kbd>⏪</kbd> <kbd>⏩</kbd></td><td>Skip back / forward 30 seconds.</td></tr>
       <tr><td><kbd>⏯</kbd></td><td>Play / pause.</td></tr>
       <tr><td><kbd>OK</kbd></td><td>Show the playback controls.</td></tr>
+      <tr><td><kbd>▼</kbd></td><td>Opens the <b>options bar</b> along the bottom: Pause, Back / Ahead 10 s, Start over, Next episode, My List, Subtitles, Audio, Picture, Mini player and Exit, with the time played, time left and the clock above it.</td></tr>
       <tr><td><kbd>☰ Menu</kbd></td><td>Add to My List, Subtitles (pick a track, search online, load a file from the TV or a USB drive, load a link, text size), Exit player.</td></tr>
     </table>
     <p>If the connection drops, WygTV shows "Connection dropped. Reconnecting…" and tries again by itself, picking a live channel up at the newest point and a movie where it left off.</p>
@@ -258,7 +249,7 @@
     <table>
       <tr><th>Setting</th><th>What it does</th></tr>
       <tr><td>Manage playlists</td><td>Opens the <a href="#playlists">Playlists</a> screen: add, edit, refresh, delete, or turn playlists on and off.</td></tr>
-      <tr><td>Turn playlists on or off</td><td>A full-screen tick list of every playlist and antenna tuner (Save, Tick all, Untick all, Exit at the top; Back jumps to the top). Ticked = on. An unticked playlist is skipped everywhere (menus, TV guides, Favorites, Search) and isn't downloaded or updated until you tick it again. Its favorites and settings stay saved. At least one stays on. All are on to start with.</td></tr>
+      <tr><td>Select Active Playlists</td><td>A full-screen tick list of every playlist and antenna tuner (Save, Tick all, Untick all, Exit at the top; Back jumps to the top). Ticked = on. An unticked playlist is skipped everywhere (menus, TV guides, Favorites, Search) and isn't downloaded or updated until you tick it again. Its favorites and settings stay saved. At least one stays on. All are on to start with.</td></tr>
       <tr><td>HDHomeRun antenna TV</td><td>Add a tuner, or pick one to <b>Edit name or address</b>, <b>Refresh channels</b> (after a channel scan) or <b>Remove</b>. <b>+ Add another tuner</b> for more than one.</td></tr>
       <tr><td>Hidden categories and channels</td><td>Shows how many are hidden; OK shows them all again.</td></tr>
       <tr><td>Channel groups</td><td>Make a <b>New Channel Group</b>, or rename or delete one.</td></tr>
@@ -298,7 +289,6 @@
     <table>
       <tr><th>Setting</th><th>Choices</th></tr>
       <tr><td>Theme</td><td><b>Royal blue &amp; bronze</b> (default), Steampunk (brass &amp; leather), Teal &amp; bronze, Emerald &amp; bronze, Mahogany &amp; bronze, Black &amp; gold. Changes right away.</td></tr>
-      <tr><td>Glass effect</td><td>Off by default. On makes panels, buttons and menus frosted see-through glass over a softly blurred background.</td></tr>
       <tr><td>App mode</td><td><b>Full</b>, or <b>Live TV only</b>: opens on the TV guide and hides Movies and Series. Settings stays in the side menu so you can switch back.</td></tr>
       <tr><td>Open at start-up</td><td>Home, Live TV, TV Guide, <b>Last channel watched</b> (CH+/CH− then go through your Favorites), Favorites, or Recently watched. In Live TV only mode: TV Guide or Last channel.</td></tr>
       <tr><td>Side menu order</td><td>Press OK for a list of the side menu. OK picks an item up, ▲ ▼ move it, OK puts it down, then <b>Save</b>. <b>Reset</b> puts the menu back the way it came.</td></tr>

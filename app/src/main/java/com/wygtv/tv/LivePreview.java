@@ -40,7 +40,7 @@ final class LivePreview {
         FrameLayout frame = new FrameLayout(a);
         GradientDrawable border = new GradientDrawable();
         border.setColor(0xff000000);
-        border.setCornerRadius(a.dp(10));
+        border.setCornerRadius(0);
         border.setStroke(a.dp(3), Theme.STROKE_FOCUS);
         frame.setBackground(border);
         frame.setPadding(a.dp(3), a.dp(3), a.dp(3), a.dp(3));

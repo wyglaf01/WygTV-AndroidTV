@@ -49,9 +49,9 @@
 
 <section id="story">
   <div class="wrap">
-    <h2>How WygTV started</h2>
-    <div class="maker"><img src="img/wyglaf.png" alt="Wyglaf" width="140" height="158"><div><b>Made by Wyglaf</b><br><span>The person behind WygTV</span></div></div>
-    <p class="sub">WygTV began with a simple goal: to bring free over-the-air channels from an HDHomeRun network tuner to the TV, complete with a proper channel list and TV guide. From there it grew into a full IPTV player, so your Xtream Codes and M3U playlists sit right alongside your antenna channels in one place. It was first built for Android TVs and tablets, and it has since come to Windows, Mac, Ubuntu, iPhone and iPad as well.</p>
+    <h2 id="about-title">How WygTV started</h2>
+    <div class="maker"><img src="img/wyglaf.png" alt="Wyglaf" width="140" height="158"><div><b id="about-maker">Made by Wyglaf</b><br><span id="about-tagline">The person behind WygTV</span></div></div>
+    <p class="sub" id="about-story">WygTV began with a simple goal: to bring free over-the-air channels from an HDHomeRun network tuner to the TV, complete with a proper channel list and TV guide. From there it grew into a full IPTV player, so your Xtream Codes and M3U playlists sit right alongside your antenna channels in one place. It was first built for Android TVs and tablets, and it has since come to Windows, Mac, Ubuntu, iPhone and iPad as well.</p>
   </div>
 </section>
 
@@ -65,7 +65,7 @@
       <div class="card"><div class="ico">☰</div><h3>Every kind of playlist</h3>
         <ul><li>Xtream Codes logins (Live TV, Movies, Series and the provider's guide)</li><li>M3U / M3U8 links, grouped the way the playlist groups them</li><li>Paste a full <code>get.php</code> link and WygTV fills in the login</li><li>Keep as many playlists as you like and switch any time</li><li>Playlists and TV guides update by themselves: at start-up or every 6, 12 or 24 hours, with the last update time shown</li></ul></div>
       <div class="card"><div class="ico">📡</div><h3>Free antenna TV</h3>
-        <ul><li>HDHomeRun tuners found on your network automatically</li><li>Each tuner has its own 📡 entry on the side menu, on Home and in the TV Guide</li><li>Free program guide from the tuner, or your own XMLTV link</li><li>AirTV boxes too: a button opens the free Sling TV app, where AirTV channels play</li></ul></div>
+        <ul><li>HDHomeRun tuners found on your network automatically</li><li>Each tuner has its own 📡 entry on the side menu, on Home and in the TV Guide</li><li>Free program guide from the tuner, or your own XMLTV link</li></ul></div>
       <div class="card"><div class="ico">▣</div><h3>Live TV with a live preview</h3>
         <ul><li>Menu on the left: Favorites, Search, your channel groups, then your playlists; OK on a playlist opens its categories right under it</li><li>Preview window and a 90-minute guide on the right follow what you highlight</li><li>The menu shrinks to icons while you browse the guide, and ◀ or Back takes you right back to where you were</li><li>OK plays full screen, hold OK for options</li><li>On a tablet: tap a channel name to preview it, tap a show to watch it</li></ul></div>
       <div class="card"><div class="ico">▦</div><h3>Full TV guide</h3>
@@ -79,7 +79,7 @@
       <div class="card"><div class="ico">⚙</div><h3>A steady player</h3>
         <ul><li>Reconnects by itself when a stream drops</li><li>Buffer and video decoder settings for shaky streams or boxes</li><li>MPEG-TS or HLS for live channels</li><li>Subtitles and closed captions</li></ul></div>
       <div class="card"><div class="ico">◐</div><h3>Themes, backup & updates</h3>
-        <ul><li>Royal blue & bronze, Steampunk, Teal, Emerald, Mahogany, Black & gold, plus a see-through Glass effect</li><li>"Live TV only" mode for a simple cable-box feel</li><li>Back up and restore everything to a file</li><li>Checks for new versions and installs them over itself; big lists load in pieces so it stays steady on small TV boxes</li><li>Want new changes first? Try the <a href="builds.html">WygTV Beta</a></li></ul></div>
+        <ul><li>Royal blue & bronze, Steampunk, Teal, Emerald, Mahogany, Black & gold</li><li>"Live TV only" mode for a simple cable-box feel</li><li>Back up and restore everything to a file</li><li>Checks for new versions and installs them over itself; big lists load in pieces so it stays steady on small TV boxes</li><li>Want new changes first? Try the <a href="builds.html">WygTV Beta</a></li></ul></div>
     </div>
   </div>
 </section>
@@ -303,6 +303,14 @@
   }
 </script>
 <!-- Buy Me a Coffee button (bottom right) -->
+<script>
+  // How WygTV started: docs/about.json is the one place to edit it (the apps' About reads it too).
+  fetch("about.json", { cache: "no-cache" }).then(function (r) { return r.json(); }).then(function (a) {
+    [["about-title", a.title], ["about-maker", a.maker], ["about-tagline", a.tagline], ["about-story", a.story]].forEach(function (x) {
+      var el = document.getElementById(x[0]); if (el && x[1]) el.textContent = x[1];
+    });
+  }).catch(function () {});
+</script>
 <script data-name="BMC-Widget" data-cfasync="false" src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js" data-id="wyglaf" data-description="Support me on Buy me a coffee!" data-message="" data-color="#5F7FFF" data-position="Right" data-x_margin="18" data-y_margin="18"></script>
 </body>
 </html>
