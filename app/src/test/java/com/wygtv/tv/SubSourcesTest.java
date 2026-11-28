@@ -59,14 +59,44 @@ public class SubSourcesTest {
         assertEquals("en", r.get(0).lang);
     }
 
-    @Test public void podnapisiAnswer() {
-        String xml = "<results><pagination><current>1</current></pagination><subtitle><pid>AbC1</pid><title>Inception</title>"
-                + "<language>en</language><release>Inception.2010.720p Inception.BluRay</release><flags>nh</flags><downloads>77</downloads></subtitle></results>";
-        List<SubSources.Result> r = SubSources.parsePodnapisi(xml);
-        assertEquals(1, r.size());
-        assertEquals("https://www.podnapisi.net/subtitles/AbC1/download?container=zip", r.get(0).url);
-        assertEquals(77, r.get(0).downloads);
-        assertTrue(r.get(0).hearingImpaired);
+    @Test public void freeLibraryAnswer() throws Exception {
+        JSONObject o = new JSONObject("{\"subtitles\":[{\"id\":\"1\",\"lang\":\"eng\",\"url\":\"https://subs5.strem.io/en/download/file/1\","
+                + "\"subtitleFileName\":\"Show.S01E02.srt\",\"movieReleaseName\":\"Show.S01E02.720p\"},"
+                + "{\"id\":\"2\",\"lang\":\"pob\",\"url\":\"https://subs5.strem.io/en/download/file/2\"},{\"id\":\"3\",\"lang\":\"fre\",\"url\":\"\"}]}");
+        List<SubSources.Result> r = SubSources.parseFree(o);
+        assertEquals(2, r.size());
+        assertEquals("en", r.get(0).lang);
+        assertEquals("Show.S01E02.srt", r.get(0).fileName);
+        assertEquals("pt", r.get(1).lang);
+        assertEquals(1, SubSources.onlyLanguage(r, "en").size());
+        assertEquals(2, SubSources.onlyLanguage(r, "ja").size());
+    }
+
+    @Test public void freeLibraryAddresses() throws Exception {
+        SubSources.Query q = SubSources.queryFor("series", "Breaking Bad S01E02", null, "", "");
+        assertEquals("https://v3-cinemeta.strem.io/catalog/series/top/search=Breaking%20Bad.json", SubSources.cinemetaUrl(q));
+        assertEquals("https://opensubtitles-v3.strem.io/subtitles/series/tt0903747:1:2.json", SubSources.freeUrl("tt0903747", q));
+        SubSources.Query m = new SubSources.Query(); m.title = "Heat"; m.year = "1995";
+        assertEquals("https://opensubtitles-v3.strem.io/subtitles/movie/tt0113277.json", SubSources.freeUrl("tt0113277", m));
+    }
+
+    @Test public void cinemetaPicksSameNameAndYear() throws Exception {
+        JSONObject o = new JSONObject("{\"metas\":[{\"id\":\"tt1\",\"name\":\"Heat Wave\",\"releaseInfo\":\"2020\"},"
+                + "{\"id\":\"tt2\",\"name\":\"Heat\",\"releaseInfo\":\"1986\"},{\"id\":\"tt3\",\"name\":\"Heat\",\"releaseInfo\":\"1995\"}]}");
+        SubSources.Query q = new SubSources.Query(); q.title = "Heat"; q.year = "1995";
+        assertEquals("tt3", SubSources.pickImdb(o, q));
+        q.year = "";
+        assertEquals("tt2", SubSources.pickImdb(o, q));
+        q.title = "Nothing like it";
+        assertEquals("tt1", SubSources.pickImdb(o, q));
+    }
+
+    @Test public void threeLetterLanguages() {
+        assertEquals("de", SubSources.twoLetter("ger"));
+        assertEquals("cs", SubSources.twoLetter("cze"));
+        assertEquals("zh", SubSources.twoLetter("zht"));
+        assertEquals("en", SubSources.twoLetter("en"));
+        assertEquals("xyz", SubSources.twoLetter("xyz"));
     }
 
     @Test public void wantedLanguageSortsFirst() {

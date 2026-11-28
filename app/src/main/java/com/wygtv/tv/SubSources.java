@@ -29,8 +29,9 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 /**
- * Subtitles from outside the stream, for movies and episodes: searched online (Podnapisi needs nothing,
- * OpenSubtitles.com and SubDL need a free API key typed in Settings), loaded from a link, or from a file
+ * Subtitles from outside the stream, for movies and episodes: searched online (the free OpenSubtitles library that
+ * Stremio's official add-on serves needs nothing; OpenSubtitles.com and SubDL need a free API key typed in Settings),
+ * loaded from a link, or from a file
  * on the TV or a USB drive. Each one is saved as a UTF-8 file in the app's cache and handed to the player.
  */
 final class SubSources {
@@ -40,7 +41,8 @@ final class SubSources {
     static final String PREF_OS_KEY = "opensubtitles_key", PREF_OS_USER = "opensubtitles_user", PREF_OS_PASS = "opensubtitles_pass";
     static final String PREF_SUBDL_KEY = "subdl_key";
 
-    static final String PODNAPISI = "Podnapisi", OPENSUBTITLES = "OpenSubtitles", SUBDL = "SubDL";
+    /** FREE = OpenSubtitles through Stremio's public add-on (no key). Podnapisi, the old no-key source, has been offline since early 2026. */
+    static final String FREE = "OpenSubtitles (free)", OPENSUBTITLES = "OpenSubtitles", SUBDL = "SubDL";
 
     /** Subtitle languages offered in Settings; "" follows the TV's own language. */
     static final String[] LANG_CODES = {"", "en", "es", "fr", "de", "it", "pt", "nl", "pl", "ro", "el", "tr", "ru", "uk", "ar", "he", "sv", "da", "no", "fi", "hu", "cs", "hr", "sr", "bg", "hi", "vi", "th", "id", "ja", "ko", "zh"};
@@ -117,7 +119,7 @@ final class SubSources {
     // ------------------------------------------------------------------ results
 
     static final class Result {
-        String source = "", id = "", name = "", lang = "", url = "";
+        String source = "", id = "", name = "", lang = "", url = "", fileName = "";
         int downloads;
         boolean hearingImpaired;
         String season = "", episode = "";
@@ -130,12 +132,12 @@ final class SubSources {
         }
     }
 
-    /** The sources that can be used now: Podnapisi always, the others once their key is saved. */
+    /** The sources that can be used now: the free library always, the others once their key is saved. */
     static List<String> sources(SharedPreferences prefs) {
         List<String> out = new ArrayList<>();
         if (!prefs.getString(PREF_OS_KEY, "").trim().isEmpty()) out.add(OPENSUBTITLES);
         if (!prefs.getString(PREF_SUBDL_KEY, "").trim().isEmpty()) out.add(SUBDL);
-        out.add(PODNAPISI);
+        out.add(FREE);
         return out;
     }
 
@@ -146,7 +148,7 @@ final class SubSources {
             try {
                 if (s.equals(OPENSUBTITLES)) all.addAll(openSubtitlesSearch(prefs, q, lang));
                 else if (s.equals(SUBDL)) all.addAll(subdlSearch(prefs, q, lang));
-                else all.addAll(podnapisiSearch(q, lang));
+                else all.addAll(freeSearch(q, lang));
             } catch (Exception e) {
                 problems.add(s + ": " + (e.getMessage() == null ? "no answer" : e.getMessage()));
             }
@@ -222,7 +224,7 @@ final class SubSources {
         HttpURLConnection c = openSubtitles(prefs, openSubtitlesUrl(q, lang));
         try {
             int code = c.getResponseCode();
-            if (code == 401 || code == 403) throw new java.io.IOException("the API key wasn't accepted (Settings > Manage player)");
+            if (code == 401 || code == 403) throw new java.io.IOException("the API key wasn't accepted (Settings > Subtitles)");
             if (code != 200) throw new java.io.IOException("answered " + code);
             return parseOpenSubtitles(new JSONObject(Tmdb.read(c.getInputStream())));
         } finally { c.disconnect(); }
@@ -264,7 +266,7 @@ final class SubSources {
             InputStream in = code >= 400 ? c.getErrorStream() : c.getInputStream();
             String text = in == null ? "" : Tmdb.read(in);
             if (code == 406 || code == 429) throw new java.io.IOException("today's OpenSubtitles download limit is used up. Add your OpenSubtitles username and password in Settings for more, or try another source");
-            if (code == 401 || code == 403) throw new java.io.IOException("OpenSubtitles didn't accept the key or sign-in (Settings > Manage player)");
+            if (code == 401 || code == 403) throw new java.io.IOException("OpenSubtitles didn't accept the key or sign-in (Settings > Subtitles)");
             if (code >= 400) throw new java.io.IOException("OpenSubtitles answered " + code);
             return new JSONObject(text);
         } finally { c.disconnect(); }
@@ -328,57 +330,103 @@ final class SubSources {
         } finally { c.disconnect(); }
     }
 
-    // ------------------------------------------------------------------ Podnapisi
+    // ------------------------------------------------------------------ OpenSubtitles (free, through Stremio's add-on)
 
-    static String podnapisiUrl(Query q, String lang) throws Exception {
-        StringBuilder u = new StringBuilder("https://www.podnapisi.net/subtitles/search/old?sXML=1&sL=").append(URLEncoder.encode(lang, "UTF-8"))
-                .append("&sK=").append(URLEncoder.encode(q.title, "UTF-8"));
-        if (q.series) {
-            if (!q.season.isEmpty()) u.append("&sTS=").append(toInt(q.season));
-            if (!q.episode.isEmpty()) u.append("&sTE=").append(toInt(q.episode));
-        } else if (!q.year.isEmpty()) u.append("&sY=").append(q.year);
-        return u.toString();
+    static final String CINEMETA = "https://v3-cinemeta.strem.io", FREE_SUBS = "https://opensubtitles-v3.strem.io";
+    private static final java.util.Map<String, String> imdbCache = new java.util.HashMap<>();
+
+    /** Cinemeta's title search, the address book of IMDb ids the free library is filed under. */
+    static String cinemetaUrl(Query q) throws Exception {
+        return CINEMETA + "/catalog/" + (q.series ? "series" : "movie") + "/top/search=" + URLEncoder.encode(q.title, "UTF-8").replace("+", "%20") + ".json";
     }
 
-    private static final Pattern XML_SUB = Pattern.compile("(?s)<subtitle>(.*?)</subtitle>");
+    /** The IMDb id for a title: the same name (and year, when known) first, otherwise the best match Cinemeta gives. */
+    static String pickImdb(JSONObject o, Query q) {
+        JSONArray metas = o == null ? null : o.optJSONArray("metas");
+        if (metas == null) return "";
+        String want = norm(q.title), sameName = "", first = "";
+        for (int i = 0; i < metas.length(); i++) {
+            JSONObject m = metas.optJSONObject(i);
+            if (m == null || !m.optString("id").startsWith("tt")) continue;
+            if (first.isEmpty()) first = m.optString("id");
+            if (!norm(m.optString("name")).equals(want)) continue;
+            String year = m.optString("releaseInfo", m.optString("year"));
+            if (q.year.isEmpty() || year.startsWith(q.year)) return m.optString("id");
+            if (sameName.isEmpty()) sameName = m.optString("id");
+        }
+        return sameName.isEmpty() ? first : sameName;
+    }
 
-    static List<Result> parsePodnapisi(String xml) {
+    private static String norm(String s) { return s == null ? "" : s.toLowerCase(Locale.US).replaceAll("[^\\p{L}\\p{N}]+", ""); }
+
+    static String freeUrl(String imdb, Query q) {
+        return FREE_SUBS + "/subtitles/" + (q.series ? "series/" + imdb + ":" + toInt(q.season) + ":" + toInt(q.episode) : "movie/" + imdb) + ".json";
+    }
+
+    /** The add-on's answer: every subtitle it has, in every language. Languages come as three letters ("eng", "pob"). */
+    static List<Result> parseFree(JSONObject o) {
         List<Result> out = new ArrayList<>();
-        if (xml == null) return out;
-        Matcher m = XML_SUB.matcher(xml);
-        while (m.find()) {
-            String s = m.group(1);
-            String pid = tag(s, "pid");
-            if (pid.isEmpty()) continue;
+        JSONArray subs = o == null ? null : o.optJSONArray("subtitles");
+        for (int i = 0; subs != null && i < subs.length(); i++) {
+            JSONObject s = subs.optJSONObject(i);
+            if (s == null || !s.optString("url").startsWith("http")) continue;
             Result r = new Result();
-            r.source = PODNAPISI;
-            r.id = pid;
-            r.url = "https://www.podnapisi.net/subtitles/" + pid + "/download?container=zip";
-            r.lang = tag(s, "language");
-            r.name = tag(s, "release").trim().replaceAll("\\s+", " / ");
-            if (r.name.isEmpty()) r.name = tag(s, "title");
-            String dl = tag(s, "downloads");
-            r.downloads = dl.matches("\\d{1,9}") ? Integer.parseInt(dl) : 0;
-            r.hearingImpaired = tag(s, "flags").contains("n");
+            r.source = FREE;
+            r.id = s.optString("id");
+            r.url = s.optString("url");
+            r.lang = twoLetter(s.optString("lang"));
+            r.fileName = s.optString("subtitleFileName");
+            r.name = s.optString("movieReleaseName");
+            if (r.name.isEmpty()) r.name = r.fileName;
             out.add(r);
         }
         return out;
     }
 
-    private static String tag(String s, String name) {
-        Matcher m = Pattern.compile("(?s)<" + name + ">(.*?)</" + name + ">").matcher(s);
-        if (!m.find()) return "";
-        String v = m.group(1).trim();
-        if (v.startsWith("<![CDATA[") && v.endsWith("]]>")) v = v.substring(9, v.length() - 3);
-        return v.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&#39;", "'").trim();
+    /** Only the wanted language when the add-on has it (a popular film has hundreds of files in 40 languages). */
+    static List<Result> onlyLanguage(List<Result> all, String lang) {
+        List<Result> mine = new ArrayList<>();
+        for (Result r : all) if (sameLang(r.lang, lang)) mine.add(r);
+        return mine.isEmpty() ? all : mine;
     }
 
-    private static List<Result> podnapisiSearch(Query q, String lang) throws Exception {
-        HttpURLConnection c = Library.open(podnapisiUrl(q, lang), 20000);
+    private static final String[][] LANG3 = {
+            {"en", "eng"}, {"es", "spa", "spl", "spn", "ea"}, {"fr", "fre", "fra"}, {"de", "ger", "deu"}, {"it", "ita"}, {"pt", "por", "pob", "pom"},
+            {"nl", "nld", "dut"}, {"pl", "pol"}, {"ro", "ron", "rum"}, {"el", "ell", "gre"}, {"tr", "tur"}, {"ru", "rus"}, {"uk", "ukr"},
+            {"ar", "ara"}, {"he", "heb"}, {"sv", "swe"}, {"da", "dan"}, {"no", "nor", "nob", "nno"}, {"fi", "fin"}, {"hu", "hun"},
+            {"cs", "cze", "ces"}, {"hr", "hrv", "scr"}, {"sr", "srp", "scc"}, {"bg", "bul"}, {"hi", "hin"}, {"vi", "vie"}, {"th", "tha"},
+            {"id", "ind"}, {"ja", "jpn"}, {"ko", "kor"}, {"zh", "chi", "zho", "zhs", "zht", "zhe"}, {"sl", "slv"}, {"sk", "slo", "slk"},
+            {"fa", "per", "fas"}, {"et", "est"}, {"lv", "lav"}, {"lt", "lit"}, {"ms", "may", "msa"}, {"bs", "bos"}, {"mk", "mac", "mkd"}};
+
+    /** "eng" to "en", "pob" (Brazilian) to "pt"; codes it doesn't know stay as they are. */
+    static String twoLetter(String code) {
+        String c = code == null ? "" : code.toLowerCase(Locale.US).trim();
+        if (c.length() == 2) return c;
+        for (String[] row : LANG3) for (int i = 1; i < row.length; i++) if (row[i].equals(c)) return row[0];
+        return c;
+    }
+
+    private static List<Result> freeSearch(Query q, String lang) throws Exception {
+        if (q.series && (q.season.isEmpty() || q.episode.isEmpty())) throw new java.io.IOException("type the season and episode (Search words) to search episodes");
+        String key = (q.series ? "s|" : "m|") + q.title.toLowerCase(Locale.US) + "|" + q.year;
+        String imdb;
+        synchronized (imdbCache) { imdb = imdbCache.get(key); }
+        if (imdb == null) {
+            HttpURLConnection c = Library.open(cinemetaUrl(q), 20000);
+            try {
+                int code = c.getResponseCode();
+                if (code != 200) throw new java.io.IOException("the title search answered " + code);
+                imdb = pickImdb(new JSONObject(Tmdb.read(c.getInputStream())), q);
+            } finally { c.disconnect(); }
+            synchronized (imdbCache) { imdbCache.put(key, imdb); }
+        }
+        if (imdb.isEmpty()) return new ArrayList<>();
+        HttpURLConnection c = Library.open(freeUrl(imdb, q), 20000);
         try {
             int code = c.getResponseCode();
+            if (code == 404) return new ArrayList<>();
             if (code != 200) throw new java.io.IOException("answered " + code);
-            return parsePodnapisi(Tmdb.read(c.getInputStream()));
+            return onlyLanguage(parseFree(new JSONObject(Tmdb.read(c.getInputStream()))), lang);
         } finally { c.disconnect(); }
     }
 
@@ -398,7 +446,7 @@ final class SubSources {
             nameHint = o.optString("file_name", "subtitle.srt");
         } else {
             data = fetch(r.url);
-            nameHint = r.url;
+            nameHint = r.fileName.isEmpty() ? r.url : r.fileName;
         }
         return save(c, data, nameHint, r.lang, q);
     }
