@@ -95,7 +95,7 @@ final class Menus {
             if (!on) row.setTextColor(Theme.MUTED);
             if (focus == null) focus = row;
         }
-        if (all.length() > 1) a.button("☑  Turn playlists on or off…", list, () -> Manage.playlistsOnOff(a, () -> playlists(a)));
+        if (all.length() > 1) a.button("☑  Select Active Playlists…", list, () -> Manage.playlistsOnOff(a, () -> playlists(a)));
         TextView addX = a.button("+  Add an Xtream Codes login", list, () -> xtreamForm(a, null, null));
         a.button("+  Add an M3U playlist link", list, () -> m3uForm(a, null));
         int extraCount = a.library.extras.urls().size();
@@ -614,12 +614,12 @@ final class Menus {
         if (g.isEmpty()) {
             row(a, list, groupIcon(GROUP_PLAYLISTS) + "  " + groupTitle(GROUP_PLAYLISTS), "playlists, HDHomeRun, Tablo, manage categories, hide and show channels, channel groups, TV guides (EPG)", () -> settingsGroup(a, GROUP_PLAYLISTS));
             row(a, list, groupIcon(GROUP_PLAYER) + "  " + groupTitle(GROUP_PLAYER), "built-in or external player, live stream format, buffer, video decoder, subtitles, watched series, play next", () -> settingsGroup(a, GROUP_PLAYER));
-            row(a, list, groupIcon(GROUP_APPEARANCE) + "  " + groupTitle(GROUP_APPEARANCE), "theme, glass effect, app mode, main screen, start-up screen, side menu order, Exit button, guide rows, channel order, live preview, movie and series info, IMDb ratings", () -> settingsGroup(a, GROUP_APPEARANCE));
+            row(a, list, groupIcon(GROUP_APPEARANCE) + "  " + groupTitle(GROUP_APPEARANCE), "theme, app mode, main screen, start-up screen, side menu order, Exit button, guide rows, channel order, live preview, movie and series info, IMDb ratings", () -> settingsGroup(a, GROUP_APPEARANCE));
             row(a, list, groupIcon(GROUP_BACKUP) + "  " + groupTitle(GROUP_BACKUP), (Brand.STORE ? "back up, restore  •  " : "back up, restore, check for updates  •  ") + Brand.NAME + " " + Updater.installedName(a), () -> settingsGroup(a, GROUP_BACKUP));
         } else if (g.equals(GROUP_PLAYLISTS)) {
             if (!Brand.OTA) row(a, list, "Manage playlists", Manage.playlistSummary(a) + "  •  press OK to add, edit, refresh, delete or turn playlists on and off", () -> { playlistsFromSettings = true; playlists(a); });
             final int onOffRow = list.getChildCount();
-            if (!Brand.OTA) row(a, list, "Turn playlists on or off", Manage.playlistSummary(a) + "  •  press OK to tick the playlists to use. Unticked ones are skipped in menus, guides, Search and updates",
+            if (!Brand.OTA) row(a, list, "Select Active Playlists", Manage.playlistSummary(a) + "  •  press OK to tick the playlists to use. Unticked ones are skipped in menus, guides, Search and updates",
                     () -> Manage.playlistsOnOff(a, () -> settings(a, onOffRow)));
             java.util.List<JSONObject> tuners = hdhrTuners(a);
             row(a, list, "HDHomeRun antenna TV", tuners.isEmpty()
@@ -666,13 +666,6 @@ final class Menus {
         } else if (g.equals(GROUP_PLAYER)) {
             final int playerRow = list.getChildCount();
             row(a, list, "Player", ExternalPlayer.label(a) + "  •  press OK to keep WygTV's own player or use another video app such as VLC or MX Player", () -> choosePlayer(a, playerRow));
-            if (Pip.supported(a)) {
-                final int pipRow = list.getChildCount();
-                row(a, list, "Picture-in-picture", (Pip.onHome(a.prefs) ? "On" : "Off") + "  •  pressing Home while something plays keeps it playing in a small window. Press OK to switch", () -> {
-                    a.prefs.edit().putBoolean(Pip.PREF_ON_HOME, !Pip.onHome(a.prefs)).apply();
-                    settings(a, pipRow);
-                });
-            }
             if (!ExternalPlayer.choice(a.prefs).isEmpty()) {
                 final int forRow = list.getChildCount();
                 row(a, list, "Use the external player for", ExternalPlayer.FOR_LABELS[ExternalPlayer.forIndex(ExternalPlayer.forKey(a.prefs))] + "  •  everything else plays in WygTV's own player", () ->
@@ -757,12 +750,6 @@ final class Menus {
                         a.applyTheme();
                         settings(a, themeRow);
                     }));
-            final int glassRow = list.getChildCount();
-            row(a, list, "Glass effect", onOff(Theme.glass) + "  •  frosted see-through panels and buttons over a softly blurred background. Press OK to switch", () -> {
-                a.prefs.edit().putBoolean(Theme.PREF_GLASS, !Theme.glass).apply();
-                a.applyTheme();
-                settings(a, glassRow);
-            });
             final int modeRow = list.getChildCount();
             if (!Brand.OTA) row(a, list, "App mode", liveOnly ? "Live TV only  •  opens on the TV guide; press OK for the full app" : "Full  •  press OK for Live TV only (opens on the TV guide, hides Movies and Series)", () -> {
                 a.prefs.edit().putBoolean("live_only", !a.liveOnly()).apply();
@@ -1221,6 +1208,11 @@ final class Menus {
         parent.addView(t, new LinearLayout.LayoutParams(-1, -2));
     }
 
+    /** How WygTV started. The real text lives in docs/about.json on the website (one place for site and apps);
+     *  About shows the last copy it got from there, or this one until then. */
+    static final String ABOUT_URL = "https://wyglaf01.github.io/WygTV-AndroidTV/about.json";
+    static final String STORY = "WygTV began with a simple goal: to bring free over-the-air channels from an HDHomeRun network tuner to the TV, complete with a proper channel list and TV guide. From there it grew into a full IPTV player, so your Xtream Codes and M3U playlists sit right alongside your antenna channels in one place. It was first built for Android TVs and tablets, and it has since come to Windows, Mac, Ubuntu, iPhone and iPad as well.";
+
     /** About: the version, and Wyglaf (who makes WygTV) with his framed portrait. */
     private static void aboutDialog(MainActivity a, String about) {
         LinearLayout box = new LinearLayout(a);
@@ -1234,7 +1226,7 @@ final class Menus {
         LinearLayout text = new LinearLayout(a);
         text.setOrientation(LinearLayout.VERTICAL);
         text.setPadding(a.dp(18), 0, 0, 0);
-        TextView made = a.label("Made by Wyglaf", 20);
+        TextView made = a.label(a.prefs.getString("about_maker", "Made by Wyglaf"), 20);
         made.setTypeface(null, android.graphics.Typeface.BOLD);
         made.setTextColor(Theme.ACCENT);
         text.addView(made);
@@ -1242,7 +1234,26 @@ final class Menus {
         ver.setTextColor(Theme.MUTED);
         text.addView(ver);
         box.addView(text, new LinearLayout.LayoutParams(0, -2, 1));
-        new Dialogs.Builder(a).setTitle("About " + Brand.NAME).setView(box).setPositiveButton("OK", null).show();
+        LinearLayout page = new LinearLayout(a);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.addView(box);
+        TextView story = a.label(a.prefs.getString("about_story", STORY), 15);
+        story.setTextColor(Theme.TEXT);
+        story.setLineSpacing(0, 1.2f);
+        story.setPadding(a.dp(22), a.dp(6), a.dp(22), a.dp(8));
+        page.addView(story, new LinearLayout.LayoutParams(-1, -2));
+        android.widget.ScrollView scroll = new android.widget.ScrollView(a);
+        scroll.addView(page);
+        new Thread(() -> {
+            try {
+                org.json.JSONObject j = new org.json.JSONObject(new String(Updater.fetch(ABOUT_URL), "UTF-8"));
+                String m = j.optString("maker", ""), st = j.optString("story", "");
+                if (st.isEmpty()) return;
+                a.prefs.edit().putString("about_story", st).putString("about_maker", m.isEmpty() ? "Made by Wyglaf" : m).apply();
+                a.runOnUiThread(() -> { story.setText(st); if (!m.isEmpty()) made.setText(m); });
+            } catch (Exception ignored) { }
+        }).start();
+        new Dialogs.Builder(a).setTitle("About " + Brand.NAME).setView(scroll).setPositiveButton("OK", null).show();
     }
 
     private static void row(MainActivity a, LinearLayout list, String name, String value, Runnable action) {

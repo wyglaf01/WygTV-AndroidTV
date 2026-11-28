@@ -241,6 +241,7 @@ body { font-size: 16px; }
 .about { display: flex; gap: 20px; align-items: center; }
 .about img { width: 96px; border-radius: 20px; }
 .about.maker { margin-top: 14px; }
+.about-story { max-width: 640px; margin: 14px 0 4px; line-height: 1.55; color: var(--text); }
 .about.maker img { width: 110px; height: auto; border-radius: 0; }
 
 /* ------------------------------------------------------------------ pop-ups */

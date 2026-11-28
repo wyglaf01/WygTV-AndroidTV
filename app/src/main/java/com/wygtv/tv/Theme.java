@@ -4,7 +4,6 @@ package com.wygtv.tv;
  * Colour themes picked in Settings (Cobalt metal unless changed). Every theme is made of floating brushed-metal plates (see Skin):
  * a deep main colour for panels and focus, with bronze (or gold) trim, headings and focused tiles. Steampunk keeps the
  * original brass-on-leather artwork; the others wash the artwork in their own colour.
- * Settings > Appearance > Glass effect turns panels and buttons into frosted see-through glass (see {@link #glass}).
  */
 final class Theme {
     static final String[] KEYS = {"royal", "steampunk", "cyan", "green", "brown", "gold"};
@@ -53,8 +52,7 @@ final class Theme {
         return k == null || k.equals("blue") ? DEFAULT : k;
     }
 
-    /** Settings > Appearance > Glass effect: frosted see-through panels and buttons over a blurred backdrop. */
-    static final String PREF_GLASS = "glass_effect";
+    /** Frosted see-through glass look. No longer a setting: the app always uses the solid look (always false). */
     static boolean glass;
 
     /** Top and bottom fill of a button, row or panel: solid, or see-through glass with a light sheen on top. */

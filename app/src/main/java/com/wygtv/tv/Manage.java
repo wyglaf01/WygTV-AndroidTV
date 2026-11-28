@@ -28,7 +28,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Settings → Manage playlists → "Turn playlists on or off", "Manage categories" and "Hide and show channels".
+ * Settings → Manage playlists → "Select Active Playlists", "Manage categories" and "Hide and show channels".
  * Both open a full-screen page (mode "manage"): a fixed menu bar at the top (Save, Tick all, Untick all,
  * Exit), groups on the left (Live TV / Movies / Series, or the channel categories) and a tick list on the
  * right where ticked = shown. Changes are kept across groups until Save. Back in a list jumps to the menu
@@ -253,7 +253,7 @@ final class Manage {
             }
             got.run(ids, names, "No playlists saved yet.");
         }));
-        Page page = new Page(a, "TURN PLAYLISTS ON OR OFF", "playlists", groups, 0, () -> { applyPlaylistsOnOff(a); after.run(); });
+        Page page = new Page(a, "SELECT ACTIVE PLAYLISTS", "playlists", groups, 0, () -> { applyPlaylistsOnOff(a); after.run(); });
         page.onWord = "on";
         page.offWord = "off";
         page.check = off -> a.library.all().length() > 0 && off.size() >= a.library.all().length() ? "Keep at least one playlist on." : null;
