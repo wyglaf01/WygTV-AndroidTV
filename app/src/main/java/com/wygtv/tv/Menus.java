@@ -751,7 +751,7 @@ final class Menus {
                 String sdKey = a.saved(SubSources.PREF_SUBDL_KEY).trim();
                 row(a, list, "Online subtitles: SubDL", sdKey.isEmpty() ? "Off  •  press OK to add a free SubDL API key" : "On  •  key …" + sdKey.substring(Math.max(0, sdKey.length() - 4)) + "  •  press OK to change",
                         () -> subdlKey(a, subdlRow));
-                note(a, list, "Podnapisi works without a key. In the player, MENU > Subtitles searches every source that's on, or loads a subtitle file from a link, the TV or a USB drive.");
+                note(a, list, "The free OpenSubtitles library works without a key. In the player, MENU > Subtitles searches every source that's on, or loads a subtitle file from a link, the TV or a USB drive.");
             }
         } else if (g.equals(GROUP_APPEARANCE)) {
             final int themeRow = list.getChildCount();
