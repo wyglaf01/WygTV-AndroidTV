@@ -62,7 +62,7 @@ final class Library {
 
     // ------------------------------------------------------------------ on / off
 
-    /** Pref: ids of saved playlists that are switched off (Settings > Manage playlists > Turn playlists on or off). */
+    /** Pref: ids of saved playlists that are switched off (Settings > Manage playlists > Select Active Playlists). */
     static final String OFF = "playlists_off";
 
     java.util.Set<String> offIds() { return prefs.getStringSet(OFF, java.util.Collections.<String>emptySet()); }

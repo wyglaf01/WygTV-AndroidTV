@@ -114,13 +114,12 @@ final class NavRail {
                 entries.put("series", () -> add("▤", "Series", "series", current, () -> a.browseVod("series")));
             }
             java.util.List<org.json.JSONObject> tuners = Antenna.tuners(a);
-            boolean airTv = AirTv.isOn(a.prefs), tabloApp = TabloApp.isOn(a.prefs);
-            if (!tuners.isEmpty() || airTv || tabloApp) entries.put("antenna", () -> {
+            boolean tabloApp = TabloApp.isOn(a.prefs);
+            if (!tuners.isEmpty() || tabloApp) entries.put("antenna", () -> {
                 for (org.json.JSONObject t : tuners) { // each HDHomeRun tuner
                     String id = Antenna.PREFIX + t.optString("id");
                     add("📡", Antenna.nameOf(t), id, current, () -> a.showGuide(id, null, true)); // full TV guide of its channels
                 }
-                if (airTv) add("📡", AirTv.nameOf(a.prefs), "airtv", current, () -> AirTv.open(a)); // opens the Sling app
                 if (tabloApp) add("📡", TabloApp.nameOf(a.prefs), "tabloapp", current, () -> TabloApp.open(a)); // opens the Tablo app (4th Gen)
             });
             entries.put("msearch", () -> add("⌕", "Search", "msearch", current, () -> MasterSearch.show(a)));
@@ -297,18 +296,16 @@ final class NavRail {
         for (int i = 0; i < items.size(); i++) items.get(i).setText(open ? labels.get(i)[0] + "   " + labels.get(i)[1] : labels.get(i)[0]);
     }
 
-    private GradientDrawable background(boolean open) {
-        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                open ? new int[]{Theme.pane(Theme.alpha(Theme.BG,0xfa)), Theme.pane(Theme.alpha(Theme.PANEL,0xf2))} : new int[]{Theme.pane(Theme.alpha(Theme.BG,0xe6)), Theme.pane(Theme.alpha(Theme.PANEL,0xcc))});
-        g.setStroke(a.dp(1), Theme.edge(false));
-        return g;
+    /** The side menu is a brushed-metal plate too, floating over the screen with its shadow to the right. */
+    private android.graphics.drawable.Drawable background(boolean open) {
+        return Skin.plate(a.getResources(), a.dp(1), new int[]{Theme.alpha(Theme.PANEL, open ? 0xfa : 0xf0), Theme.alpha(Theme.mix(Theme.PANEL, Theme.BG, 0.55f), open ? 0xfa : 0xf0)}, 1, Theme.edge(false), true);
     }
 
-    private GradientDrawable itemBg(boolean focused, boolean here) {
-        if (focused) { GradientDrawable t = Skin.tile(a, true); t.setCornerRadius(a.dp(10)); t.setStroke(a.dp(2), Theme.TILE_STROKE); return t; }
+    private android.graphics.drawable.Drawable itemBg(boolean focused, boolean here) {
+        if (focused) return Skin.railFocus(a);
         GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
                 here ? new int[]{Theme.alpha(Theme.FOCUS,0x70), Theme.alpha(Theme.FOCUS,0x40)} : new int[]{0x00000000, 0x00000000});
-        g.setCornerRadius(a.dp(10));
+        g.setCornerRadius(0);
         if (here) g.setStroke(a.dp(1), Theme.edge(false));
         return g;
     }

@@ -5,6 +5,9 @@
   const D = W.data;
 
   const FREE_GUIDES = [['USA', 'US'], ['Canada', 'CA'], ['United Kingdom', 'GB'], ['Ireland', 'IE'], ['Australia', 'AU'], ['Mexico', 'MX'], ['Spain', 'ES'], ['Germany', 'DE'], ['France', 'FR'], ['Italy', 'IT'], ['Portugal', 'PT'], ['Brazil', 'BR'], ['India', 'IN']];
+  // How WygTV started: the real text is docs/about.json on the website; this copy shows until the app has read it once.
+  const ABOUT_URL = 'https://wyglaf01.github.io/WygTV-AndroidTV/about.json';
+  const ABOUT_STORY = 'WygTV began with a simple goal: to bring free over-the-air channels from an HDHomeRun network tuner to the TV, complete with a proper channel list and TV guide. From there it grew into a full IPTV player, so your Xtream Codes and M3U playlists sit right alongside your antenna channels in one place. It was first built for Android TVs and tablets, and it has since come to Windows, Mac, Ubuntu, iPhone and iPad as well.';
   const freeGuideUrl = (code) => `https://epg.pw/xmltv/epg_${code}.xml.gz`;
 
   async function savePlaylists(changed) {
@@ -278,10 +281,21 @@
       label: 'ℹ About & updates',
       render() {
         const ver = h('div', { class: 'set-sub' }, '…');
+        // How WygTV started: docs/about.json on the website is the one place to edit it (the website reads it too).
+        const A = Object.assign({ maker: 'Made by Wyglaf', tagline: 'The person behind WygTV.', story: ABOUT_STORY }, W.load('about', {}));
+        const makerName = h('div', { class: 'brand' }, A.maker), tagline = h('div', { class: 'set-sub' }, A.tagline);
+        const maker = h('div', { class: 'about maker' }, h('img', { src: 'assets/wyglaf.png', alt: 'Wyglaf' }), h('div', null, makerName, tagline));
+        const story = h('p', { class: 'about-story' }, A.story);
+        W.api.net.json(ABOUT_URL, 15000).then((j) => {
+          if (!j || !j.story) return;
+          W.save('about', { maker: j.maker || A.maker, tagline: j.tagline || A.tagline, story: j.story });
+          story.textContent = j.story; if (j.maker) makerName.textContent = j.maker; if (j.tagline) tagline.textContent = j.tagline;
+        }).catch(() => {});
         W.api.app.info().then((i) => { ver.textContent = 'Version ' + i.version + ' · ' + (i.platform === 'win32' ? 'Windows' : i.platform === 'linux' ? 'Linux' : i.platform === 'darwin' ? 'macOS' : i.platform === 'ios' || i.platform === 'tizen' ? i.device : i.platform); });
         return [
           h('div', { class: 'about' }, h('img', { src: 'assets/icon.png', alt: '' }), h('div', null, h('div', { class: 'brand' }, W.brand), ver, h('div', { class: 'set-sub' }, W.isIOS ? 'WygTV for iPhone and iPad.' : W.isTV ? 'WygTV for Samsung Smart TVs.' : 'The desktop copy of WygTV.'))),
-          h('div', { class: 'about maker' }, h('img', { src: 'assets/wyglaf.png', alt: 'Wyglaf' }), h('div', null, h('div', { class: 'brand' }, 'Made by Wyglaf'), h('div', { class: 'set-sub' }, 'The person behind WygTV.'))),
+          maker,
+          story,
           h('div', { class: 'set-buttons' },
             W.isTV ? null : btn({ class: 'button primary', onclick: () => W.checkUpdates(true) }, '⟳ Check for updates'),
             W.isIOS ? null : btn({ class: 'button', onclick: () => W.api.win.quit() }, '⏻ Quit'),

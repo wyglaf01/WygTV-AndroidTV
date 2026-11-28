@@ -19,7 +19,7 @@ final class MenuOrder {
 
     static final String PREF = "menu_order";
     /**
-     * Every side-menu item that can be moved. "antenna" stands for all HDHomeRun tuners (and AirTV) together. Favorites has no
+     * Every side-menu item that can be moved. "antenna" stands for all HDHomeRun tuners (and Tablo) together. Favorites has no
      * entry of its own (it is the first item inside Live TV); an old saved "fav" is dropped by {@link #parse}.
      */
     static final String[] DEFAULT = {"home", "guide", "live", "vod", "series", "antenna", "msearch", "playlists", "settings"};

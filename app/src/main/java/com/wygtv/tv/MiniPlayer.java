@@ -27,7 +27,7 @@ import org.json.JSONArray;
  * stay off while it plays, so they don't take a second tuner or play sound over it.
  *
  * Keys anywhere while it shows: Play/Pause, Stop (closes it), Window (full screen). Focus the window and press OK for
- * full screen, or hold OK (or Menu) for Move, Picture-in-picture and Close.
+ * full screen, or hold OK (or Menu) for Move and Close.
  */
 @OptIn(markerClass = UnstableApi.class)
 final class MiniPlayer {
@@ -107,7 +107,7 @@ final class MiniPlayer {
         if (a.tvGuide != null && a.mode.equals("guide")) a.tvGuide.resumePreview();
     }
 
-    /** The app is going to the background (not into picture-in-picture): pause, like the full-screen player. */
+    /** The app is going to the background: pause, like the full-screen player. */
     static void onStop(MainActivity a) { if (active()) { if (watching != null) { a.player = player; a.watching = watching; a.saveWatch(); a.player = null; a.watching = null; } player.pause(); refreshLabel(); } }
 
     static void onDestroy() { if (active()) { if (recovery != null) recovery.stop(); player.release(); clear(); } }
@@ -156,7 +156,7 @@ final class MiniPlayer {
     private static GradientDrawable frame(MainActivity a, boolean focused) {
         GradientDrawable g = new GradientDrawable();
         g.setColor(0xee000000);
-        g.setCornerRadius(a.dp(10));
+        g.setCornerRadius(0);
         g.setStroke(a.dp(focused ? 3 : 1), focused ? Theme.ACCENT : 0x66ffffff);
         return g;
     }
@@ -197,14 +197,12 @@ final class MiniPlayer {
         if (!active()) return;
         boolean playing = player.getPlayWhenReady();
         java.util.List<String> items = new java.util.ArrayList<>(java.util.Arrays.asList("Full screen", playing ? "Pause" : "Play", "Move to the next corner"));
-        if (Pip.supported(a)) items.add("Picture-in-picture (keeps playing outside " + Brand.NAME + ")");
         items.add("Close the mini player");
         new Dialogs.Builder(a).setTitle(title == null ? "Mini player" : title).setItems(items.toArray(new String[0]), (d, w) -> {
             String pick = items.get(w);
             if (pick.equals("Full screen")) expand(a);
             else if (pick.equals("Pause") || pick.equals("Play")) { if (playing) player.pause(); else player.play(); refreshLabel(); }
             else if (pick.startsWith("Move")) move(a);
-            else if (pick.startsWith("Picture")) Pip.enter(a);
             else close(a);
         }).show();
     }

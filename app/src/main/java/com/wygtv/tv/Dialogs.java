@@ -24,9 +24,9 @@ final class Dialogs {
         }
     }
 
-    static GradientDrawable background(Context c) {
+    static android.graphics.drawable.Drawable background(Context c) {
         float dp = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 1, c.getResources().getDisplayMetrics());
-        return Skin.panel(dp, 16);
+        return Skin.panel(c.getResources(), dp);
     }
 
     /** Colours the buttons; call it from any OnShowListener that replaces the default one. */
