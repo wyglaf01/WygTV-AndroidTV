@@ -127,6 +127,8 @@ final class MiniPlayer {
         view.setShutterBackgroundColor(0xff000000);
         view.setFocusable(false);
         view.setKeepScreenOn(true);
+        // Live TV keeps reading captions even while they're switched off, so the small window never draws them.
+        if (view.getSubtitleView() != null) view.getSubtitleView().setVisibility(android.view.View.GONE);
         label = new TextView(a);
         label.setTextSize(13);
         label.setTextColor(0xffffffff);

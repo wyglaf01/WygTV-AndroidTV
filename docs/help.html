@@ -32,7 +32,6 @@
     <a class="l2" href="#install-firetv">Fire TV (Downloader)</a>
     <a class="l2" href="#install-androidtv">Android / Google TV</a>
     <a class="l2" href="#install-desktop">Windows &amp; Ubuntu</a>
-    <a class="l2" href="#install-mac">Mac</a>
     <a href="#setup">2. First-time setup</a>
     <a class="l2" href="#setup-xtream">Xtream Codes</a>
     <a class="l2" href="#setup-m3u">M3U link</a>
@@ -49,6 +48,7 @@
     <a href="#settings">11. Settings</a>
     <a class="l2" href="#set-playlists">Manage playlists</a>
     <a class="l2" href="#set-player">Manage player</a>
+    <a class="l2" href="#set-subtitles">Subtitles</a>
     <a class="l2" href="#set-appearance">Appearance</a>
     <a class="l2" href="#set-backup">Manage app</a>
     <a href="#trouble">12. Troubleshooting</a>
@@ -83,16 +83,6 @@
     <p><b>Windows:</b> download <code>WygDesktop-Setup.exe</code> (installs and adds a Start menu entry) or <code>WygDesktop-Portable.exe</code> (runs without installing). If Windows shows "Windows protected your PC", click <b>More info → Run anyway</b>.</p>
     <p><b>Ubuntu 22.04 and newer:</b> download the <code>.deb</code> and run <code>sudo apt install ./WygDesktop-linux.deb</code>, or download the AppImage, run <code>chmod +x WygDesktop-linux.AppImage</code> and open it.</p>
     <p>WygDesktop has the same playlists, Live TV, TV Guide, Movies and Series. Keys: arrows move, <kbd>Enter</kbd> plays, hold <kbd>Enter</kbd> / right-click / <kbd>M</kbd> for options, <kbd>Esc</kbd> or <kbd>Backspace</kbd> goes back, <kbd>S</kbd> searches, <kbd>F11</kbd> full screen. In the player, <kbd>↑</kbd><kbd>↓</kbd> or <kbd>PgUp</kbd><kbd>PgDn</kbd> change channel, number keys jump to a channel, <kbd>Space</kbd> pauses, <kbd>I</kbd> shows info.</p>
-
-    <h3 id="install-mac">Mac (WygTV-Mac)</h3>
-    <p>WygTV-Mac is the same desktop app for macOS 11 Big Sur and newer. Check  → <b>About This Mac</b>: if it says <b>Chip: Apple M…</b>, download <code>WygTV-Mac-AppleSilicon.dmg</code>; if it says <b>Processor: Intel</b>, download <code>WygTV-Mac-Intel.dmg</code>.</p>
-    <ol>
-      <li>Open the downloaded <code>.dmg</code> and drag <b>WygTV-Mac</b> onto the <b>Applications</b> folder.</li>
-      <li>Open WygTV-Mac from Applications. Because it isn't signed by Apple yet, macOS says it can't check it for malicious software. Click <b>Done</b> (or <b>OK</b>).</li>
-      <li>Open <b>System Settings → Privacy &amp; Security</b>, scroll down to the message about WygTV-Mac and click <b>Open Anyway</b>, then confirm with your password. On macOS 14 and older you can instead right-click WygTV-Mac in Applications, choose <b>Open</b>, then <b>Open</b> again.</li>
-      <li>If macOS ever says the app "is damaged", open Terminal and run <code>xattr -cr /Applications/WygTV-Mac.app</code>, then open it again.</li>
-    </ol>
-    <p>The first time you add an HDHomeRun tuner, allow WygTV-Mac to find devices on your local network. <kbd>⌘</kbd><kbd>Q</kbd> quits, <kbd>⌘</kbd><kbd>V</kbd> pastes playlist addresses and <kbd>F</kbd> toggles full screen in the player. Settings → About &amp; updates → Check for updates downloads newer builds; drag the new one into Applications to replace the old one. External player: install VLC in Applications and WygTV-Mac uses it.</p>
 
     <!-- ============================================================ SETUP -->
     <h2 id="setup">2. First-time setup</h2>
@@ -190,7 +180,7 @@
     <table>
       <tr><th>Button</th><th>What it does</th></tr>
       <tr><td><kbd>CH+</kbd> <kbd>CH−</kbd> or <kbd>▲</kbd></td><td>Next / previous channel in the list you started from (Favorites, a category, a group…). ▲ goes to the next channel.</td></tr>
-      <tr><td><kbd>▼</kbd></td><td>Shows the playback controls. They include a <b>CC</b> button: OK on it turns subtitles on or off, picks a subtitle track, and for movies and episodes searches online for subtitles (or loads a file or link). ▼ no longer changes channel; use CH− for that.</td></tr>
+      <tr><td><kbd>▼</kbd></td><td>Opens the <b>options bar</b> along the bottom of the picture: Pause, Channels, TV guide, ★ Favorite, Resume, <b>Subtitles</b>, Audio (when the channel has more than one track), Picture (Fit / Zoom / Stretch), More (channel groups), Mini player and Exit. Above the buttons you see the channel, LIVE, what's on now and the clock. ◀ ▶ move along the buttons, OK presses one, ▲ or Back closes the bar, and it hides by itself after 8 seconds. ▼ no longer changes channel; use CH− for that.</td></tr>
       <tr><td>Number keys</td><td>Type a channel number; it switches after a short pause, or press OK to go now.</td></tr>
       <tr><td><kbd>OK</kbd></td><td>Channel options: <b>Resume</b> (reconnects the channel, handy if it froze), Add to / Remove from Favorites, Add to channel group, New channel group. The channel banner (logo, source, what's on) shows underneath.</td></tr>
       <tr><td><kbd>Info</kbd></td><td>Channel banner with the channel's logo and what's on now and next.</td></tr>
@@ -207,6 +197,7 @@
       <tr><td><kbd>⏪</kbd> <kbd>⏩</kbd></td><td>Skip back / forward 30 seconds.</td></tr>
       <tr><td><kbd>⏯</kbd></td><td>Play / pause.</td></tr>
       <tr><td><kbd>OK</kbd></td><td>Show the playback controls.</td></tr>
+      <tr><td><kbd>▼</kbd></td><td>Opens the <b>options bar</b> along the bottom: Pause, Back / Ahead 10 s, Start over, Next episode, My List, Subtitles, Audio, Picture, Mini player and Exit, with the time played, time left and the clock above it.</td></tr>
       <tr><td><kbd>☰ Menu</kbd></td><td>Add to My List, Subtitles (pick a track, search online, load a file from the TV or a USB drive, load a link, text size), Exit player.</td></tr>
     </table>
     <p>If the connection drops, WygTV shows "Connection dropped. Reconnecting…" and tries again by itself, picking a live channel up at the newest point and a movie where it left off.</p>
@@ -241,7 +232,7 @@
 
     <!-- ============================================================ SETTINGS -->
     <h2 id="settings">11. Settings</h2>
-    <p>Settings works like a tree. It opens with the highlight on the <b>SETTINGS</b> column on the left (All settings, Manage playlists, Manage player, Appearance, Manage app), with the Manage playlists page beside it. Use ▲ ▼ and OK to open a group, or ▶ to go into the page's rows. Press ◀ to step back into the column and OK on another group to jump straight to it, or ▶ to go back to the page. <kbd>Back</kbd> from the rows returns to the column; Back from the column leaves Settings. <b>All settings</b> lists the four groups as big rows. Playlists opened from Settings keeps the same column, and Back returns to Manage playlists. Movies and Series work the same way: once you move into the posters, the category menu shrinks to a narrow column, and opens again when you go back into it.</p>
+    <p>Settings works like a tree. It opens with the highlight on the <b>SETTINGS</b> column on the left (All settings, Manage playlists, Manage player, Subtitles, Appearance, Manage app), with the Manage playlists page beside it. Use ▲ ▼ and OK to open a group, or ▶ to go into the page's rows. Press ◀ to step back into the column and OK on another group to jump straight to it, or ▶ to go back to the page. <kbd>Back</kbd> from the rows returns to the column; Back from the column leaves Settings. <b>All settings</b> lists the five groups as big rows. Playlists opened from Settings keeps the same column, and Back returns to Manage playlists. Movies and Series work the same way: once you move into the posters, the category menu shrinks to a narrow column, and opens again when you go back into it.</p>
 
     <h3 id="set-playlists">▤ Manage playlists</h3>
     <table>
@@ -270,12 +261,19 @@
       <tr><td>Live stream format</td><td>Xtream only. <b>Automatic</b> (provider default), <b>MPEG-TS (.ts)</b>, or <b>HLS (.m3u8)</b>. Try HLS if channels stutter or won't start.</td></tr>
       <tr><td>Buffer</td><td><b>Off</b> (starts fastest), <b>Small, 5 s</b> (recommended, default), <b>Medium, 10 s</b>, <b>Large, 20 s</b>. More buffer rides out a shaky connection but takes longer to start a channel.</td></tr>
       <tr><td>Video decoder</td><td><b>Software first</b> (recommended, default), <b>Hardware first</b>, or <b>Automatic</b>. Switch if a channel freezes, shows green blocks or won't play.</td></tr>
+    </table>
+
+    <h3 id="set-subtitles">💬 Subtitles</h3>
+    <p>Every subtitle setting lives here. In the player, the <b>CC</b> button or Menu → Subtitles picks a track, and for movies and episodes searches online or loads a file or link.</p>
+    <table>
+      <tr><th>Setting</th><th>Choices</th></tr>
       <tr><td>Subtitles for Live TV</td><td>On/Off. When on, closed captions start for every channel that sends them.</td></tr>
       <tr><td>Subtitles for Movies and Series</td><td>On/Off. In the player, Menu → Subtitles picks a language.</td></tr>
       <tr><td>Subtitle language</td><td>Picked first when a stream has several, and used when searching online. Default: the TV's language.</td></tr>
       <tr><td>Subtitle text size</td><td>Small, Normal, Large or Extra large.</td></tr>
-      <tr><td>Online subtitles: OpenSubtitles / SubDL</td><td>Add a free API key to search these too. Podnapisi works without a key. In the player, Menu → Subtitles → Search online.</td></tr>
+      <tr><td>Online subtitles: OpenSubtitles / SubDL</td><td>Add a free API key to search these too. The free OpenSubtitles library works without a key. In the player, Menu → Subtitles → Search online.</td></tr>
     </table>
+    <p><b>Live TV captions.</b> WygTV looks for TV closed captions in every channel: CC1, CC3 (often a second language) and digital CEA-708 captions, in plain streams, HLS (.m3u8) streams and HDHomeRun antenna channels. Subtitle tracks listed in an HLS playlist and DVB picture subtitles show up in the list too. When captions are on and the first caption service stays silent, WygTV tries the next one by itself. Teletext subtitles (page 888) aren't supported.</p>
 
     <h3 id="set-appearance">◐ Appearance</h3>
     <table>

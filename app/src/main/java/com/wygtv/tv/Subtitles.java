@@ -34,6 +34,10 @@ import java.util.Locale;
  * start switched on; in the player, MENU then "Subtitles" (or the CC / captions key) picks a track or turns them off.
  * Movies and episodes with no subtitles of their own can get them from {@link SubSources}: searched online,
  * from a link, or from a file on the TV or a USB drive. Settings also sets the language and the text size.
+ *
+ * On Live TV the caption track is always read, and switching subtitles off only hides them. Turning a track on or
+ * off in a live stream makes the player open the stream again (a few seconds of black, and on a busy server a
+ * dropped channel), so CC on / off is instant this way. {@link Captions} decides which caption services are looked for.
  */
 @OptIn(markerClass = UnstableApi.class)
 final class Subtitles {
@@ -75,7 +79,14 @@ final class Subtitles {
         this.type = type == null ? "" : type;
         this.title = title == null ? "" : title;
         applySize();
+        applyShown();
         addCcButton(v);
+    }
+
+    /** Live TV: captions are always decoded, so "off" hides them on screen instead. */
+    private void applyShown() {
+        SubtitleView sv = view == null ? null : view.getSubtitleView();
+        if (sv != null) sv.setVisibility(wanted || !live ? android.view.View.VISIBLE : android.view.View.GONE);
     }
 
     /**
@@ -124,21 +135,27 @@ final class Subtitles {
     /** Channel changes keep the player, so a new stream gets a fresh pick of track. */
     void newStream() { forcedHere = false; }
 
-    /** On: prefer the TV's language, accept tracks with no language (most closed captions). Off: no text track. */
+    /**
+     * On: prefer the TV's language, accept tracks with no language (most closed captions). Off: no text track for
+     * movies and series; on Live TV the track keeps being read and is only hidden (see the class notes).
+     */
     private void set(boolean on) {
+        boolean was = wanted;
         wanted = on;
+        applyShown();
+        refreshCc();
+        if (live && was != on && player.getCurrentTracks().isTypeSelected(C.TRACK_TYPE_TEXT)) return; // just shown or hidden
         forcedHere = false;
         TrackSelectionParameters.Builder b = player.getTrackSelectionParameters().buildUpon().clearOverridesOfType(C.TRACK_TYPE_TEXT);
-        if (on) b.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false).setPreferredTextLanguage(SubSources.lang(a.prefs)).setSelectUndeterminedTextLanguage(true);
+        if (on || live) b.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false).setPreferredTextLanguage(SubSources.lang(a.prefs)).setSelectUndeterminedTextLanguage(true);
         else b.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true);
         player.setTrackSelectionParameters(b.build());
         ensureShown(player.getCurrentTracks());
-        refreshCc();
     }
 
-    /** When subtitles are wanted but the language rules picked nothing, show the first track the stream has. */
+    /** When subtitles are wanted (always on Live TV) but the language rules picked nothing, use the first track the stream has. */
     private void ensureShown(Tracks tracks) {
-        if (!wanted || forcedHere || tracks == null || tracks.isTypeSelected(C.TRACK_TYPE_TEXT)) return;
+        if ((!wanted && !live) || forcedHere || tracks == null || tracks.isTypeSelected(C.TRACK_TYPE_TEXT)) return;
         for (Tracks.Group g : tracks.getGroups()) {
             if (g.getType() != C.TRACK_TYPE_TEXT) continue;
             for (int i = 0; i < g.length; i++) {
@@ -199,7 +216,9 @@ final class Subtitles {
             Tracks.Group g = groups.get(w - 1);
             wanted = true;
             forcedHere = true;
+            applyShown();
             refreshCc();
+            if (g.isTrackSelected(index.get(w - 1))) return; // already reading it (Live TV keeps it while hidden)
             player.setTrackSelectionParameters(player.getTrackSelectionParameters().buildUpon()
                     .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
                     .setOverrideForType(new TrackSelectionOverride(g.getMediaTrackGroup(), index.get(w - 1))).build());
@@ -240,7 +259,7 @@ final class Subtitles {
         for (SubSources.Result r : found) rows.add(r.label());
         String head = found.isEmpty() ? "No subtitles found" : found.size() + " subtitles found";
         if (!problems.isEmpty()) head += "  •  " + android.text.TextUtils.join("; ", problems);
-        if (SubSources.sources(a.prefs).size() == 1) head += "  •  more sources: add a free OpenSubtitles or SubDL key in Settings > Manage player";
+        if (SubSources.sources(a.prefs).size() == 1) head += "  •  more sources: add a free OpenSubtitles or SubDL key in Settings > Subtitles";
         new Dialogs.Builder(a).setTitle(head).setItems(rows.toArray(new String[0]), (d, w) -> {
             if (w == 0) { changeWords(q, lang); return; }
             if (w == 1) { changeLanguage(q, lang); return; }
@@ -356,6 +375,7 @@ final class Subtitles {
         boolean playing = player.getPlayWhenReady();
         waitingFor = name;
         wanted = true;
+        applyShown();
         refreshCc();
         player.setTrackSelectionParameters(player.getTrackSelectionParameters().buildUpon()
                 .clearOverridesOfType(C.TRACK_TYPE_TEXT).setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false).build());
@@ -374,6 +394,7 @@ final class Subtitles {
                 if (!waitingFor.equals(g.getTrackFormat(i).label)) continue;
                 waitingFor = null;
                 forcedHere = true;
+                applyShown();
                 player.setTrackSelectionParameters(player.getTrackSelectionParameters().buildUpon()
                         .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
                         .setOverrideForType(new TrackSelectionOverride(g.getMediaTrackGroup(), i)).build());
@@ -408,7 +429,16 @@ final class Subtitles {
     }
 
     /** "English (CC)", "Spanish", "Track 2", plus the stream's own label when it has one. */
-    static String label(Format f, int number) { return label(f.language, f.label, f.sampleMimeType, f.roleFlags, f.selectionFlags, number); }
+    static String label(Format f, int number) { return label(f.language, f.label, mimeOf(f), f.roleFlags, f.selectionFlags, number); }
+
+    /**
+     * The subtitle's real kind. Subtitles read while the video is unpacked (Media3 1.4 and later: MKV, MP4, HLS
+     * WebVTT) say "application/x-media3-cues" and keep the original kind in {@code codecs}.
+     */
+    static String mimeOf(Format f) {
+        if (MimeTypes.APPLICATION_MEDIA3_CUES.equals(f.sampleMimeType) && f.codecs != null && !f.codecs.isEmpty()) return f.codecs;
+        return f.sampleMimeType != null ? f.sampleMimeType : f.codecs;
+    }
 
     static String label(String language, String trackLabel, String mimeType, int roleFlags, int selectionFlags, int number) {
         String name = "";
@@ -416,11 +446,16 @@ final class Subtitles {
             name = new Locale(language).getDisplayLanguage();
             if (name.isEmpty()) name = language;
         }
-        if (trackLabel != null && !trackLabel.isEmpty() && !trackLabel.equalsIgnoreCase(name)) name = name.isEmpty() ? trackLabel : name + " • " + trackLabel;
         String mime = mimeType == null ? "" : mimeType;
-        boolean cc = MimeTypes.APPLICATION_CEA608.equals(mime) || MimeTypes.APPLICATION_CEA708.equals(mime) || mime.contains("cea-608") || mime.contains("cea-708");
-        if (name.isEmpty()) name = cc ? "Closed captions" : "Track " + number;
-        else if (cc) name += " (CC)";
+        boolean cc = Captions.isClosedCaption(mime);
+        boolean picture = mime.contains("pgs") || mime.contains("dvbsubs") || mime.contains("vobsub");
+        String extra = trackLabel != null && !trackLabel.isEmpty() && !trackLabel.equalsIgnoreCase(name) ? trackLabel : "";
+        if (cc) name = (name.isEmpty() ? "Closed captions" : name + " (CC)") + (extra.isEmpty() ? "" : " • " + extra);
+        else {
+            if (!extra.isEmpty()) name = name.isEmpty() ? extra : name + " • " + extra;
+            if (name.isEmpty()) name = "Track " + number;
+            if (picture) name += mime.contains("dvbsubs") ? " (DVB)" : " (picture)";
+        }
         if ((roleFlags & C.ROLE_FLAG_DESCRIBES_MUSIC_AND_SOUND) != 0 && !cc) name += " (SDH)";
         if ((selectionFlags & C.SELECTION_FLAG_FORCED) != 0) name += " (forced)";
         return name;

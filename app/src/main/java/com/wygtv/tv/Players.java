@@ -106,9 +106,14 @@ final class Players {
                 .setPrioritizeTimeOverSizeThresholds(true)
                 .build();
         return new ExoPlayer.Builder(c, renderers)
-                .setMediaSourceFactory(new DefaultMediaSourceFactory(tabloResolving(new DefaultDataSource.Factory(c, http)), liveExtractors()))
+                .setMediaSourceFactory(mediaSources(tabloResolving(new DefaultDataSource.Factory(c, http))))
                 .setLoadControl(load)
                 .build();
+    }
+
+    /** How streams are opened: the usual factory, with closed captions looked for in every live and HLS stream ({@link Captions}). */
+    static androidx.media3.exoplayer.source.MediaSource.Factory mediaSources(DataSource.Factory data) {
+        return new Captions.SourceFactory(new DefaultMediaSourceFactory(data, liveExtractors()), data);
     }
 
     /**
@@ -141,7 +146,9 @@ final class Players {
     static androidx.media3.extractor.DefaultExtractorsFactory liveExtractors() {
         return new androidx.media3.extractor.DefaultExtractorsFactory().setTsExtractorFlags(
                 androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS
-                        | androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES);
+                        | androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES)
+                // Look for CC1, CC3 and digital (CEA-708) captions, not only CC1, when the stream doesn't list its own.
+                .setTsSubtitleFormats(Captions.FORMATS);
     }
 
     /** Errors from a decoder or the audio output: the ones FFmpeg can get around when it's the audio part that failed. */
