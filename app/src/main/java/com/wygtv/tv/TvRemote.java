@@ -77,28 +77,9 @@ final class TvRemote {
     JSONArray currentList() { return zapList; }
     PlayerView currentView() { return view; }
 
-    /** Picture-in-picture: no banner, number box, Up next or playback controls in the small window. */
-    void pictureInPicture(boolean in) {
-        if (view == null) return;
-        if (in) {
-            ui.removeCallbacksAndMessages(null);
-            view.hideController();
-            view.setUseController(false);
-            if (banner != null) banner.setVisibility(View.GONE);
-            if (numberBox != null) numberBox.setVisibility(View.GONE);
-            if (upNext != null) upNext.setVisibility(View.GONE);
-            typed = "";
-        } else {
-            view.setUseController(true);
-            if (isLive()) view.setControllerAutoShow(false);
-            view.requestFocus();
-        }
-    }
-
-    /** The player menu's window choices: the in-app mini player, and picture-in-picture where the device has it. */
+    /** The player menu's window choice: the in-app mini player. */
     private String[] windowItems() {
-        return Pip.supported(a) ? new String[]{"▣  Mini player (keep watching while you browse)", "⧉  Picture-in-picture (keep watching outside " + Brand.NAME + ")"}
-                : new String[]{"▣  Mini player (keep watching while you browse)"};
+        return new String[]{"▣  Mini player (keep watching while you browse)"};
     }
 
     private static String[] join(String[] first, String[] then) {
@@ -111,7 +92,6 @@ final class TvRemote {
     /** True (and done) when a player-menu pick was a window choice. */
     private boolean windowPick(String pick) {
         if (pick.startsWith("▣")) { MiniPlayer.shrink(a); return true; }
-        if (pick.startsWith("⧉")) { if (!Pip.enter(a)) toast("Picture-in-picture isn't available on this device."); return true; }
         return false;
     }
 
@@ -332,7 +312,7 @@ final class TvRemote {
             case KeyEvent.KEYCODE_MENU:
                 if (down) playerMenu();
                 return true;
-            case KeyEvent.KEYCODE_WINDOW: // the Window / PiP key some remotes have: shrink to the mini player
+            case KeyEvent.KEYCODE_WINDOW: // the Window key some remotes have: shrink to the mini player
                 if (down && e.getRepeatCount() == 0) MiniPlayer.shrink(a);
                 return true;
             case KeyEvent.KEYCODE_CAPTIONS:
