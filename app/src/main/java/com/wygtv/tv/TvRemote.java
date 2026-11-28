@@ -714,11 +714,8 @@ final class TvRemote {
         return t;
     }
 
-    private GradientDrawable panel() {
-        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{Theme.pane(Theme.alpha(Theme.PANEL,0xe6)), Theme.alpha(Theme.BG, Theme.glass ? 0xb0 : 0xf0)});
-        g.setCornerRadius(a.dp(14));
-        g.setStroke(a.dp(Theme.glass ? 1 : 2), Theme.glass ? Theme.edge(false) : Theme.STROKE_FOCUS);
-        return g;
+    private android.graphics.drawable.Drawable panel() {
+        return Skin.plate(a.getResources(), a.dp(1), new int[]{Theme.alpha(Theme.PANEL, 0xf0), Theme.alpha(Theme.BG, 0xf0)}, 2, Theme.STROKE_FOCUS, true);
     }
 
 }

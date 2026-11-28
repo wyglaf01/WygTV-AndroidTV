@@ -30,7 +30,7 @@ public class MainActivity extends Activity {
  void migrateFavorites(){if(prefs.getBoolean("favorites_migrated",false))return;android.content.SharedPreferences.Editor edit=prefs.edit();for(Map.Entry<String,?> entry:prefs.getAll().entrySet())if(entry.getKey().startsWith("fav_")||entry.getKey().startsWith("ext_"))edit.putString(accountPrefix()+entry.getKey(),String.valueOf(entry.getValue()));edit.putBoolean("favorites_migrated",true).apply();}
  @Override public void onCreate(Bundle b){super.onCreate(b);Crash.install(this);prefs=getSharedPreferences("wygtv",MODE_PRIVATE);applyTheme();library=new Library(this,prefs);library.migrate();migrateFavorites();moveVodFavoritesToMyList();getWindow().getDecorView().setSystemUiVisibility(5894|1024|512);if(library.isEmpty())setup();else start();if(b==null){Updater.afterUpdate(this);Updater.checkAtStartup(this);Crash.showLast(this);}}
  /** A button or row background: bg(PANEL) idle, bg(Theme.FOCUS) focused (see Skin). */
- GradientDrawable bg(int color){return Skin.button(this,color!=PANEL);}
+ android.graphics.drawable.Drawable bg(int color){return Skin.button(this,color!=PANEL);}
  TextView label(String t,int size){TextView v=new TextView(this);v.setText(t);v.setTextColor(-1);v.setTextSize(size);v.setGravity(Gravity.CENTER_VERTICAL);return v;}
  // Menu rows written as "title\n      description": title a little bigger, description a little smaller, so the two read apart.
  static void twoSize(TextView v,String text){int nl=text.indexOf('\n');if(nl<0)return;android.text.SpannableString s=new android.text.SpannableString(text);s.setSpan(new android.text.style.RelativeSizeSpan(1.1f),0,nl,android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);s.setSpan(new android.text.style.RelativeSizeSpan(0.8f),nl,text.length(),android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);v.setText(s);}
@@ -81,7 +81,7 @@ public class MainActivity extends Activity {
   LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-1,1);lp.setMargins(dp(8),dp(10),dp(8),dp(10));parent.addView(tile,lp);tile.setOnClickListener(v->action.run());
   tile.setOnFocusChangeListener((v,focused)->{tile.setBackground(homeTileBackground(focused));tile.setTextColor(focused?Theme.INK:Theme.TEXT);tile.animate().scaleX(focused?1.035f:1f).scaleY(focused?1.035f:1f).setDuration(130).start();});return tile;
  }
- GradientDrawable homeTileBackground(boolean focused){return Skin.tile(this,focused);}
+ android.graphics.drawable.Drawable homeTileBackground(boolean focused){return Skin.tile(this,focused);}
 
  /** Old entry point ("Add a playlist first" dialogs): the playlists screen, or setup when there are none. */
  void login(){if(library.isEmpty())setup();else playlists();}
