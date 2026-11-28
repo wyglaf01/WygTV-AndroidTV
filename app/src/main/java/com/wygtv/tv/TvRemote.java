@@ -48,6 +48,7 @@ final class TvRemote {
 
     // Overlays.
     private LinearLayout banner;
+    private PlayerBar bar;
     private TextView bannerLogo, bannerTitle, bannerSource, bannerNow, bannerNext, numberBox;
     private String typed = "";
     private final Runnable hideBanner = () -> { if (banner != null) banner.setVisibility(View.GONE); };
@@ -152,6 +153,7 @@ final class TvRemote {
         nlp.setMargins(0, a.dp(28), a.dp(36), 0);
         frame.addView(numberBox, nlp);
         buildUpNext(frame);
+        bar = new PlayerBar(a, frame, isLive(), this::barOptions);
 
         if (isLive()) {
             playerView.setControllerAutoShow(false);
@@ -188,9 +190,9 @@ final class TvRemote {
         bannerNext.setSingleLine(true);
         banner.addView(bannerNext);
         TextView hints = text(isLive()
-                ? "▲ / CH± change channel    ▼ controls    0-9 channel number    OK resume / favorites / groups    INFO channel info    GUIDE TV guide    MENU options / subtitles    BACK exit"
-                : "series".equals(type) && Episodes.next(a) != null ? "◀▶ seek    ▶❚❚ play / pause    MENU next episode / options / subtitles    BACK exit"
-                : "◀▶ seek    ▶❚❚ play / pause    MENU options / subtitles    BACK exit", 14, Theme.MUTED, false);
+                ? "▲ / CH± change channel    ▼ options    0-9 channel number    OK resume / favorites / groups    INFO channel info    GUIDE TV guide    MENU options / subtitles    BACK exit"
+                : "series".equals(type) && Episodes.next(a) != null ? "◀▶ seek    ▼ options    ▶❚❚ play / pause    MENU next episode / options / subtitles    BACK exit"
+                : "◀▶ seek    ▼ options    ▶❚❚ play / pause    MENU options / subtitles    BACK exit", 14, Theme.MUTED, false);
         hints.setPadding(0, a.dp(8), 0, 0);
         banner.addView(hints);
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM);
@@ -261,6 +263,7 @@ final class TvRemote {
             if (ticket != epgTicket || !forId.equals(id)) return;
             JSONArray list = o == null ? null : o.optJSONArray("epg_listings");
             bannerNow.setText(list == null || list.length() == 0 ? "No guide information" : "Now  " + epgLine(list.optJSONObject(0)));
+            if (bar != null) bar.setNow(list == null || list.length() == 0 ? "" : epgLine(list.optJSONObject(0)));
             bannerNext.setText(list != null && list.length() > 1 ? "Next  " + epgLine(list.optJSONObject(1)) : "");
         });
     }
@@ -295,6 +298,7 @@ final class TvRemote {
         boolean controls = view.isControllerFullyVisible();
         int digit = RemoteKeys.digit(key);
         if (isLive() && digit >= 0) { if (down) typeDigit(digit); return true; }
+        if (bar != null && bar.showing() && bar.key(e)) return true;
         switch (key) {
             case KeyEvent.KEYCODE_CHANNEL_UP:
                 if (down && isLive()) zap(1);
@@ -307,9 +311,9 @@ final class TvRemote {
                 if (down) zap(1);
                 return true;
             case KeyEvent.KEYCODE_DPAD_DOWN:
-                // Down shows the playback controls (live too) instead of changing channel; CH- still goes down a channel.
+                // Down opens the options bar along the bottom (live too) instead of changing channel; CH- still goes down a channel.
                 if (controls) return false;
-                if (down && e.getRepeatCount() == 0) { hideBanner.run(); view.showController(); }
+                if (down && e.getRepeatCount() == 0) openBar();
                 return true;
             case KeyEvent.KEYCODE_DPAD_CENTER:
             case KeyEvent.KEYCODE_ENTER:
@@ -382,6 +386,7 @@ final class TvRemote {
         if (!a.mode.equals("player") || view == null) return false;
         if (!typed.isEmpty()) { ui.removeCallbacks(commitNumber); typed = ""; numberBox.setVisibility(View.GONE); return true; }
         if (view.isControllerFullyVisible()) { view.hideController(); return true; }
+        if (bar != null && bar.showing()) { bar.hide(); return true; }
         if (upNextShowing()) { upNextDismissed = true; endedSeconds = -1; upNext.setVisibility(View.GONE); return true; }
         return false;
     }
@@ -394,6 +399,7 @@ final class TvRemote {
         view = null;
         banner = null;
         upNext = null;
+        bar = null;
     }
 
     private void flashControls() { if (!isLive()) view.showController(); }
@@ -604,6 +610,60 @@ final class TvRemote {
                     else if (w == 4) channelList();
                     else a.onBackPressed();
                 }).show();
+    }
+
+    /** D-pad Down: the options bar along the bottom of the picture (in place of the playback controls). */
+    private void openBar() {
+        hideBanner.run();
+        view.hideController();
+        bar.show(title);
+        if (isLive()) { bar.setNow(""); loadNowNext(); }
+    }
+
+    /** The options bar's buttons for what is playing now. Order: watching, then the stream, then the window. */
+    private java.util.List<PlayerBar.Option> barOptions() {
+        java.util.List<PlayerBar.Option> o = new java.util.ArrayList<>();
+        boolean playing = a.player != null && a.player.isPlaying();
+        o.add(new PlayerBar.Option(playing ? R.drawable.pb_pause : R.drawable.pb_play, playing ? "Pause" : "Play", null, () -> {
+            if (a.player == null) return;
+            if (a.player.isPlaying()) a.player.pause(); else a.player.play();
+        }));
+        String subs = a.subs != null && a.subs.on() ? "On" : "Off";
+        int audio = PlayerBar.audioCount(a);
+        if (isLive()) {
+            boolean fav = a.isFavorite("live", id);
+            o.add(new PlayerBar.Option(R.drawable.pb_channels, "Channels", null, bar.closing(this::channelList)));
+            o.add(new PlayerBar.Option(R.drawable.pb_guide, "TV guide", null, bar.closing(this::openGuideFromPlayer)));
+            o.add(new PlayerBar.Option(fav ? R.drawable.pb_star : R.drawable.pb_star_border, fav ? "Favorite" : "Add favorite", fav ? "★ On" : null,
+                    () -> toast(a.toggleFavorite("live", id, title, ext) ? "Added to Favorites" : "Removed from Favorites")));
+            o.add(new PlayerBar.Option(R.drawable.pb_restart, "Resume", null, bar.closing(this::restart)));
+        } else {
+            o.add(new PlayerBar.Option(R.drawable.pb_rewind, "Back 10 s", null, () -> seek(-SEEK_SHORT_MS)));
+            o.add(new PlayerBar.Option(R.drawable.pb_forward, "Ahead 10 s", null, () -> seek(SEEK_SHORT_MS)));
+            o.add(new PlayerBar.Option(R.drawable.pb_replay, "Start over", null, () -> { if (a.player != null) a.player.seekTo(0); }));
+            String next = "series".equals(type) ? Episodes.nextLabel(a) : null;
+            if (next != null) o.add(new PlayerBar.Option(R.drawable.pb_next, "Next episode", next, bar.closing(() -> Episodes.playNext(a))));
+            final boolean series = "series".equals(type);
+            final String listType = series ? "series" : "vod", listId = series ? (a.watching != null ? a.watching[0] : "") : id;
+            if (!listId.isEmpty()) {
+                boolean mine = a.inMyList(listType, listId);
+                o.add(new PlayerBar.Option(mine ? R.drawable.pb_mylist_done : R.drawable.pb_mylist, mine ? "In My List" : "My List", null, () -> {
+                    JSONObject item = new JSONObject();
+                    try {
+                        item.put(series ? "series_id" : "stream_id", listId).put("name", series && a.seriesTitle != null ? a.seriesTitle : title);
+                        if (!series) item.put("container_extension", ext);
+                    } catch (Exception ignored) { }
+                    toast(a.toggleMyList(listType, item) ? "Added to My List" : "Removed from My List");
+                }));
+            }
+        }
+        o.add(new PlayerBar.Option(R.drawable.pb_subtitles, "Subtitles", subs, bar.closing(() -> { if (a.subs != null) a.subs.choose(); })));
+        if (audio > 1) o.add(new PlayerBar.Option(R.drawable.pb_audio, "Audio", audio + " tracks", bar.closing(() -> PlayerBar.chooseAudio(a))));
+        o.add(new PlayerBar.Option(R.drawable.pb_picture, "Picture", PlayerBar.fitLabel(a), () -> PlayerBar.applyFit(a, 1)));
+        if (isLive()) o.add(new PlayerBar.Option(R.drawable.pb_more, "More", "groups…", bar.closing(this::channelOptions)));
+        o.add(new PlayerBar.Option(R.drawable.pb_mini, "Mini player", null, bar.closing(() -> MiniPlayer.shrink(a))));
+        o.add(new PlayerBar.Option(R.drawable.pb_exit, "Exit", null, bar.closing(a::onBackPressed)));
+        return o;
     }
 
     private String subtitlesItem() { return "Subtitles / CC: " + (a.subs != null && a.subs.on() ? "on" : "off"); }
