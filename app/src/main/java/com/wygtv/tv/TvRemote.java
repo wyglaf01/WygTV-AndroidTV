@@ -634,7 +634,7 @@ final class TvRemote {
             boolean fav = a.isFavorite("live", id);
             o.add(new PlayerBar.Option(R.drawable.pb_channels, "Channels", null, bar.closing(this::channelList)));
             o.add(new PlayerBar.Option(R.drawable.pb_guide, "TV guide", null, bar.closing(this::openGuideFromPlayer)));
-            o.add(new PlayerBar.Option(fav ? R.drawable.pb_star : R.drawable.pb_star_border, fav ? "Favorite" : "Add favorite", fav ? "★ On" : null,
+            o.add(new PlayerBar.Option(fav ? R.drawable.pb_star : R.drawable.pb_star_border, "Favorite", fav ? "★ On" : "Off",
                     () -> toast(a.toggleFavorite("live", id, title, ext) ? "Added to Favorites" : "Removed from Favorites")));
             o.add(new PlayerBar.Option(R.drawable.pb_restart, "Resume", null, bar.closing(this::restart)));
         } else {

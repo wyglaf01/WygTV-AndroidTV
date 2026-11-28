@@ -74,7 +74,7 @@ final class PlayerBar {
         LinearLayout column = new LinearLayout(a);
         column.setOrientation(LinearLayout.VERTICAL);
         column.setGravity(Gravity.CENTER_HORIZONTAL);
-        column.setPadding(a.dp(48), a.dp(56), a.dp(48), a.dp(24));
+        column.setPadding(a.dp(32), a.dp(56), a.dp(32), a.dp(20));
 
         // Status line: title  LIVE  now playing ................ clock
         LinearLayout status = new LinearLayout(a);
@@ -237,7 +237,7 @@ final class PlayerBar {
         t.setGravity(Gravity.CENTER_HORIZONTAL);
         t.setFocusable(true);
         t.setTag(o);
-        t.setPadding(a.dp(6), a.dp(4), a.dp(6), a.dp(4));
+        t.setPadding(a.dp(3), a.dp(4), a.dp(3), a.dp(4));
         FrameLayout plate = new FrameLayout(a);
         ImageView icon = new ImageView(a);
         icon.setImageResource(o.icon);
@@ -246,11 +246,11 @@ final class PlayerBar {
         int lift = a.dp(Skin.LIFT_DP);
         plate.setPadding(0, 0, lift, lift);
         t.addView(plate, new LinearLayout.LayoutParams(a.dp(58) + lift, a.dp(58) + lift));
-        TextView name = text(13, Theme.TEXT, false);
+        TextView name = text(12, Theme.TEXT, false);
         name.setText(o.label);
         name.setGravity(Gravity.CENTER);
         name.setSingleLine(true);
-        LinearLayout.LayoutParams nlp = new LinearLayout.LayoutParams(a.dp(92), -2);
+        LinearLayout.LayoutParams nlp = new LinearLayout.LayoutParams(a.dp(74), -2);
         nlp.setMargins(0, a.dp(4), 0, 0);
         t.addView(name, nlp);
         TextView detail = text(11, Theme.ACCENT, false);
@@ -258,7 +258,7 @@ final class PlayerBar {
         detail.setSingleLine(true);
         detail.setText(o.detail == null ? "" : o.detail);
         detail.setVisibility(o.detail == null ? View.INVISIBLE : View.VISIBLE);
-        t.addView(detail, new LinearLayout.LayoutParams(a.dp(92), -2));
+        t.addView(detail, new LinearLayout.LayoutParams(a.dp(74), -2));
         View.OnFocusChangeListener paint = (v, has) -> {
             plate.setBackground(has ? Skin.tile(a, true) : Skin.button(a, false));
             plate.setTranslationY(has ? -a.dp(4) : 0);
