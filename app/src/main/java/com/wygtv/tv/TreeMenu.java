@@ -89,6 +89,23 @@ final class TreeMenu {
         }
     }
 
+    /** Puts the highlight on the column's marked entry (or its first entry), e.g. when a page opens on its menu tree. */
+    static void focusTree() {
+        if (column == null) return;
+        if (main != null) {
+            View f = main.findFocus();
+            if (f != null) lastMain = f;
+        }
+        if (current != null) current.requestFocus();
+        else focusFirst(column);
+    }
+
+    /** True while the highlight is in the column. */
+    static boolean inTree(MainActivity a) {
+        View f = a.getCurrentFocus();
+        return f != null && scroll != null && scroll.isAttachedToWindow() && inside(f, scroll);
+    }
+
     /**
      * Left from the page into the column, Right from the column back into the page. Called from TvRemote before
      * other keys. Returns true when the key was used.

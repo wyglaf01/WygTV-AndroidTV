@@ -573,15 +573,27 @@ final class Menus {
     static final String[] GROUPS = {GROUP_PLAYLISTS, GROUP_PLAYER, GROUP_APPEARANCE, GROUP_BACKUP};
     static String settingsGroup = "";
 
-    /** Opens the top Settings page (from Home, the side menu, or Back out of a group). */
-    static void settings(MainActivity a) { settingsGroup = ""; settings(a, 0); }
+    /**
+     * Opens Settings from Home or the side menu: the first group's page, with the highlight on the SETTINGS group
+     * column in the middle (the menu tree), so ▲ ▼ pick a group and OK / ▶ go into its rows.
+     */
+    static void settings(MainActivity a) {
+        settingsGroup = GROUP_PLAYLISTS;
+        settings(a, 0);
+        TreeMenu.focusTree();
+    }
 
-    /** Back on a Settings group page goes up to the top Settings page, on that group. */
+    /** "All settings" in the group column: the top page that lists the four groups as big rows. */
+    static void settingsTop(MainActivity a) { settingsGroup = ""; settings(a, 0); }
+
+    /**
+     * Back on a Settings group page: from the rows, up to the SETTINGS group column (on this group); from the column
+     * (or the top page), out of Settings.
+     */
     static boolean settingsBack(MainActivity a) {
         if (settingsGroup.isEmpty()) return false;
-        int at = indexOf(GROUPS, settingsGroup);
-        settingsGroup = "";
-        settings(a, at);
+        if (TreeMenu.inTree(a)) return false;
+        TreeMenu.focusTree();
         return true;
     }
 
@@ -841,7 +853,7 @@ final class Menus {
     static void settingsTree(MainActivity a, String here) {
         TreeMenu.begin(a);
         TreeMenu.heading(a, "SETTINGS");
-        TreeMenu.entry(a, "⚙", "All settings", false, () -> settings(a));
+        TreeMenu.entry(a, "⚙", "All settings", false, () -> settingsTop(a));
         for (String g : GROUPS) TreeMenu.entry(a, groupIcon(g), groupTitle(g), g.equals(here), () -> settingsGroup(a, g));
     }
 
