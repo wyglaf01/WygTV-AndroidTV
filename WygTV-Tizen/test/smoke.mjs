@@ -21,7 +21,8 @@ const NUMS = ['1', '2', '3', '4.1', '4.2', '6', '7', '8', '9', '10', '11', '12']
 const M3U = ['#EXTM3U', ...Array.from({ length: 12 }, (_, i) => `#EXTINF:-1 tvg-id="ch${i}" tvg-chno="${NUMS[i]}" group-title="${i < 6 ? 'News' : 'Sports'}",Channel ${i + 1}\nhttp://127.0.0.1:1/ch${i}.m3u8`)].join('\n');
 // A guide for the demo channels, starting an hour ago, served gzip-compressed (as most guides are).
 const xmltvTime = (t) => new Date(t).toISOString().replace(/[-:T]/g, '').slice(0, 14) + ' +0000';
-const t0 = Math.floor(Date.now() / 3600e3) * 3600e3 - 3600e3;
+// Center the current programme on fixture creation so the suite can cross an hour boundary.
+const t0 = Date.now() - 90 * 60e3;
 const GUIDE = zlib.gzipSync('<?xml version="1.0"?>\n<tv>\n' + Array.from({ length: 12 }, (_, i) => `<channel id="ch${i}"><display-name>Channel ${i + 1}</display-name></channel>\n` +
   Array.from({ length: 6 }, (_, k) => `<programme start="${xmltvTime(t0 + k * 3600e3)}" stop="${xmltvTime(t0 + (k + 1) * 3600e3)}" channel="ch${i}"><title>Show ${k} on ${i + 1}</title></programme>`).join('\n')).join('\n') + '\n</tv>\n');
 const BACKUP = JSON.stringify({ app: 'WygDesktop', version: 1, settings: { userAgent: 'from-a-link', playlists: [] } });
