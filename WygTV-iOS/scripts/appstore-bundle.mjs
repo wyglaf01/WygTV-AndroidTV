@@ -33,7 +33,7 @@ export function prepareAppStore(www, { smoke = false } = {}) {
         'screenshot handshake');
       source = replaceRequired(source,
         "console.log('WYG-SMOKE ' + JSON.stringify(out));",
-        "console.log('WYG-SMOKE ' + JSON.stringify(out)); await Http.post({ url: base + '/__capture/result', data: out, responseType: 'text', readTimeout: 10000 });",
+        "console.log('WYG-SMOKE ' + JSON.stringify(out)); await Http.post({ url: base + '/__capture/result', headers: { 'Content-Type': 'application/json' }, data: out, responseType: 'text', readTimeout: 10000 });",
         'simulator result reporting');
     }
     if (!smoke) {
