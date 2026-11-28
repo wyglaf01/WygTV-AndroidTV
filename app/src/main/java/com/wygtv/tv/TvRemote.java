@@ -301,8 +301,9 @@ final class TvRemote {
                 if (controls) return false;
                 if (upNextShowing()) { if (down && e.getRepeatCount() == 0) Episodes.playNext(a); return true; }
                 if (!typed.isEmpty()) { if (down) { ui.removeCallbacks(commitNumber); commitNumber(); } return true; }
-                if (!isLive()) return false; // movies and episodes: OK shows the playback controls
-                if (down && e.getRepeatCount() == 0) channelOptions();
+                // Short press: the options bar along the bottom. Hold: channel options (live) or the
+                // playback controls with the seek bar (movies and episodes).
+                okKey(e);
                 return true;
             case KeyEvent.KEYCODE_INFO:
                 if (down) { if (banner.getVisibility() == View.VISIBLE) hideBanner.run(); else showBanner(); }
@@ -481,7 +482,7 @@ final class TvRemote {
     }
 
     /**
-     * OK on a live channel: Resume, Favorites, Add to channel group and New channel group (the guide pop-up
+     * Hold OK on a live channel: Resume, Favorites, Add to channel group and New channel group (the guide pop-up
      * without Hidden), with the channel banner shown under it for the logo, source and what's on.
      */
     private void channelOptions() {
@@ -590,6 +591,42 @@ final class TvRemote {
                     else if (w == 4) channelList();
                     else a.onBackPressed();
                 }).show();
+    }
+
+    /** How long OK must be held in the player before it counts as a long press. */
+    private static final int OK_HOLD_MS = 600;
+    private boolean okDown, okLongDone;
+    private final Runnable okHeld = () -> {
+        if (!okDown) return;
+        okLongDone = true;
+        okLong();
+    };
+
+    /** OK in the player: a quick press opens the options bar, holding it opens the second pop-up. */
+    private void okKey(KeyEvent e) {
+        if (e.getAction() == KeyEvent.ACTION_DOWN) {
+            if (e.getRepeatCount() == 0) {
+                okDown = true;
+                okLongDone = false;
+                ui.removeCallbacks(okHeld);
+                ui.postDelayed(okHeld, OK_HOLD_MS);
+            } else if (okDown && !okLongDone && e.isLongPress()) {
+                ui.removeCallbacks(okHeld);
+                okHeld.run();
+            }
+            return;
+        }
+        if (e.getAction() != KeyEvent.ACTION_UP) return;
+        ui.removeCallbacks(okHeld);
+        boolean wasDown = okDown, wasLong = okLongDone;
+        okDown = false;
+        okLongDone = false;
+        if (wasDown && !wasLong && !e.isCanceled()) openBar();
+    }
+
+    private void okLong() {
+        if (isLive()) channelOptions();
+        else { hideBanner.run(); view.showController(); }
     }
 
     /** D-pad Down: the options bar along the bottom of the picture (in place of the playback controls). */
