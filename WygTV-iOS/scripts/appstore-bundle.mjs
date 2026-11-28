@@ -31,6 +31,10 @@ export function prepareAppStore(www, { smoke = false } = {}) {
         "const step = async (name, ms = 2500) => { await sleep(ms); console.log('WYG-STEP ' + name); await sleep(1500); };",
         "const step = async (name, ms = 1200) => { await sleep(ms); console.log('WYG-STEP ' + name); await Http.get({ url: base + '/__capture?name=' + encodeURIComponent(name), responseType: 'text', connectTimeout: 5000, readTimeout: 90000 }); };",
         'screenshot handshake');
+      source = replaceRequired(source,
+        "console.log('WYG-SMOKE ' + JSON.stringify(out));",
+        "console.log('WYG-SMOKE ' + JSON.stringify(out)); await Http.post({ url: base + '/__capture/result', data: out, responseType: 'text', readTimeout: 10000 });",
+        'simulator result reporting');
     }
     if (!smoke) {
       const test = source.indexOf('  // ------------------------------------------------------------------ self-test used by CI');

@@ -28,7 +28,11 @@ test('capture fixture holds the screen until the host acknowledges its screensho
   const screen = fetch(base + '/__capture?name=home').then(r => r.json()).then(r => { completed = true; return r; });
   await new Promise(resolve => setTimeout(resolve, 40));
   assert.equal(completed, false, 'app must not advance before capture');
+  assert.equal(await (await fetch(base + '/__capture/pending')).text(), 'home');
   assert.equal((await fetch(base + '/__capture/ack?name=home')).status, 200);
   assert.equal((await screen).captured, 'home');
   assert.equal((await fetch(base + '/__capture/ack?name=unknown')).status, 409);
+  assert.equal(await (await fetch(base + '/__capture/result')).text(), '');
+  await fetch(base + '/__capture/result', { method: 'POST', body: JSON.stringify({ ok: true }) });
+  assert.equal((await (await fetch(base + '/__capture/result')).json()).ok, true);
 });

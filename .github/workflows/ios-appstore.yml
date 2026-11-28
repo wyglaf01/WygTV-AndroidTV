@@ -79,10 +79,10 @@ jobs:
           RESULT=""; seen=""
           for i in $(seq 1 300); do
             sleep 1
-            for s in $(grep -o 'WYG-STEP [a-z0-9-]*' "$RUNNER_TEMP/app.log" | awk '{print $2}'); do
+            for s in $(curl -sf "http://$IP:8765/__capture/pending"); do
               case " $seen " in *" $s "*) ;; *) seen="$seen $s"; xcrun simctl io "$DEV" screenshot "$RUNNER_TEMP/shots/ipad/$s.png" >/dev/null 2>&1; curl -sf "http://$IP:8765/__capture/ack?name=$s" >/dev/null; echo "screenshot $s";; esac
             done
-            RESULT="$(grep -o 'WYG-SMOKE .*' "$RUNNER_TEMP/app.log" | head -1 || true)"
+            RESULT="$(curl -sf "http://$IP:8765/__capture/result")"
             [ -n "$RESULT" ] && break
           done
           xcrun simctl terminate "$DEV" com.wygtv.ios || true
@@ -93,6 +93,7 @@ jobs:
         timeout-minutes: 12
         run: |
           mkdir -p "$RUNNER_TEMP/shots/iphone"
+          curl -sf -X POST -H "Content-Type: application/json" -d null "http://$(ipconfig getifaddr en0 || ipconfig getifaddr en1 || echo 127.0.0.1):8765/__capture/result" >/dev/null
           IP="$(ipconfig getifaddr en0 || ipconfig getifaddr en1 || echo 127.0.0.1)"
           DEV="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; l=[x for k,v in d.items() if "iOS" in k for x in v if x["name"].startswith("iPhone")]; l.sort(key=lambda x: ("Pro Max" not in x["name"], x["name"])); print(l[0]["udid"])')"
           xcrun simctl list devices available | grep "$DEV"
@@ -104,10 +105,10 @@ jobs:
           RESULT=""; seen=""
           for i in $(seq 1 300); do
             sleep 1
-            for s in $(grep -o 'WYG-STEP [a-z0-9-]*' "$RUNNER_TEMP/iphone-app.log" | awk '{print $2}'); do
+            for s in $(curl -sf "http://$IP:8765/__capture/pending"); do
               case " $seen " in *" $s "*) ;; *) seen="$seen $s"; xcrun simctl io "$DEV" screenshot "$RUNNER_TEMP/shots/iphone/$s.png" >/dev/null 2>&1; curl -sf "http://$IP:8765/__capture/ack?name=$s" >/dev/null; echo "screenshot $s";; esac
             done
-            RESULT="$(grep -o 'WYG-SMOKE .*' "$RUNNER_TEMP/iphone-app.log" | head -1 || true)"
+            RESULT="$(curl -sf "http://$IP:8765/__capture/result")"
             [ -n "$RESULT" ] && break
           done
           xcrun simctl terminate "$DEV" com.wygtv.ios || true
